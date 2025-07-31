@@ -1,0 +1,26 @@
+# Environment files
+.env
+.env.*
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+logs/
+*.log
+
+# Data volumes
+data/
+volumes/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
