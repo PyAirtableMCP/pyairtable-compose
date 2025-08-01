@@ -1,0 +1,230 @@
+# Global configuration
+global:
+  namespace: pyairtable
+  imageRegistry: ghcr.io/reg-kris
+  imagePullPolicy: IfNotPresent
+  storageClassName: standard
+
+# Application configuration
+app:
+  environment: development
+  logLevel: info
+  
+# Service configurations
+services:
+  # API Gateway - Main entry point
+  apiGateway:
+    enabled: true
+    name: api-gateway
+    image: pyairtable-api-gateway
+    tag: latest
+    port: 8000
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+  # LLM Orchestrator - Gemini 2.5 Flash integration
+  llmOrchestrator:
+    enabled: true
+    name: llm-orchestrator
+    image: llm-orchestrator-py
+    tag: latest
+    port: 8003
+    replicas: 1
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+
+  # MCP Server - Protocol implementation
+  mcpServer:
+    enabled: true
+    name: mcp-server
+    image: mcp-server-py
+    tag: latest
+    port: 8001
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+  # Airtable Gateway - Direct Airtable API integration
+  airtableGateway:
+    enabled: true
+    name: airtable-gateway
+    image: airtable-gateway-py
+    tag: latest
+    port: 8002
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+  # Platform Services - Unified Auth & Analytics
+  platformServices:
+    enabled: true
+    name: platform-services
+    image: pyairtable-platform-services
+    tag: latest
+    port: 8007
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+  # Automation Services - File processing and workflow automation
+  automationServices:
+    enabled: true
+    name: automation-services
+    image: pyairtable-automation-services
+    tag: latest
+    port: 8006
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+  # Frontend - Next.js web interface
+  frontend:
+    enabled: true
+    name: frontend
+    image: pyairtable-frontend
+    tag: latest
+    port: 3000
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+# Database services
+databases:
+  # PostgreSQL
+  postgres:
+    enabled: true
+    name: postgres
+    image: postgres
+    tag: 16-alpine
+    port: 5432
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: standard
+
+  # Redis
+  redis:
+    enabled: true
+    name: redis
+    image: redis
+    tag: 7-alpine
+    port: 6379
+    replicas: 1
+    resources:
+      limits:
+        cpu: 250m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    persistence:
+      enabled: true
+      size: 1Gi
+      storageClass: standard
+
+# Persistent volumes
+persistence:
+  fileUploads:
+    enabled: true
+    size: 5Gi
+    storageClass: standard
+
+# Service exposure
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: pyairtable.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 3000
+        - path: /api
+          pathType: Prefix
+          service: api-gateway
+          port: 8000
+
+# Environment variables (these will be created as secrets)
+secrets:
+  apiKey: "your-api-key-here"
+  geminiApiKey: "your-gemini-api-key-here"
+  airtableToken: "your-airtable-token-here"
+  airtableBase: "your-airtable-base-here"
+  jwtSecret: "your-jwt-secret-here"
+  nextauthSecret: "your-nextauth-secret-here"
+  redisPassword: "your-redis-password-here"
+  
+  # Database credentials
+  postgresDb: pyairtable
+  postgresUser: postgres
+  postgresPassword: "your-postgres-password-here"
+  
+  # Optional configuration
+  thinkingBudget: "1000"
+  corsOrigins: "*"
+  maxFileSize: "10MB"
+  allowedExtensions: "pdf,doc,docx,txt,csv,xlsx"
+
+# Health checks
+healthChecks:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
+  successThreshold: 1
+
+# Horizontal Pod Autoscaler
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80

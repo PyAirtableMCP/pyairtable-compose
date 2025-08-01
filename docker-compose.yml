@@ -13,20 +13,16 @@ services:
       - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
       - MCP_SERVER_URL=http://mcp-server:8001
       - LLM_ORCHESTRATOR_URL=http://llm-orchestrator:8003
-      - AUTH_SERVICE_URL=http://auth-service:8007
-      - WORKFLOW_ENGINE_URL=http://workflow-engine:8004
-      - ANALYTICS_SERVICE_URL=http://analytics-service:8005
-      - FILE_PROCESSOR_URL=http://file-processor:8006
+      - PLATFORM_SERVICES_URL=http://platform-services:8007
+      - AUTOMATION_SERVICES_URL=http://automation-services:8006
       - API_KEY=${API_KEY}
       - LOG_LEVEL=${LOG_LEVEL}
     depends_on:
       - airtable-gateway
       - mcp-server
       - llm-orchestrator
-      - auth-service
-      - workflow-engine
-      - analytics-service
-      - file-processor
+      - platform-services
+      - automation-services
     restart: unless-stopped
     networks:
       - pyairtable-network
@@ -99,23 +95,37 @@ services:
     networks:
       - pyairtable-network
 
-  # Phase 3 Microservices
-  # Auth Service - JWT authentication (Port 8007) - No dependencies (standalone)
-  auth-service:
-    image: ghcr.io/reg-kris/pyairtable-auth-service:latest
+  # Phase 4 Consolidated Services
+  # Platform Services - Unified Auth & Analytics (Port 8007) 
+  platform-services:
+    image: ghcr.io/reg-kris/pyairtable-platform-services:latest
     build:
-      context: ../pyairtable-auth-service
+      context: ../pyairtable-platform-services
       dockerfile: Dockerfile
     ports:
       - "8007:8007"
     environment:
-      - JWT_SECRET=${JWT_SECRET:-default-jwt-secret-change-in-production}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
-      - API_KEY=${API_KEY}
+      # Service Configuration
+      - ENVIRONMENT=${ENVIRONMENT:-development}
       - LOG_LEVEL=${LOG_LEVEL}
+      - API_KEY=${API_KEY}
+      - REQUIRE_API_KEY=${REQUIRE_API_KEY:-true}
+      # JWT Authentication
+      - JWT_SECRET=${JWT_SECRET:-default-jwt-secret-change-in-production}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
+      # Database and Redis
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # CORS and Security
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      # Auth Settings
+      - PASSWORD_MIN_LENGTH=${PASSWORD_MIN_LENGTH:-8}
+      - PASSWORD_HASH_ROUNDS=${PASSWORD_HASH_ROUNDS:-12}
+      # Analytics Settings
+      - ANALYTICS_RETENTION_DAYS=${ANALYTICS_RETENTION_DAYS:-90}
+      - METRICS_BATCH_SIZE=${METRICS_BATCH_SIZE:-100}
     depends_on:
       - redis
       - postgres
@@ -129,76 +139,17 @@ services:
       retries: 3
       start_period: 20s
 
-  # Workflow Engine - Workflow automation (Port 8004) - Depends on MCP server and Auth service
-  workflow-engine:
-    image: ghcr.io/reg-kris/pyairtable-workflow-engine:latest
+  # Automation Services - Unified file processing and workflow automation (Port 8006)
+  automation-services:
+    image: ghcr.io/reg-kris/pyairtable-automation-services:latest
     build:
-      context: ../pyairtable-workflow-engine
-      dockerfile: Dockerfile
-    ports:
-      - "8004:8004"
-    environment:
-      - MCP_SERVER_URL=http://mcp-server:8001
-      - AUTH_SERVICE_URL=http://auth-service:8007
-      - API_KEY=${API_KEY}
-      - LOG_LEVEL=${LOG_LEVEL}
-      - REDIS_URL=redis://redis:6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-    depends_on:
-      - mcp-server
-      - auth-service
-      - redis
-      - postgres
-    restart: unless-stopped
-    networks:
-      - pyairtable-network
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8004/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-
-  # Analytics Service - Metrics collection (Port 8005) - Depends on Auth service
-  analytics-service:
-    image: ghcr.io/reg-kris/pyairtable-analytics-service:latest
-    build:
-      context: ../pyairtable-analytics-service
-      dockerfile: Dockerfile
-    ports:
-      - "8005:8005"
-    environment:
-      - AUTH_SERVICE_URL=http://auth-service:8007
-      - API_KEY=${API_KEY}
-      - LOG_LEVEL=${LOG_LEVEL}
-      - REDIS_URL=redis://redis:6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-    depends_on:
-      - auth-service
-      - redis
-      - postgres
-    restart: unless-stopped
-    networks:
-      - pyairtable-network
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8005/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-
-  # File Processor - File processing (Port 8006) - Depends on Auth service
-  file-processor:
-    image: ghcr.io/reg-kris/pyairtable-file-processor:latest
-    build:
-      context: ../pyairtable-file-processor
+      context: ../pyairtable-automation-services
       dockerfile: Dockerfile
     ports:
       - "8006:8006"
     environment:
-      - AUTH_SERVICE_URL=http://auth-service:8007
+      - MCP_SERVER_URL=http://mcp-server:8001
+      - PLATFORM_SERVICES_URL=http://platform-services:8007
       - API_KEY=${API_KEY}
       - LOG_LEVEL=${LOG_LEVEL}
       - REDIS_URL=redis://redis:6379
@@ -208,8 +159,13 @@ services:
       - MAX_FILE_SIZE=${MAX_FILE_SIZE:-10MB}
       - ALLOWED_EXTENSIONS=${ALLOWED_EXTENSIONS:-pdf,doc,docx,txt,csv,xlsx}
       - UPLOAD_DIR=${UPLOAD_DIR:-/tmp/uploads}
+      # Workflow settings
+      - DEFAULT_WORKFLOW_TIMEOUT=${DEFAULT_WORKFLOW_TIMEOUT:-300}
+      - MAX_WORKFLOW_RETRIES=${MAX_WORKFLOW_RETRIES:-3}
+      - SCHEDULER_CHECK_INTERVAL=${SCHEDULER_CHECK_INTERVAL:-30}
     depends_on:
-      - auth-service
+      - mcp-server
+      - platform-services
       - redis
       - postgres
     restart: unless-stopped
@@ -223,6 +179,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+
+
 
   # Redis - Caching and session storage
   redis:
@@ -272,10 +230,8 @@ services:
       - LLM_ORCHESTRATOR_URL=http://llm-orchestrator:8003
       - MCP_SERVER_URL=http://mcp-server:8001
       - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
-      - AUTH_SERVICE_URL=http://auth-service:8007
-      - WORKFLOW_ENGINE_URL=http://workflow-engine:8004
-      - ANALYTICS_SERVICE_URL=http://analytics-service:8005
-      - FILE_PROCESSOR_URL=http://file-processor:8006
+      - PLATFORM_SERVICES_URL=http://platform-services:8007
+      - AUTOMATION_SERVICES_URL=http://automation-services:8006
       # Authentication and security
       - API_KEY=${API_KEY}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-default-secret-change-in-production}
@@ -296,10 +252,8 @@ services:
       - llm-orchestrator
       - mcp-server
       - airtable-gateway
-      - auth-service
-      - workflow-engine
-      - analytics-service
-      - file-processor
+      - platform-services
+      - automation-services
     restart: unless-stopped
     networks:
       - pyairtable-network

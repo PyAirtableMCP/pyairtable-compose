@@ -1,0 +1,94 @@
+{{- if .Values.services.llmOrchestrator.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-{{ .Values.services.llmOrchestrator.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ .Values.services.llmOrchestrator.name }}
+spec:
+  replicas: {{ .Values.services.llmOrchestrator.replicas }}
+  selector:
+    matchLabels:
+      {{- include "pyairtable-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: llm-orchestrator
+  template:
+    metadata:
+      labels:
+        {{- include "pyairtable-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: llm-orchestrator
+    spec:
+      containers:
+      - name: {{ .Values.services.llmOrchestrator.name }}
+        image: {{ include "pyairtable-stack.image" (dict "registry" .Values.global.imageRegistry "repository" .Values.services.llmOrchestrator.image "tag" .Values.services.llmOrchestrator.tag) | quote }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: {{ .Values.services.llmOrchestrator.port }}
+        env:
+        {{- include "pyairtable-stack.commonSecretEnvVars" . | nindent 8 }}
+        {{- include "pyairtable-stack.commonConfigEnvVars" . | nindent 8 }}
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: GEMINI_API_KEY
+        - name: MCP_SERVER_HTTP_URL
+          value: "http://{{ .Values.services.mcpServer.name }}:{{ .Values.services.mcpServer.port }}"
+        - name: REDIS_URL
+          value: "redis://{{ .Values.databases.redis.name }}:{{ .Values.databases.redis.port }}"
+        - name: USE_HTTP_MCP
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-config
+              key: USE_HTTP_MCP
+        - name: USE_REDIS_SESSIONS
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-config
+              key: USE_REDIS_SESSIONS
+        - name: THINKING_BUDGET
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-config
+              key: THINKING_BUDGET
+        resources:
+          {{- toYaml .Values.services.llmOrchestrator.resources | nindent 10 }}
+        {{- if .Values.healthChecks.enabled }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.services.llmOrchestrator.port }}
+          initialDelaySeconds: {{ .Values.healthChecks.initialDelaySeconds }}
+          periodSeconds: {{ .Values.healthChecks.periodSeconds }}
+          timeoutSeconds: {{ .Values.healthChecks.timeoutSeconds }}
+          failureThreshold: {{ .Values.healthChecks.failureThreshold }}
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.services.llmOrchestrator.port }}
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: {{ .Values.healthChecks.timeoutSeconds }}
+          failureThreshold: {{ .Values.healthChecks.failureThreshold }}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.services.llmOrchestrator.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ .Values.services.llmOrchestrator.name }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: {{ .Values.services.llmOrchestrator.port }}
+    targetPort: {{ .Values.services.llmOrchestrator.port }}
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "pyairtable-stack.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: llm-orchestrator
+{{- end }}

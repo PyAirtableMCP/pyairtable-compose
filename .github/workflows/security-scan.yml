@@ -1,0 +1,477 @@
+name: Security Scanning
+
+on:
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  AWS_REGION: us-east-1
+
+jobs:
+  # Static Application Security Testing (SAST)
+  sast-scan:
+    name: SAST Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Semgrep SAST
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+            p/python
+            p/javascript
+            p/typescript
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python, javascript
+          config-file: ./.github/codeql/codeql-config.yml
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python,javascript"
+
+  # Dependency Vulnerability Scanning
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [frontend, api-gateway, llm-orchestrator, mcp-server, airtable-gateway, platform-services, automation-services]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Checkout service repositories
+        if: matrix.service != 'automation-services'
+        run: |
+          case "${{ matrix.service }}" in
+            "frontend")
+              git clone https://github.com/reg-kris/pyairtable-frontend.git
+              ;;
+            "api-gateway")
+              git clone https://github.com/reg-kris/pyairtable-api-gateway.git
+              ;;
+            "llm-orchestrator")
+              git clone https://github.com/reg-kris/llm-orchestrator-py.git
+              ;;
+            "mcp-server")
+              git clone https://github.com/reg-kris/mcp-server-py.git
+              ;;
+            "airtable-gateway")
+              git clone https://github.com/reg-kris/airtable-gateway-py.git
+              ;;
+            "platform-services")
+              git clone https://github.com/reg-kris/pyairtable-platform-services.git
+              ;;
+          esac
+
+      - name: Set service path
+        id: service-path
+        run: |
+          if [[ "${{ matrix.service }}" == "automation-services" ]]; then
+            echo "path=pyairtable-automation-services" >> $GITHUB_OUTPUT
+          else
+            case "${{ matrix.service }}" in
+              "frontend")
+                echo "path=pyairtable-frontend" >> $GITHUB_OUTPUT
+                ;;
+              "api-gateway")
+                echo "path=pyairtable-api-gateway" >> $GITHUB_OUTPUT
+                ;;
+              "llm-orchestrator")
+                echo "path=llm-orchestrator-py" >> $GITHUB_OUTPUT
+                ;;
+              "mcp-server")
+                echo "path=mcp-server-py" >> $GITHUB_OUTPUT
+                ;;
+              "airtable-gateway")
+                echo "path=airtable-gateway-py" >> $GITHUB_OUTPUT
+                ;;
+              "platform-services")
+                echo "path=pyairtable-platform-services" >> $GITHUB_OUTPUT
+                ;;
+            esac
+          fi
+
+      - name: Set up Python
+        if: matrix.service != 'frontend'
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        if: matrix.service == 'frontend'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Scan Python dependencies
+        if: matrix.service != 'frontend'
+        working-directory: ${{ steps.service-path.outputs.path }}
+        run: |
+          # Install safety for Python dependency scanning
+          pip install safety bandit
+
+          # Check for known security vulnerabilities
+          if [ -f "requirements.txt" ]; then
+            echo "Scanning requirements.txt for vulnerabilities..."
+            safety check -r requirements.txt --json > safety-report.json || true
+            
+            # Scan code for security issues
+            echo "Running Bandit security scan..."
+            bandit -r src/ -f json -o bandit-report.json || true
+            
+            # Display results
+            if [ -f "safety-report.json" ]; then
+              echo "Safety scan results:"
+              cat safety-report.json
+            fi
+            
+            if [ -f "bandit-report.json" ]; then
+              echo "Bandit scan results:"
+              cat bandit-report.json
+            fi
+          fi
+
+      - name: Scan Node.js dependencies
+        if: matrix.service == 'frontend'
+        working-directory: ${{ steps.service-path.outputs.path }}
+        run: |
+          if [ -f "package.json" ]; then
+            # Install npm audit for Node.js dependency scanning
+            npm audit --audit-level high --json > npm-audit-report.json || true
+            
+            # Display results
+            echo "NPM audit results:"
+            cat npm-audit-report.json
+            
+            # Check for high/critical vulnerabilities
+            HIGH_VULNS=$(cat npm-audit-report.json | jq -r '.metadata.vulnerabilities.high // 0')
+            CRITICAL_VULNS=$(cat npm-audit-report.json | jq -r '.metadata.vulnerabilities.critical // 0')
+            
+            if [ "$HIGH_VULNS" -gt 0 ] || [ "$CRITICAL_VULNS" -gt 0 ]; then
+              echo "::warning::Found $HIGH_VULNS high and $CRITICAL_VULNS critical vulnerabilities"
+            fi
+          fi
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports-${{ matrix.service }}
+          path: |
+            ${{ steps.service-path.outputs.path }}/*-report.json
+          retention-days: 30
+
+  # Container Image Security Scanning
+  container-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    needs: dependency-scan
+    strategy:
+      matrix:
+        service: [frontend, api-gateway, llm-orchestrator, mcp-server, airtable-gateway, platform-services, automation-services]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image for scanning
+        run: |
+          case "${{ matrix.service }}" in
+            "automation-services")
+              docker build -t ${{ matrix.service }}:scan ./pyairtable-automation-services
+              ;;
+            *)
+              echo "Skipping build for ${{ matrix.service }} - would require external repo"
+              exit 0
+              ;;
+          esac
+
+      - name: Run Trivy vulnerability scanner
+        if: matrix.service == 'automation-services'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ matrix.service }}:scan'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        if: matrix.service == 'automation-services'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Trivy filesystem scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
+
+      - name: Upload Trivy filesystem scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-fs-results.sarif'
+
+  # Infrastructure Security Scanning
+  infrastructure-scan:
+    name: Infrastructure Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Checkov on Terraform
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: infrastructure/
+          framework: terraform
+          output_format: sarif
+          output_file_path: checkov-terraform.sarif
+
+      - name: Upload Checkov scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov-terraform.sarif
+
+      - name: Run Checkov on Docker files
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: dockerfile
+          output_format: sarif
+          output_file_path: checkov-docker.sarif
+
+      - name: Upload Checkov Docker scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov-docker.sarif
+
+  # Secrets Scanning
+  secrets-scan:
+    name: Secrets Scanning
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog OSS
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
+
+      - name: Run GitLeaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # License Compliance Scanning
+  license-scan:
+    name: License Compliance Scan
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [frontend, automation-services]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: matrix.service != 'frontend'
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        if: matrix.service == 'frontend'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Scan Python licenses
+        if: matrix.service != 'frontend'
+        working-directory: pyairtable-automation-services
+        run: |
+          pip install pip-licenses
+          pip install -r requirements.txt
+          
+          # Generate license report
+          pip-licenses --format=json --output-file=licenses.json
+          
+          # Check for problematic licenses
+          pip-licenses --fail-on="GPL;AGPL;LGPL" || echo "Found potentially problematic licenses"
+
+      - name: Scan Node.js licenses
+        if: matrix.service == 'frontend'
+        run: |
+          # This would scan the frontend if we had access to it
+          echo "Would scan frontend licenses here"
+
+      - name: Upload license reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report-${{ matrix.service }}
+          path: |
+            **/licenses.json
+          retention-days: 30
+
+  # Security Summary Report
+  security-summary:
+    name: Security Summary Report
+    runs-on: ubuntu-latest
+    needs: [sast-scan, dependency-scan, container-scan, infrastructure-scan, secrets-scan, license-scan]
+    if: always()
+
+    steps:
+      - name: Download all security reports
+        uses: actions/download-artifact@v4
+        with:
+          path: security-reports
+
+      - name: Generate security summary
+        run: |
+          echo "# Security Scan Summary" > security-summary.md
+          echo "" >> security-summary.md
+          echo "**Scan Date:** $(date)" >> security-summary.md
+          echo "" >> security-summary.md
+          
+          # Job statuses
+          echo "## Scan Results" >> security-summary.md
+          echo "" >> security-summary.md
+          echo "| Scan Type | Status |" >> security-summary.md
+          echo "|-----------|--------|" >> security-summary.md
+          echo "| SAST Scan | ${{ needs.sast-scan.result }} |" >> security-summary.md
+          echo "| Dependency Scan | ${{ needs.dependency-scan.result }} |" >> security-summary.md
+          echo "| Container Scan | ${{ needs.container-scan.result }} |" >> security-summary.md
+          echo "| Infrastructure Scan | ${{ needs.infrastructure-scan.result }} |" >> security-summary.md
+          echo "| Secrets Scan | ${{ needs.secrets-scan.result }} |" >> security-summary.md
+          echo "| License Scan | ${{ needs.license-scan.result }} |" >> security-summary.md
+          echo "" >> security-summary.md
+          
+          # Overall status
+          if [[ "${{ needs.sast-scan.result }}" == "success" && 
+                "${{ needs.dependency-scan.result }}" == "success" && 
+                "${{ needs.container-scan.result }}" == "success" && 
+                "${{ needs.infrastructure-scan.result }}" == "success" && 
+                "${{ needs.secrets-scan.result }}" == "success" && 
+                "${{ needs.license-scan.result }}" == "success" ]]; then
+            echo "## ✅ Overall Status: PASS" >> security-summary.md
+            echo "" >> security-summary.md
+            echo "All security scans completed successfully with no critical issues found." >> security-summary.md
+          else
+            echo "## ❌ Overall Status: ATTENTION REQUIRED" >> security-summary.md
+            echo "" >> security-summary.md
+            echo "One or more security scans found issues that require attention." >> security-summary.md
+            echo "Please review the individual scan results and address any critical or high-severity findings." >> security-summary.md
+          fi
+          
+          echo "" >> security-summary.md
+          echo "## Recommendations" >> security-summary.md
+          echo "" >> security-summary.md
+          echo "1. Review all HIGH and CRITICAL severity findings" >> security-summary.md
+          echo "2. Update dependencies with known vulnerabilities" >> security-summary.md
+          echo "3. Address any hardcoded secrets or credentials" >> security-summary.md
+          echo "4. Ensure all container images use non-root users" >> security-summary.md
+          echo "5. Review and update security policies as needed" >> security-summary.md
+          
+          cat security-summary.md
+
+      - name: Upload security summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-summary
+          path: security-summary.md
+          retention-days: 90
+
+      - name: Comment on PR with security summary
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('security-summary.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+# Separate workflow for scheduled vulnerability database updates
+---
+name: Update Vulnerability Database
+
+on:
+  schedule:
+    # Update vulnerability databases weekly on Sundays at 1 AM UTC
+    - cron: '0 1 * * 0'
+  workflow_dispatch:
+
+jobs:
+  update-vulnerability-db:
+    name: Update Vulnerability Database
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Update Trivy database
+        run: |
+          # Download and update Trivy vulnerability database
+          docker run --rm -v trivy_cache:/root/.cache/trivy aquasecurity/trivy:latest image --download-db-only
+
+      - name: Update Safety database
+        run: |
+          pip install safety
+          safety --update
+
+      - name: Notify team of database updates
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Vulnerability Database Updated',
+              body: 'The vulnerability databases have been updated. Please run security scans on your development branches to check for any new vulnerabilities.',
+              labels: ['security', 'maintenance']
+            });

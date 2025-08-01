@@ -1,0 +1,274 @@
+# Simple CI/CD for PyAirtable
+# Integrated with your main application repository
+
+name: Deploy PyAirtable
+
+on:
+  push:
+    branches:
+      - main        # Deploy prod
+      - develop     # Deploy dev
+    paths:
+      - 'pyairtable-automation-services/**'
+      - 'infrastructure/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+      service:
+        description: 'Service to deploy (optional - deploys all if empty)'
+        required: false
+        type: string
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  # Determine what to deploy
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.env.outputs.environment }}
+      deploy_infrastructure: ${{ steps.changes.outputs.infrastructure }}
+      deploy_services: ${{ steps.changes.outputs.services }}
+      services_to_deploy: ${{ steps.services.outputs.services }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Determine environment
+        id: env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "environment=prod" >> $GITHUB_OUTPUT
+          else
+            echo "environment=dev" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "infrastructure=true" >> $GITHUB_OUTPUT
+            echo "services=true" >> $GITHUB_OUTPUT
+          else
+            # Check if infrastructure changed
+            if git diff --name-only HEAD~1 | grep -E '^infrastructure/'; then
+              echo "infrastructure=true" >> $GITHUB_OUTPUT
+            else
+              echo "infrastructure=false" >> $GITHUB_OUTPUT
+            fi
+            
+            # Check if services changed
+            if git diff --name-only HEAD~1 | grep -E '^pyairtable-automation-services/'; then
+              echo "services=true" >> $GITHUB_OUTPUT
+            else
+              echo "services=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Determine services to deploy
+        id: services
+        run: |
+          if [ -n "${{ github.event.inputs.service }}" ]; then
+            echo "services=[\"${{ github.event.inputs.service }}\"]" >> $GITHUB_OUTPUT
+          else
+            # Deploy all services - adjust this list to match your actual services
+            echo "services=[\"api-gateway\", \"llm-orchestrator\", \"mcp-server\", \"airtable-gateway\", \"platform-services\", \"automation-services\"]" >> $GITHUB_OUTPUT
+          fi
+
+  # Deploy infrastructure if needed
+  infrastructure:
+    needs: setup
+    if: needs.setup.outputs.deploy_infrastructure == 'true'
+    runs-on: ubuntu-latest
+    environment: ${{ needs.setup.outputs.environment }}
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.5.0'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: |
+          cd infrastructure/terraform
+          terraform init -backend-config=backend-config.hcl
+
+      - name: Select Workspace
+        run: |
+          cd infrastructure/terraform
+          terraform workspace select ${{ needs.setup.outputs.environment }} || terraform workspace new ${{ needs.setup.outputs.environment }}
+
+      - name: Terraform Plan
+        run: |
+          cd infrastructure/terraform
+          terraform plan -var-file=environments/${{ needs.setup.outputs.environment }}.tfvars
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.event_name == 'workflow_dispatch'
+        run: |
+          cd infrastructure/terraform
+          terraform apply -auto-approve -var-file=environments/${{ needs.setup.outputs.environment }}.tfvars
+
+  # Build and deploy services
+  services:
+    needs: [setup, infrastructure]
+    if: needs.setup.outputs.deploy_services == 'true' && (success() || needs.infrastructure.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment: ${{ needs.setup.outputs.environment }}
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.setup.outputs.services_to_deploy) }}
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform (for outputs)
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.5.0'
+
+      - name: Get ECR repository URL
+        id: ecr
+        run: |
+          cd infrastructure/terraform
+          terraform init -backend-config=backend-config.hcl
+          terraform workspace select ${{ needs.setup.outputs.environment }}
+          ECR_URL=$(terraform output -raw ecr_repositories | jq -r '.["${{ matrix.service }}"]')
+          echo "repository_url=$ECR_URL" >> $GITHUB_OUTPUT
+
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.ecr.outputs.repository_url }}
+
+      - name: Build and push Docker image
+        run: |
+          # Adjust the path based on your service structure
+          cd pyairtable-automation-services
+          
+          # Build image
+          docker build -t ${{ matrix.service }} .
+          
+          # Tag for ECR
+          docker tag ${{ matrix.service }}:latest ${{ steps.ecr.outputs.repository_url }}:latest
+          docker tag ${{ matrix.service }}:latest ${{ steps.ecr.outputs.repository_url }}:${{ github.sha }}
+          
+          # Push to ECR
+          docker push ${{ steps.ecr.outputs.repository_url }}:latest
+          docker push ${{ steps.ecr.outputs.repository_url }}:${{ github.sha }}
+
+      - name: Deploy to ECS
+        run: |
+          # Get cluster name
+          cd infrastructure/terraform
+          CLUSTER_NAME=$(terraform output -raw deployment_info | jq -r '.cluster_name')
+          SERVICE_NAME="pyairtable-${{ needs.setup.outputs.environment }}-${{ matrix.service }}"
+          
+          # Update ECS service
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service $SERVICE_NAME \
+            --force-new-deployment \
+            --query 'service.serviceName' \
+            --output text
+
+      - name: Wait for deployment
+        run: |
+          cd infrastructure/terraform
+          CLUSTER_NAME=$(terraform output -raw deployment_info | jq -r '.cluster_name')
+          SERVICE_NAME="pyairtable-${{ needs.setup.outputs.environment }}-${{ matrix.service }}"
+          
+          echo "Waiting for service $SERVICE_NAME to stabilize..."
+          aws ecs wait services-stable \
+            --cluster $CLUSTER_NAME \
+            --services $SERVICE_NAME \
+            --cli-read-timeout 600 \
+            --cli-connect-timeout 60
+
+  # Smoke tests
+  test:
+    needs: [setup, services]
+    if: success()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.5.0'
+
+      - name: Get application URL
+        id: url
+        run: |
+          cd infrastructure/terraform
+          terraform init -backend-config=backend-config.hcl
+          terraform workspace select ${{ needs.setup.outputs.environment }}
+          APP_URL=$(terraform output -raw application_url)
+          echo "app_url=$APP_URL" >> $GITHUB_OUTPUT
+
+      - name: Run smoke tests
+        run: |
+          # Test main services
+          for service in api-gateway mcp-server airtable-gateway platform-services automation-services; do
+            echo "Testing $service..."
+            response=$(curl -s -o /dev/null -w "%{http_code}" ${{ steps.url.outputs.app_url }}/$service/health || echo "000")
+            if [ "$response" = "200" ]; then
+              echo "✅ $service is healthy"
+            else
+              echo "❌ $service returned $response"
+              exit 1
+            fi
+          done
+
+  # Notification
+  notify:
+    needs: [setup, infrastructure, services, test]
+    if: always()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Send notification
+        if: needs.setup.outputs.environment == 'prod' && (success() || failure())
+        run: |
+          STATUS="✅ Success"
+          if [ "${{ job.status }}" != "success" ]; then
+            STATUS="❌ Failed"
+          fi
+          
+          MESSAGE="PyAirtable deployment to ${{ needs.setup.outputs.environment }}: $STATUS"
+          echo "Deployment completed: $MESSAGE"
+          # Add Slack/email notification here if needed

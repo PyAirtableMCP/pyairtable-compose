@@ -1,0 +1,87 @@
+{{- if .Values.services.mcpServer.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-{{ .Values.services.mcpServer.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ .Values.services.mcpServer.name }}
+spec:
+  replicas: {{ .Values.services.mcpServer.replicas }}
+  selector:
+    matchLabels:
+      {{- include "pyairtable-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mcp-server
+  template:
+    metadata:
+      labels:
+        {{- include "pyairtable-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mcp-server
+    spec:
+      containers:
+      - name: {{ .Values.services.mcpServer.name }}
+        image: {{ include "pyairtable-stack.image" (dict "registry" .Values.global.imageRegistry "repository" .Values.services.mcpServer.image "tag" .Values.services.mcpServer.tag) | quote }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: {{ .Values.services.mcpServer.port }}
+        env:
+        {{- include "pyairtable-stack.commonSecretEnvVars" . | nindent 8 }}
+        {{- include "pyairtable-stack.commonConfigEnvVars" . | nindent 8 }}
+        - name: AIRTABLE_GATEWAY_URL
+          value: "http://{{ .Values.services.airtableGateway.name }}:{{ .Values.services.airtableGateway.port }}"
+        - name: AIRTABLE_GATEWAY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: API_KEY
+        - name: MCP_SERVER_MODE
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-config
+              key: MCP_SERVER_MODE
+        - name: MCP_SERVER_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-config
+              key: MCP_SERVER_PORT
+        resources:
+          {{- toYaml .Values.services.mcpServer.resources | nindent 10 }}
+        {{- if .Values.healthChecks.enabled }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.services.mcpServer.port }}
+          initialDelaySeconds: {{ .Values.healthChecks.initialDelaySeconds }}
+          periodSeconds: {{ .Values.healthChecks.periodSeconds }}
+          timeoutSeconds: {{ .Values.healthChecks.timeoutSeconds }}
+          failureThreshold: {{ .Values.healthChecks.failureThreshold }}
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.services.mcpServer.port }}
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: {{ .Values.healthChecks.timeoutSeconds }}
+          failureThreshold: {{ .Values.healthChecks.failureThreshold }}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.services.mcpServer.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ .Values.services.mcpServer.name }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: {{ .Values.services.mcpServer.port }}
+    targetPort: {{ .Values.services.mcpServer.port }}
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "pyairtable-stack.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp-server
+{{- end }}

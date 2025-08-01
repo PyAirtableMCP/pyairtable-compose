@@ -1,0 +1,94 @@
+{{- if .Values.services.platformServices.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-{{ .Values.services.platformServices.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ .Values.services.platformServices.name }}
+spec:
+  replicas: {{ .Values.services.platformServices.replicas }}
+  selector:
+    matchLabels:
+      {{- include "pyairtable-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: platform-services
+  template:
+    metadata:
+      labels:
+        {{- include "pyairtable-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: platform-services
+    spec:
+      containers:
+      - name: {{ .Values.services.platformServices.name }}
+        image: {{ include "pyairtable-stack.image" (dict "registry" .Values.global.imageRegistry "repository" .Values.services.platformServices.image "tag" .Values.services.platformServices.tag) | quote }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: {{ .Values.services.platformServices.port }}
+        env:
+        {{- include "pyairtable-stack.commonSecretEnvVars" . | nindent 8 }}
+        {{- include "pyairtable-stack.commonConfigEnvVars" . | nindent 8 }}
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: JWT_SECRET
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@{{ .Values.databases.postgres.name }}:{{ .Values.databases.postgres.port }}/$(POSTGRES_DB)"
+        - name: REDIS_URL
+          value: "redis://{{ .Values.databases.redis.name }}:{{ .Values.databases.redis.port }}"
+        - name: REQUIRE_API_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-config
+              key: REQUIRE_API_KEY
+        - name: JWT_ALGORITHM
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-config
+              key: JWT_ALGORITHM
+        - name: JWT_EXPIRES_IN
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-config
+              key: JWT_EXPIRES_IN
+        resources:
+          {{- toYaml .Values.services.platformServices.resources | nindent 10 }}
+        {{- if .Values.healthChecks.enabled }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.services.platformServices.port }}
+          initialDelaySeconds: {{ .Values.healthChecks.initialDelaySeconds }}
+          periodSeconds: {{ .Values.healthChecks.periodSeconds }}
+          timeoutSeconds: {{ .Values.healthChecks.timeoutSeconds }}
+          failureThreshold: {{ .Values.healthChecks.failureThreshold }}
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.services.platformServices.port }}
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: {{ .Values.healthChecks.timeoutSeconds }}
+          failureThreshold: {{ .Values.healthChecks.failureThreshold }}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.services.platformServices.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ .Values.services.platformServices.name }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: {{ .Values.services.platformServices.port }}
+    targetPort: {{ .Values.services.platformServices.port }}
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "pyairtable-stack.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: platform-services
+{{- end }}

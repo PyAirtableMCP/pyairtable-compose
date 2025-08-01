@@ -1,0 +1,40 @@
+# FastAPI and web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Database
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+alembic==1.12.1
+
+# Redis
+redis[hiredis]==5.0.1
+
+# HTTP clients
+httpx==0.25.2
+aiohttp==3.9.1
+
+# Configuration
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# File processing
+python-multipart==0.0.6
+
+# Optional file processing libraries
+PyPDF2==3.0.1
+python-docx==1.1.0
+openpyxl==3.1.2
+pandas==2.1.4
+pdfplumber==0.10.3
+
+# Task scheduling
+croniter==2.0.1
+
+# Logging and monitoring
+structlog==23.2.0
+
+# Development and testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2

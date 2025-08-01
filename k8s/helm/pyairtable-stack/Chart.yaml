@@ -1,0 +1,17 @@
+apiVersion: v2
+name: pyairtable-stack
+description: A Helm chart for PyAirtable microservices stack
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - pyairtable
+  - microservices
+  - llm
+  - orchestration
+home: https://github.com/your-org/pyairtable-compose
+sources:
+  - https://github.com/your-org/pyairtable-compose
+maintainers:
+  - name: PyAirtable Team
+    email: team@pyairtable.com

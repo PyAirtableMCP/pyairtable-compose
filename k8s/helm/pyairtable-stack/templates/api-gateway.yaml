@@ -1,0 +1,77 @@
+{{- if .Values.services.apiGateway.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-{{ .Values.services.apiGateway.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ .Values.services.apiGateway.name }}
+spec:
+  replicas: {{ .Values.services.apiGateway.replicas }}
+  selector:
+    matchLabels:
+      {{- include "pyairtable-stack.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pyairtable-stack.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: {{ .Values.services.apiGateway.name }}
+        image: {{ include "pyairtable-stack.image" (dict "registry" .Values.global.imageRegistry "repository" .Values.services.apiGateway.image "tag" .Values.services.apiGateway.tag) | quote }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: {{ .Values.services.apiGateway.port }}
+        env:
+        {{- include "pyairtable-stack.commonSecretEnvVars" . | nindent 8 }}
+        {{- include "pyairtable-stack.commonConfigEnvVars" . | nindent 8 }}
+        - name: AIRTABLE_GATEWAY_URL
+          value: "http://{{ .Values.services.airtableGateway.name }}:{{ .Values.services.airtableGateway.port }}"
+        - name: MCP_SERVER_URL
+          value: "http://{{ .Values.services.mcpServer.name }}:{{ .Values.services.mcpServer.port }}"
+        - name: LLM_ORCHESTRATOR_URL
+          value: "http://{{ .Values.services.llmOrchestrator.name }}:{{ .Values.services.llmOrchestrator.port }}"
+        - name: PLATFORM_SERVICES_URL
+          value: "http://{{ .Values.services.platformServices.name }}:{{ .Values.services.platformServices.port }}"
+        - name: AUTOMATION_SERVICES_URL
+          value: "http://{{ .Values.services.automationServices.name }}:{{ .Values.services.automationServices.port }}"
+        resources:
+          {{- toYaml .Values.services.apiGateway.resources | nindent 10 }}
+        {{- if .Values.healthChecks.enabled }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.services.apiGateway.port }}
+          initialDelaySeconds: {{ .Values.healthChecks.initialDelaySeconds }}
+          periodSeconds: {{ .Values.healthChecks.periodSeconds }}
+          timeoutSeconds: {{ .Values.healthChecks.timeoutSeconds }}
+          failureThreshold: {{ .Values.healthChecks.failureThreshold }}
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.services.apiGateway.port }}
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: {{ .Values.healthChecks.timeoutSeconds }}
+          failureThreshold: {{ .Values.healthChecks.failureThreshold }}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.services.apiGateway.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ .Values.services.apiGateway.name }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: {{ .Values.services.apiGateway.port }}
+    targetPort: {{ .Values.services.apiGateway.port }}
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "pyairtable-stack.selectorLabels" . | nindent 4 }}
+{{- end }}

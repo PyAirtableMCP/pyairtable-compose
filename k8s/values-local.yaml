@@ -1,0 +1,39 @@
+# Local development values for using locally built images
+global:
+  imageRegistry: ""  # Empty registry for local images
+  imagePullPolicy: Never
+
+# Override service images to use local builds
+services:
+  frontend:
+    image: pyairtable-frontend
+    tag: dev
+  apiGateway:
+    image: pyairtable-api-gateway
+    tag: dev
+  llmOrchestrator:
+    image: pyairtable-llm-orchestrator
+    tag: dev
+  mcpServer:
+    image: pyairtable-mcp-server
+    tag: dev
+  airtableGateway:
+    image: pyairtable-airtable-gateway
+    tag: dev
+  platformServices:
+    image: pyairtable-platform-services
+    tag: dev
+  automationServices:
+    image: pyairtable-automation-services
+    tag: dev
+
+# PostgreSQL and Redis use default images from Docker Hub
+databases:
+  postgres:
+    persistence:
+      enabled: true
+      size: 1Gi
+  redis:
+    persistence:
+      enabled: true
+      size: 1Gi

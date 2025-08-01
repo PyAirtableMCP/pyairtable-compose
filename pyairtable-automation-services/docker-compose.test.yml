@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  automation-services:
+    build: .
+    ports:
+      - "8006:8006"
+    environment:
+      - API_KEY=test-api-key-12345
+      - AUTH_SERVICE_URL=http://auth-service:8007
+      - DATABASE_URL=postgresql://test_user:test_password@postgres:5432/test_automation_db
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=test_redis_password
+      - MAX_FILE_SIZE=10MB
+      - ALLOWED_EXTENSIONS=pdf,doc,docx,txt,csv,xlsx
+      - UPLOAD_DIR=/tmp/uploads
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - file-uploads:/tmp/uploads
+    networks:
+      - automation-network
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=test_automation_db
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=test_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - automation-network
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass test_redis_password
+    volumes:
+      - redis-data:/data
+    networks:
+      - automation-network
+
+networks:
+  automation-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  file-uploads:
