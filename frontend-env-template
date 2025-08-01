@@ -1,0 +1,18 @@
+# Frontend Environment Template
+# Copy this to ../frontend/.env.local after creating frontend
+
+# API Configuration
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_KEY=internal_api_key_123
+
+# Airtable Configuration (for direct access if needed)
+NEXT_PUBLIC_AIRTABLE_BASE=appXXXXXXXXXXXXXX
+
+# Development Settings
+NEXT_PUBLIC_ENVIRONMENT=development
+NEXT_PUBLIC_ENABLE_DEVTOOLS=true
+
+# Feature Flags
+NEXT_PUBLIC_ENABLE_CHAT=true
+NEXT_PUBLIC_ENABLE_BUDGET_TRACKING=true
+NEXT_PUBLIC_ENABLE_ANALYTICS=true

@@ -122,6 +122,53 @@ services:
     networks:
       - pyairtable-network
 
+  # Next.js Frontend - Web interface
+  frontend:
+    image: ghcr.io/reg-kris/pyairtable-frontend:latest
+    build:
+      context: ../pyairtable-frontend
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "3000:3000"
+    environment:
+      # API Gateway endpoint
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_GATEWAY_URL=http://api-gateway:8000
+      # Internal service URLs (for SSR/API routes)
+      - LLM_ORCHESTRATOR_URL=http://llm-orchestrator:8003
+      - MCP_SERVER_URL=http://mcp-server:8001
+      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
+      # Authentication and security
+      - API_KEY=${API_KEY}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-default-secret-change-in-production}
+      - NEXTAUTH_URL=http://localhost:3000
+      # Development configuration
+      - NODE_ENV=${NODE_ENV:-development}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      # Feature flags
+      - NEXT_PUBLIC_ENABLE_DEBUG=${ENABLE_DEBUG:-false}
+      - NEXT_PUBLIC_SHOW_COST_TRACKING=${SHOW_COST_TRACKING:-true}
+    volumes:
+      # Enable hot reloading in development
+      - ../pyairtable-frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - api-gateway
+      - llm-orchestrator
+      - mcp-server
+      - airtable-gateway
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
 networks:
   pyairtable-network:
     driver: bridge

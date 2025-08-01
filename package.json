@@ -1,0 +1,33 @@
+{
+  "name": "pyairtable-fullstack",
+  "version": "1.0.0",
+  "description": "PyAirtable Full-Stack Development Environment",
+  "scripts": {
+    "dev": "./dev-fullstack.sh",
+    "dev:backend": "./start.sh",
+    "dev:frontend": "cd ../frontend && npm run dev",
+    "start": "./start.sh",
+    "stop": "./stop.sh",
+    "stop:all": "./stop.sh && pkill -f 'npm run dev'",
+    "test": "./test.sh",
+    "test:health": "curl -s http://localhost:8000/api/health | jq",
+    "test:chat": "./scripts/test-chat.sh",
+    "logs": "./start.sh logs",
+    "logs:gateway": "docker-compose logs -f api-gateway",
+    "logs:llm": "docker-compose logs -f llm-orchestrator", 
+    "logs:mcp": "docker-compose logs -f mcp-server",
+    "logs:airtable": "docker-compose logs -f airtable-gateway",
+    "db:migrate": "psql -h localhost -U postgres -d pyairtable -f migrations/001_create_session_tables.sql",
+    "db:reset": "dropdb -h localhost -U postgres pyairtable --if-exists && createdb -h localhost -U postgres pyairtable && npm run db:migrate",
+    "setup": "./setup.sh",
+    "setup:frontend": "npx create-next-app@latest ../frontend --typescript --tailwind --eslint --app --use-npm",
+    "build": "docker-compose build",
+    "clean": "docker-compose down -v && docker system prune -f"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "wait-on": "^7.2.0"
+  },
+  "keywords": ["airtable", "ai", "microservices", "fastapi", "development"],
+  "author": "PyAirtable Team"
+}

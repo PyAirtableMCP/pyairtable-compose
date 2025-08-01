@@ -14,6 +14,7 @@ PURPLE='\033[0;35m'
 NC='\033[0m' # No Color
 
 # Configuration
+BASE_URL_FRONTEND="http://localhost:3000"
 BASE_URL_LLM="http://localhost:8003"
 BASE_URL_MCP="http://localhost:8001"
 BASE_URL_GATEWAY="http://localhost:8002"
@@ -87,6 +88,7 @@ test_health_checks() {
     echo -e "${BLUE}🏥 Health Check Tests${NC}"
     echo "======================="
     
+    test_endpoint "Frontend Health" "$BASE_URL_FRONTEND/api/health"
     test_endpoint "LLM Orchestrator Health" "$BASE_URL_LLM/health"
     test_endpoint "MCP Server Health" "$BASE_URL_MCP/health"
     test_endpoint "Airtable Gateway Health" "$BASE_URL_GATEWAY/health"
@@ -166,6 +168,28 @@ test_budget_management() {
     echo ""
 }
 
+# Function to test frontend specific endpoints
+test_frontend() {
+    echo -e "${BLUE}🌐 Frontend Tests${NC}"
+    echo "=================="
+    
+    # Test main page (should return HTML)
+    print_test "Testing frontend main page..."
+    local response=$(curl -s -w "HTTPSTATUS:%{http_code}" "$BASE_URL_FRONTEND" 2>/dev/null || echo "HTTPSTATUS:000")
+    local status_code=$(echo "$response" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+    
+    if [ "$status_code" = "200" ]; then
+        print_status "Frontend main page: HTTP $status_code"
+    else
+        print_error "Frontend main page: Expected HTTP 200, got $status_code"
+    fi
+    
+    # Test API routes
+    test_endpoint "Frontend API Config" "$BASE_URL_FRONTEND/api/config"
+    
+    echo ""
+}
+
 # Function to test integration
 test_integration() {
     echo -e "${BLUE}🔗 Integration Tests${NC}"
@@ -185,6 +209,16 @@ test_integration() {
         fi
     else
         print_error "LLM ↔ MCP integration: Communication failed"
+    fi
+    
+    # Test if Frontend can reach API Gateway
+    print_test "Testing Frontend ↔ API Gateway connectivity..."
+    local frontend_config_response=$(curl -s "$BASE_URL_FRONTEND/api/config" 2>/dev/null || echo "")
+    
+    if echo "$frontend_config_response" | grep -q "api_url"; then
+        print_status "Frontend ↔ API Gateway: Configuration accessible"
+    else
+        print_warning "Frontend ↔ API Gateway: Configuration not accessible"
     fi
     
     echo ""
@@ -228,18 +262,32 @@ test_performance() {
     
     print_test "Testing response times..."
     
-    # Test health endpoint response time
+    # Test frontend response time
+    local start_time=$(date +%s%N)
+    curl -s "$BASE_URL_FRONTEND/api/health" > /dev/null 2>&1
+    local end_time=$(date +%s%N)
+    local frontend_duration=$(( (end_time - start_time) / 1000000 ))
+    
+    if [ $frontend_duration -lt 1000 ]; then
+        print_status "Frontend response time: ${frontend_duration}ms (excellent)"
+    elif [ $frontend_duration -lt 3000 ]; then
+        print_status "Frontend response time: ${frontend_duration}ms (good)"
+    else
+        print_warning "Frontend response time: ${frontend_duration}ms (slow)"
+    fi
+    
+    # Test backend health endpoint response time
     local start_time=$(date +%s%N)
     curl -s "$BASE_URL_LLM/health" > /dev/null 2>&1
     local end_time=$(date +%s%N)
-    local duration=$(( (end_time - start_time) / 1000000 ))
+    local backend_duration=$(( (end_time - start_time) / 1000000 ))
     
-    if [ $duration -lt 1000 ]; then
-        print_status "LLM Orchestrator response time: ${duration}ms (excellent)"
-    elif [ $duration -lt 2000 ]; then
-        print_status "LLM Orchestrator response time: ${duration}ms (good)"
+    if [ $backend_duration -lt 1000 ]; then
+        print_status "LLM Orchestrator response time: ${backend_duration}ms (excellent)"
+    elif [ $backend_duration -lt 2000 ]; then
+        print_status "LLM Orchestrator response time: ${backend_duration}ms (good)"
     else
-        print_warning "LLM Orchestrator response time: ${duration}ms (slow)"
+        print_warning "LLM Orchestrator response time: ${backend_duration}ms (slow)"
     fi
     
     echo ""
@@ -251,6 +299,7 @@ show_summary() {
     echo "================"
     echo ""
     echo -e "${GREEN}✅ Services Status:${NC}"
+    echo "• Frontend: http://localhost:3000"
     echo "• LLM Orchestrator: http://localhost:8003"
     echo "• MCP Server: http://localhost:8001"
     echo "• Airtable Gateway: http://localhost:8002"
@@ -282,6 +331,7 @@ main() {
     # Run all tests
     test_health_checks
     test_database
+    test_frontend
     test_mcp_tools
     test_airtable_gateway
     test_llm_orchestrator
@@ -303,6 +353,9 @@ case "${1:-all}" in
         ;;
     "database") 
         test_database
+        ;;
+    "frontend")
+        test_frontend
         ;;
     "mcp")
         test_mcp_tools
@@ -329,6 +382,7 @@ case "${1:-all}" in
         echo "  all           Run all tests (default)"
         echo "  health        Health check tests"
         echo "  database      Database connectivity tests"
+        echo "  frontend      Frontend tests"
         echo "  mcp           MCP tools tests"  
         echo "  gateway       Airtable Gateway tests"
         echo "  llm           LLM Orchestrator tests"

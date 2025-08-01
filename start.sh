@@ -21,6 +21,7 @@ declare -A SERVICES=(
     ["airtable-gateway"]="8002:airtable-gateway-py"
     ["mcp-server"]="8001:mcp-server-py" 
     ["llm-orchestrator"]="8003:llm-orchestrator-py"
+    ["frontend"]="3000:pyairtable-frontend"
 )
 
 # Function to print status
@@ -85,16 +86,31 @@ start_service() {
     # Create log directory
     mkdir -p "$LOG_DIR"
     
-    # Activate virtual environment and start service
+    # Activate appropriate environment and start service
     cd "$full_path"
     
-    if [ ! -d "venv" ]; then
-        print_error "Virtual environment not found for $service_name"
-        print_info "Please run ./setup.sh first"
-        return 1
+    # Handle Python services
+    if [[ "$service_name" != "frontend" ]]; then
+        if [ ! -d "venv" ]; then
+            print_error "Virtual environment not found for $service_name"
+            print_info "Please run ./setup.sh first"
+            return 1
+        fi
+        source venv/bin/activate
+    else
+        # Handle Node.js frontend
+        if [ ! -f "package.json" ]; then
+            print_error "package.json not found for $service_name"
+            print_info "Please run ./setup.sh first"
+            return 1
+        fi
+        
+        if [ ! -d "node_modules" ]; then
+            print_error "Node modules not found for $service_name"
+            print_info "Please run ./setup.sh first"
+            return 1
+        fi
     fi
-    
-    source venv/bin/activate
     
     # Start service based on type
     case $service_name in
@@ -107,12 +123,23 @@ start_service() {
         "llm-orchestrator")
             nohup python src/main.py > "$LOG_DIR/${service_name}.log" 2>&1 &
             ;;
+        "frontend")
+            # Check if we should use yarn or npm
+            if [ -f "yarn.lock" ]; then
+                nohup yarn dev > "$LOG_DIR/${service_name}.log" 2>&1 &
+            else
+                nohup npm run dev > "$LOG_DIR/${service_name}.log" 2>&1 &
+            fi
+            ;;
     esac
     
     local pid=$!
     echo $pid > "$LOG_DIR/${service_name}.pid"
     
-    deactivate
+    # Deactivate Python virtual environment if it was activated
+    if [[ "$service_name" != "frontend" ]]; then
+        deactivate
+    fi
     cd - > /dev/null
     
     # Wait a moment and check if service started
@@ -131,12 +158,27 @@ check_health() {
     local service_name=$1
     local port=$2
     
-    local health_url="http://localhost:$port/health"
+    # Different health check endpoints for different services
+    local health_url
+    case $service_name in
+        "frontend")
+            health_url="http://localhost:$port/api/health"
+            ;;
+        *)
+            health_url="http://localhost:$port/health"
+            ;;
+    esac
     
     print_info "Checking health of $service_name..."
     
-    # Wait up to 30 seconds for service to be healthy
-    for i in {1..30}; do
+    # Frontend needs more time to start up
+    local max_attempts=30
+    if [[ "$service_name" == "frontend" ]]; then
+        max_attempts=60
+    fi
+    
+    # Wait for service to be healthy
+    for i in $(seq 1 $max_attempts); do
         if curl -s -f "$health_url" > /dev/null 2>&1; then
             print_status "$service_name is healthy"
             return 0
@@ -167,6 +209,9 @@ show_status() {
     echo ""
     echo -e "${BLUE}📋 Service URLs${NC}"
     echo "================"
+    echo "• Frontend: http://localhost:3000"
+    echo "• Frontend Health: http://localhost:3000/api/health"
+    echo "• API Gateway: http://localhost:8000"
     echo "• LLM Orchestrator: http://localhost:8003"
     echo "• LLM Orchestrator Health: http://localhost:8003/health"
     echo "• MCP Server: http://localhost:8001"
@@ -240,6 +285,9 @@ main() {
     # 3. Start LLM Orchestrator (depends on MCP Server)
     start_service "llm-orchestrator" "8003" "llm-orchestrator-py"
     
+    # 4. Start Frontend (depends on all backend services)
+    start_service "frontend" "3000" "pyairtable-frontend"
+    
     echo ""
     print_info "Waiting for services to fully initialize..."
     sleep 5
@@ -250,6 +298,7 @@ main() {
     check_health "airtable-gateway" "8002"
     check_health "mcp-server" "8001"
     check_health "llm-orchestrator" "8003"
+    check_health "frontend" "3000"
     
     # Show final status
     show_status
@@ -258,6 +307,7 @@ main() {
     echo -e "${GREEN}🎉 All services started successfully!${NC}"
     echo ""
     echo -e "${YELLOW}Quick Test Commands:${NC}"
+    echo "curl http://localhost:3000/api/health"
     echo "curl http://localhost:8003/health"
     echo "curl http://localhost:8001/tools"
     echo "curl http://localhost:8002/health"
@@ -293,7 +343,7 @@ case "${1:-start}" in
         echo "  logs           Show all logs"
         echo "  logs SERVICE   Show logs for specific service"
         echo ""
-        echo "Services: airtable-gateway, mcp-server, llm-orchestrator"
+        echo "Services: airtable-gateway, mcp-server, llm-orchestrator, frontend"
         exit 1
         ;;
 esac

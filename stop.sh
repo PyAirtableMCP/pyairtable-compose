@@ -16,8 +16,8 @@ NC='\033[0m' # No Color
 LOG_DIR="/tmp/pyairtable-logs"
 
 # Service ports
-PORTS=(8001 8002 8003)
-SERVICE_NAMES=("mcp-server" "airtable-gateway" "llm-orchestrator")
+PORTS=(8001 8002 8003 3000)
+SERVICE_NAMES=("mcp-server" "airtable-gateway" "llm-orchestrator" "frontend")
 
 # Function to print status
 print_status() {
@@ -137,16 +137,36 @@ cleanup_processes() {
     # Find and kill Python processes running our services
     local killed=0
     
-    # Look for specific service processes
+    # Look for specific service processes (Python services)
     for process in $(pgrep -f "python.*main.py" 2>/dev/null || true); do
         local cmd=$(ps -p $process -o command= 2>/dev/null || echo "")
         
-        # Check if it's one of our services
+        # Check if it's one of our Python services
         if [[ "$cmd" == *"airtable-gateway"* ]] || [[ "$cmd" == *"mcp-server"* ]] || [[ "$cmd" == *"llm-orchestrator"* ]]; then
-            print_info "Killing process: $process ($cmd)"
+            print_info "Killing Python process: $process ($cmd)"
             kill -9 $process 2>/dev/null || true
             killed=$((killed + 1))
         fi
+    done
+    
+    # Look for Node.js frontend processes
+    for process in $(pgrep -f "node.*next" 2>/dev/null || true); do
+        local cmd=$(ps -p $process -o command= 2>/dev/null || echo "")
+        
+        # Check if it's our frontend service
+        if [[ "$cmd" == *"next"* ]] || [[ "$cmd" == *"pyairtable-frontend"* ]]; then
+            print_info "Killing Node.js process: $process ($cmd)"
+            kill -9 $process 2>/dev/null || true
+            killed=$((killed + 1))
+        fi
+    done
+    
+    # Look for npm/yarn dev processes
+    for process in $(pgrep -f "npm.*dev\|yarn.*dev" 2>/dev/null || true); do
+        local cmd=$(ps -p $process -o command= 2>/dev/null || echo "")
+        print_info "Killing dev process: $process ($cmd)"
+        kill -9 $process 2>/dev/null || true
+        killed=$((killed + 1))
     done
     
     if [ $killed -gt 0 ]; then
@@ -230,9 +250,12 @@ main() {
 # Handle command line arguments
 case "${1:-}" in
     "force")
-        print_warning "Force stopping all Python processes..."
+        print_warning "Force stopping all service processes..."
         killall python3 2>/dev/null || true
         killall python 2>/dev/null || true
+        killall node 2>/dev/null || true
+        killall npm 2>/dev/null || true
+        killall yarn 2>/dev/null || true
         sleep 2
         show_status
         ;;
