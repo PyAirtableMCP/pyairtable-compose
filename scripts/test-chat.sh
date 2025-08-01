@@ -19,7 +19,7 @@ echo
 # Test chat endpoint
 curl -X POST http://localhost:8000/api/chat \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: simple-api-key" \
+  -H "X-API-Key: ${API_KEY:-test-api-key}" \
   -d "{
     \"message\": \"List all tables in my Airtable base\",
     \"session_id\": \"test-user-$(date +%s)\",

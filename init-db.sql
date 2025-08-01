@@ -1,6 +1,13 @@
 -- Initialize PyAirtable database schema
+-- Updated: 2025-08-01 - Added new session management tables
 
--- Sessions table for conversation history
+-- Import the new session management schema
+\i /docker-entrypoint-initdb.d/migrations/001_create_session_tables.sql
+
+-- Legacy tables (kept for backward compatibility during migration)
+-- These will be deprecated in favor of the new conversation_sessions and conversation_messages tables
+
+-- Sessions table for conversation history (LEGACY - to be deprecated)
 CREATE TABLE IF NOT EXISTS sessions (
     id VARCHAR(255) PRIMARY KEY,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -9,7 +16,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     metadata JSONB DEFAULT '{}'::jsonb
 );
 
--- Conversation history
+-- Conversation history (LEGACY - to be deprecated)
 CREATE TABLE IF NOT EXISTS conversation_history (
     id SERIAL PRIMARY KEY,
     session_id VARCHAR(255) REFERENCES sessions(id) ON DELETE CASCADE,
@@ -20,7 +27,7 @@ CREATE TABLE IF NOT EXISTS conversation_history (
     metadata JSONB DEFAULT '{}'::jsonb
 );
 
--- Tool execution logs
+-- Tool execution logs (LEGACY - to be deprecated)
 CREATE TABLE IF NOT EXISTS tool_executions (
     id SERIAL PRIMARY KEY,
     session_id VARCHAR(255) REFERENCES sessions(id) ON DELETE CASCADE,
@@ -41,7 +48,7 @@ CREATE TABLE IF NOT EXISTS airtable_bases (
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create indexes for performance
+-- Create indexes for performance (legacy tables)
 CREATE INDEX IF NOT EXISTS idx_conversation_history_session_id ON conversation_history(session_id);
 CREATE INDEX IF NOT EXISTS idx_conversation_history_timestamp ON conversation_history(timestamp);
 CREATE INDEX IF NOT EXISTS idx_tool_executions_session_id ON tool_executions(session_id);

@@ -33,12 +33,17 @@ services:
       - "8003:8003"
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MCP_SERVER_HTTP_URL=http://mcp-server:8001
+      - USE_HTTP_MCP=true
+      # Redis session storage
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - USE_REDIS_SESSIONS=true
+      # Legacy stdio config (fallback)
       - MCP_SERVER_STDIO_COMMAND=python -m src.server
       - MCP_SERVER_WORKING_DIR=/app/mcp-server
       - THINKING_BUDGET=${THINKING_BUDGET}
       - LOG_LEVEL=${LOG_LEVEL}
-    volumes:
-      - ../mcp-server-py:/app/mcp-server:ro
     depends_on:
       - mcp-server
       - redis
@@ -46,7 +51,7 @@ services:
     networks:
       - pyairtable-network
 
-  # MCP Server - Protocol implementation
+  # MCP Server - Protocol implementation (HTTP mode for performance)
   mcp-server:
     image: ghcr.io/reg-kris/mcp-server-py:latest
     build:
@@ -57,6 +62,8 @@ services:
     environment:
       - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
       - AIRTABLE_GATEWAY_API_KEY=${API_KEY}
+      - MCP_SERVER_MODE=http
+      - MCP_SERVER_PORT=8001
       - LOG_LEVEL=${LOG_LEVEL}
     depends_on:
       - airtable-gateway
@@ -87,8 +94,9 @@ services:
   # Redis - Caching and session storage
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # SECURITY: Remove exposed port - internal access only
+    # ports:
+    #   - "6379:6379"
     command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis-data:/data
@@ -99,8 +107,9 @@ services:
   # PostgreSQL - Database for sessions and metadata
   postgres:
     image: postgres:16-alpine
-    ports:
-      - "5432:5432"
+    # SECURITY: Remove exposed port - internal access only
+    # ports:
+    #   - "5432:5432"
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -108,6 +117,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      - ./migrations:/docker-entrypoint-initdb.d/migrations:ro
     restart: unless-stopped
     networks:
       - pyairtable-network

@@ -33,7 +33,7 @@ curl http://localhost:8000/api/health
 # Test the chat endpoint
 curl -X POST http://localhost:8000/api/chat \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: simple-api-key" \
+  -H "X-API-Key: $API_KEY" \
   -d '{
     "message": "List all tables in my base",
     "session_id": "test-user",
