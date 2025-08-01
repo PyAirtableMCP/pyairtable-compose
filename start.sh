@@ -21,6 +21,10 @@ declare -A SERVICES=(
     ["airtable-gateway"]="8002:airtable-gateway-py"
     ["mcp-server"]="8001:mcp-server-py" 
     ["llm-orchestrator"]="8003:llm-orchestrator-py"
+    ["auth-service"]="8007:pyairtable-auth-service"
+    ["workflow-engine"]="8004:pyairtable-workflow-engine"
+    ["analytics-service"]="8005:pyairtable-analytics-service"
+    ["file-processor"]="8006:pyairtable-file-processor"
     ["frontend"]="3000:pyairtable-frontend"
 )
 
@@ -123,6 +127,10 @@ start_service() {
         "llm-orchestrator")
             nohup python src/main.py > "$LOG_DIR/${service_name}.log" 2>&1 &
             ;;
+        "auth-service"|"workflow-engine"|"analytics-service"|"file-processor")
+            # Phase 3 Python services
+            nohup python src/main.py > "$LOG_DIR/${service_name}.log" 2>&1 &
+            ;;
         "frontend")
             # Check if we should use yarn or npm
             if [ -f "yarn.lock" ]; then
@@ -218,6 +226,14 @@ show_status() {
     echo "• MCP Server Tools: http://localhost:8001/tools"
     echo "• Airtable Gateway: http://localhost:8002"
     echo "• Airtable Gateway Health: http://localhost:8002/health"
+    echo "• Auth Service: http://localhost:8007"
+    echo "• Auth Service Health: http://localhost:8007/health"
+    echo "• Workflow Engine: http://localhost:8004"
+    echo "• Workflow Engine Health: http://localhost:8004/health"
+    echo "• Analytics Service: http://localhost:8005"
+    echo "• Analytics Service Health: http://localhost:8005/health"
+    echo "• File Processor: http://localhost:8006"
+    echo "• File Processor Health: http://localhost:8006/health"
     
     echo ""
     echo -e "${BLUE}📝 Logs Location${NC}"
@@ -276,16 +292,32 @@ main() {
     print_info "Starting services in dependency order..."
     echo ""
     
-    # 1. Start Airtable Gateway first (no dependencies)
+    # Phase 1: Core services (no dependencies beyond infrastructure)
+    # 1. Start Airtable Gateway first (depends only on Redis/PostgreSQL)
     start_service "airtable-gateway" "8002" "airtable-gateway-py"
     
-    # 2. Start MCP Server (depends on Airtable Gateway)
+    # 2. Start Auth Service (depends only on Redis/PostgreSQL) - standalone
+    start_service "auth-service" "8007" "pyairtable-auth-service"
+    
+    # Phase 2: Services with single dependencies
+    # 3. Start MCP Server (depends on Airtable Gateway)
     start_service "mcp-server" "8001" "mcp-server-py"
     
-    # 3. Start LLM Orchestrator (depends on MCP Server)
+    # 4. Start Analytics Service (depends on Auth Service)
+    start_service "analytics-service" "8005" "pyairtable-analytics-service"
+    
+    # 5. Start File Processor (depends on Auth Service)
+    start_service "file-processor" "8006" "pyairtable-file-processor"
+    
+    # Phase 3: Services with multiple dependencies
+    # 6. Start LLM Orchestrator (depends on MCP Server)
     start_service "llm-orchestrator" "8003" "llm-orchestrator-py"
     
-    # 4. Start Frontend (depends on all backend services)
+    # 7. Start Workflow Engine (depends on MCP Server and Auth Service)
+    start_service "workflow-engine" "8004" "pyairtable-workflow-engine"
+    
+    # Phase 4: Frontend (depends on all backend services)
+    # 8. Start Frontend (depends on all backend services)
     start_service "frontend" "3000" "pyairtable-frontend"
     
     echo ""
@@ -296,8 +328,12 @@ main() {
     echo ""
     print_info "Running health checks..."
     check_health "airtable-gateway" "8002"
+    check_health "auth-service" "8007"
     check_health "mcp-server" "8001"
+    check_health "analytics-service" "8005"
+    check_health "file-processor" "8006"
     check_health "llm-orchestrator" "8003"
+    check_health "workflow-engine" "8004"
     check_health "frontend" "3000"
     
     # Show final status
@@ -311,6 +347,10 @@ main() {
     echo "curl http://localhost:8003/health"
     echo "curl http://localhost:8001/tools"
     echo "curl http://localhost:8002/health"
+    echo "curl http://localhost:8007/health"
+    echo "curl http://localhost:8004/health" 
+    echo "curl http://localhost:8005/health"
+    echo "curl http://localhost:8006/health"
     echo ""
     echo -e "${YELLOW}To stop services:${NC}"
     echo "./stop.sh"
@@ -343,7 +383,7 @@ case "${1:-start}" in
         echo "  logs           Show all logs"
         echo "  logs SERVICE   Show logs for specific service"
         echo ""
-        echo "Services: airtable-gateway, mcp-server, llm-orchestrator, frontend"
+        echo "Services: airtable-gateway, auth-service, mcp-server, analytics-service, file-processor, llm-orchestrator, workflow-engine, frontend"
         exit 1
         ;;
 esac

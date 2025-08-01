@@ -18,6 +18,10 @@ BASE_URL_FRONTEND="http://localhost:3000"
 BASE_URL_LLM="http://localhost:8003"
 BASE_URL_MCP="http://localhost:8001"
 BASE_URL_GATEWAY="http://localhost:8002"
+BASE_URL_AUTH="http://localhost:8007"
+BASE_URL_WORKFLOW="http://localhost:8004"
+BASE_URL_ANALYTICS="http://localhost:8005"
+BASE_URL_FILEPROCESSOR="http://localhost:8006"
 TEST_SESSION_ID="test-session-$(date +%s)"
 
 # Function to print status
@@ -92,6 +96,10 @@ test_health_checks() {
     test_endpoint "LLM Orchestrator Health" "$BASE_URL_LLM/health"
     test_endpoint "MCP Server Health" "$BASE_URL_MCP/health"
     test_endpoint "Airtable Gateway Health" "$BASE_URL_GATEWAY/health"
+    test_endpoint "Auth Service Health" "$BASE_URL_AUTH/health"
+    test_endpoint "Workflow Engine Health" "$BASE_URL_WORKFLOW/health"
+    test_endpoint "Analytics Service Health" "$BASE_URL_ANALYTICS/health"
+    test_endpoint "File Processor Health" "$BASE_URL_FILEPROCESSOR/health"
     
     echo ""
 }
@@ -146,6 +154,63 @@ test_llm_orchestrator() {
     
     # Test services health
     test_endpoint "Services Health" "$BASE_URL_LLM/health/services"
+    
+    echo ""
+}
+
+# Function to test Auth Service
+test_auth_service() {
+    echo -e "${BLUE}🔐 Auth Service Tests${NC}"
+    echo "===================="
+    
+    # Test auth endpoints (will fail without valid credentials, but should return proper error)
+    print_test "Testing Auth Service status endpoint..."
+    local response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
+        -H "X-API-Key: ${API_KEY:-test-api-key}" \
+        "$BASE_URL_AUTH/status" 2>/dev/null || echo "HTTPSTATUS:000")
+    
+    local status_code=$(echo "$response" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+    
+    # Either 200 (if service is working) or 401/404 (if endpoint doesn't exist) is acceptable
+    if [ "$status_code" = "200" ] || [ "$status_code" = "401" ] || [ "$status_code" = "404" ]; then
+        print_status "Auth Service: Responding correctly (HTTP $status_code)"
+    else
+        print_error "Auth Service: Unexpected status $status_code"
+    fi
+    
+    echo ""
+}
+
+# Function to test Workflow Engine
+test_workflow_engine() {
+    echo -e "${BLUE}⚙️  Workflow Engine Tests${NC}"
+    echo "========================="
+    
+    # Test workflow endpoints
+    test_endpoint "Workflow Status" "$BASE_URL_WORKFLOW/status"
+    
+    echo ""
+}
+
+# Function to test Analytics Service
+test_analytics_service() {
+    echo -e "${BLUE}📊 Analytics Service Tests${NC}"
+    echo "=========================="
+    
+    # Test analytics endpoints
+    test_endpoint "Analytics Status" "$BASE_URL_ANALYTICS/status"
+    test_endpoint "Analytics Metrics" "$BASE_URL_ANALYTICS/metrics"
+    
+    echo ""
+}
+
+# Function to test File Processor
+test_file_processor() {
+    echo -e "${BLUE}📁 File Processor Tests${NC}"
+    echo "======================="
+    
+    # Test file processor endpoints
+    test_endpoint "File Processor Status" "$BASE_URL_FILEPROCESSOR/status"
     
     echo ""
 }
@@ -303,6 +368,10 @@ show_summary() {
     echo "• LLM Orchestrator: http://localhost:8003"
     echo "• MCP Server: http://localhost:8001"
     echo "• Airtable Gateway: http://localhost:8002"
+    echo "• Auth Service: http://localhost:8007"
+    echo "• Workflow Engine: http://localhost:8004"
+    echo "• Analytics Service: http://localhost:8005"
+    echo "• File Processor: http://localhost:8006"
     echo ""
     echo -e "${YELLOW}⚙️  Next Steps:${NC}"
     echo "1. Add your API keys to .env files:"
@@ -334,6 +403,10 @@ main() {
     test_frontend
     test_mcp_tools
     test_airtable_gateway
+    test_auth_service
+    test_workflow_engine
+    test_analytics_service
+    test_file_processor
     test_llm_orchestrator
     test_budget_management
     test_integration
@@ -363,6 +436,18 @@ case "${1:-all}" in
     "gateway")
         test_airtable_gateway
         ;;
+    "auth")
+        test_auth_service
+        ;;
+    "workflow")
+        test_workflow_engine
+        ;;
+    "analytics")
+        test_analytics_service
+        ;;
+    "fileprocessor")
+        test_file_processor
+        ;;
     "llm")
         test_llm_orchestrator
         ;;
@@ -385,6 +470,10 @@ case "${1:-all}" in
         echo "  frontend      Frontend tests"
         echo "  mcp           MCP tools tests"  
         echo "  gateway       Airtable Gateway tests"
+        echo "  auth          Auth Service tests"
+        echo "  workflow      Workflow Engine tests"
+        echo "  analytics     Analytics Service tests"
+        echo "  fileprocessor File Processor tests"
         echo "  llm           LLM Orchestrator tests"
         echo "  budget        Budget management tests"
         echo "  integration   Service integration tests"

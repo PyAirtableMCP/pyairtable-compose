@@ -16,8 +16,8 @@ NC='\033[0m' # No Color
 LOG_DIR="/tmp/pyairtable-logs"
 
 # Service ports
-PORTS=(8001 8002 8003 3000)
-SERVICE_NAMES=("mcp-server" "airtable-gateway" "llm-orchestrator" "frontend")
+PORTS=(8001 8002 8003 8007 8004 8005 8006 3000)
+SERVICE_NAMES=("mcp-server" "airtable-gateway" "llm-orchestrator" "auth-service" "workflow-engine" "analytics-service" "file-processor" "frontend")
 
 # Function to print status
 print_status() {
@@ -142,7 +142,9 @@ cleanup_processes() {
         local cmd=$(ps -p $process -o command= 2>/dev/null || echo "")
         
         # Check if it's one of our Python services
-        if [[ "$cmd" == *"airtable-gateway"* ]] || [[ "$cmd" == *"mcp-server"* ]] || [[ "$cmd" == *"llm-orchestrator"* ]]; then
+        if [[ "$cmd" == *"airtable-gateway"* ]] || [[ "$cmd" == *"mcp-server"* ]] || [[ "$cmd" == *"llm-orchestrator"* ]] || 
+           [[ "$cmd" == *"auth-service"* ]] || [[ "$cmd" == *"workflow-engine"* ]] || 
+           [[ "$cmd" == *"analytics-service"* ]] || [[ "$cmd" == *"file-processor"* ]]; then
             print_info "Killing Python process: $process ($cmd)"
             kill -9 $process 2>/dev/null || true
             killed=$((killed + 1))

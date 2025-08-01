@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 COMPOSE_DIR="/Users/kg/IdeaProjects/pyairtable-compose"
-REQUIRED_SERVICES=("llm-orchestrator-py" "mcp-server-py" "airtable-gateway-py" "pyairtable-common")
+REQUIRED_SERVICES=("llm-orchestrator-py" "mcp-server-py" "airtable-gateway-py" "pyairtable-common" "pyairtable-auth-service" "pyairtable-workflow-engine" "pyairtable-analytics-service" "pyairtable-file-processor")
 FRONTEND_SERVICE="pyairtable-frontend"
 
 echo -e "${BLUE}🚀 PyAirtable Local Development Setup${NC}"
@@ -129,6 +129,60 @@ LOG_LEVEL=info
 # Feature flags
 NEXT_PUBLIC_ENABLE_DEBUG=false
 NEXT_PUBLIC_SHOW_COST_TRACKING=true
+EOF
+                ;;
+            "pyairtable-auth-service")
+                cat > "$env_file" << 'EOF'
+# Auth Service Configuration
+JWT_SECRET=your-jwt-secret-change-in-production
+JWT_EXPIRES_IN=24h
+API_KEY=internal_api_key_123
+LOG_LEVEL=INFO
+REDIS_URL=redis://localhost:6379
+REDIS_PASSWORD=
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/pyairtable
+CORS_ORIGINS=http://localhost:3000,http://localhost:8000
+EOF
+                ;;
+            "pyairtable-workflow-engine")
+                cat > "$env_file" << 'EOF'
+# Workflow Engine Configuration
+MCP_SERVER_URL=http://localhost:8001
+AUTH_SERVICE_URL=http://localhost:8007
+API_KEY=internal_api_key_123
+LOG_LEVEL=INFO
+REDIS_URL=redis://localhost:6379
+REDIS_PASSWORD=
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/pyairtable
+CORS_ORIGINS=http://localhost:3000,http://localhost:8000
+EOF
+                ;;
+            "pyairtable-analytics-service")
+                cat > "$env_file" << 'EOF'
+# Analytics Service Configuration
+AUTH_SERVICE_URL=http://localhost:8007
+API_KEY=internal_api_key_123
+LOG_LEVEL=INFO
+REDIS_URL=redis://localhost:6379
+REDIS_PASSWORD=
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/pyairtable
+CORS_ORIGINS=http://localhost:3000,http://localhost:8000
+EOF
+                ;;
+            "pyairtable-file-processor")
+                cat > "$env_file" << 'EOF'
+# File Processor Configuration
+AUTH_SERVICE_URL=http://localhost:8007
+API_KEY=internal_api_key_123
+LOG_LEVEL=INFO
+REDIS_URL=redis://localhost:6379
+REDIS_PASSWORD=
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/pyairtable
+# File processing configuration
+MAX_FILE_SIZE=10MB
+ALLOWED_EXTENSIONS=pdf,doc,docx,txt,csv,xlsx
+UPLOAD_DIR=/tmp/uploads
+CORS_ORIGINS=http://localhost:3000,http://localhost:8000
 EOF
                 ;;
         esac
@@ -351,6 +405,10 @@ AIRTABLE_TOKEN=your_airtable_token_here
 # Internal API keys (can leave as default for local development)
 API_KEY=internal_api_key_123
 
+# JWT Configuration for Auth Service
+JWT_SECRET=your-jwt-secret-change-in-production 
+JWT_EXPIRES_IN=24h
+
 # Database Configuration
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/pyairtable
 POSTGRES_USER=postgres
@@ -365,6 +423,10 @@ REDIS_PASSWORD=
 LLM_ORCHESTRATOR_PORT=8003
 MCP_SERVER_PORT=8001
 AIRTABLE_GATEWAY_PORT=8002
+AUTH_SERVICE_PORT=8007
+WORKFLOW_ENGINE_PORT=8004
+ANALYTICS_SERVICE_PORT=8005
+FILE_PROCESSOR_PORT=8006
 FRONTEND_PORT=3000
 
 # CORS Configuration
@@ -385,6 +447,11 @@ LOG_LEVEL=INFO
 USE_HTTP_MCP=true
 DEFAULT_MODEL=gemini-2.5-flash
 SESSION_TIMEOUT=3600
+
+# File Processing Configuration
+MAX_FILE_SIZE=10MB
+ALLOWED_EXTENSIONS=pdf,doc,docx,txt,csv,xlsx
+UPLOAD_DIR=/tmp/uploads
 EOF
     
     print_status "Master .env file created"
@@ -410,6 +477,10 @@ EOF
     echo "• LLM Orchestrator: http://localhost:8003"
     echo "• MCP Server: http://localhost:8001" 
     echo "• Airtable Gateway: http://localhost:8002"
+    echo "• Auth Service: http://localhost:8007"
+    echo "• Workflow Engine: http://localhost:8004"
+    echo "• Analytics Service: http://localhost:8005"
+    echo "• File Processor: http://localhost:8006"
     echo ""
     echo -e "${YELLOW}Configuration files created:${NC}"
     echo "• $COMPOSE_DIR/.env (master config)"
