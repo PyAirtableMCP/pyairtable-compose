@@ -7,6 +7,7 @@ field types, relationships, and potential multi-tenant support challenges.
 
 import json
 import requests
+import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from collections import defaultdict
@@ -263,8 +264,8 @@ class AirtableSchemaAnalyzer:
 
 def main():
     # Airtable credentials
-    PERSONAL_ACCESS_TOKEN = "patYH31WYtE9fnm3M.3d628ed8162ab4f8ec0ec9d23784234ce1af0a054daa8d8318a2b8cd11256e5a"
-    BASE_ID = "appVLUAubH5cFWhMV"
+    PERSONAL_ACCESS_TOKEN = os.getenv("AIRTABLE_PAT", "your_personal_access_token_here")
+    BASE_ID = os.getenv("AIRTABLE_BASE_ID", "your_base_id_here")
     
     print("Starting Airtable Schema Analysis...")
     print(f"Base ID: {BASE_ID}")

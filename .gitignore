@@ -1,26 +1,55 @@
 # Environment files
 .env
-.env.*
+.env.local
+.env.production
+.env.*.local
 
-# Docker
-docker-compose.override.yml
+# Secrets
+*.pem
+*.key
+*.cert
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# Kubernetes secrets
+k8s/secrets/
+k8s/update-secrets.sh
+*-secrets.yaml
+*-secret.yaml
+
+# Local development
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
 
 # Logs
 logs/
 *.log
 
-# Data volumes
-data/
-volumes/
-
-# IDE
-.idea/
-.vscode/
-
-# OS
-.DS_Store
-Thumbs.db
+# Docker
+docker-compose.override.yml
 
 # Temporary files
 *.tmp
+*.temp
 *.bak
+*.backup
+
+# Analytics and reports
+k8s/airtable_schema_analysis_*.txt
+k8s/airtable_schema_*.json
