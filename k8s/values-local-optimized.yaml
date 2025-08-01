@@ -1,0 +1,140 @@
+# Optimized local development values for resource-constrained Minikube
+global:
+  imageRegistry: ""  # Empty registry for local images
+  imagePullPolicy: Never
+
+# Override service images to use local builds
+services:
+  frontend:
+    image: pyairtable-frontend
+    tag: dev
+    replicas: 1
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+  apiGateway:
+    image: pyairtable-api-gateway
+    tag: dev
+    replicas: 1
+    resources:
+      limits:
+        cpu: 300m
+        memory: 384Mi
+      requests:
+        cpu: 150m
+        memory: 192Mi
+
+  llmOrchestrator:
+    image: pyairtable-llm-orchestrator
+    tag: dev
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+  mcpServer:
+    image: pyairtable-mcp-server
+    tag: dev
+    replicas: 1
+    resources:
+      limits:
+        cpu: 300m
+        memory: 384Mi
+      requests:
+        cpu: 150m
+        memory: 192Mi
+
+  airtableGateway:
+    image: pyairtable-airtable-gateway
+    tag: dev
+    replicas: 1
+    resources:
+      limits:
+        cpu: 300m
+        memory: 384Mi
+      requests:
+        cpu: 150m
+        memory: 192Mi
+
+  platformServices:
+    image: pyairtable-platform-services
+    tag: dev
+    replicas: 1
+    resources:
+      limits:
+        cpu: 300m
+        memory: 384Mi
+      requests:
+        cpu: 150m
+        memory: 192Mi
+
+  automationServices:
+    image: pyairtable-automation-services
+    tag: dev
+    replicas: 1
+    resources:
+      limits:
+        cpu: 300m
+        memory: 384Mi
+      requests:
+        cpu: 150m
+        memory: 192Mi
+
+# PostgreSQL and Redis use optimized resources for local development
+databases:
+  postgres:
+    persistence:
+      enabled: true
+      size: 1Gi
+    resources:
+      limits:
+        cpu: 300m
+        memory: 512Mi
+      requests:
+        cpu: 150m
+        memory: 256Mi
+
+  redis:
+    persistence:
+      enabled: true
+      size: 512Mi
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+# Persistent volumes
+persistence:
+  fileUploads:
+    enabled: true
+    size: 2Gi
+
+# Application configuration with optimized settings for local development
+app:
+  environment: development
+  logLevel: INFO  # Uppercase LOG_LEVEL
+
+# Health checks with more lenient settings for local development
+healthChecks:
+  enabled: true
+  initialDelaySeconds: 60  # Increased for slower startup in resource-constrained environment
+  periodSeconds: 30
+  timeoutSeconds: 15
+  failureThreshold: 5  # More lenient for local development
+  successThreshold: 1
+
+# Disable autoscaling for local development
+autoscaling:
+  enabled: false

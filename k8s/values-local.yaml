@@ -36,4 +36,4 @@ databases:
   redis:
     persistence:
       enabled: true
-      size: 1Gi
+      size: 512Mi
