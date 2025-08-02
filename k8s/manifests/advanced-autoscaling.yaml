@@ -1,0 +1,497 @@
+# Advanced Auto-scaling Patterns for PyAirtable
+# Includes HPA, VPA, and KEDA for comprehensive scaling
+
+---
+# Horizontal Pod Autoscaler with Custom Metrics
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway-hpa
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: autoscaler
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+  # CPU utilization target
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  # Memory utilization target
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  # Custom metric: Request rate
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  # Custom metric: Response time (P95)
+  - type: Pods
+    pods:
+      metric:
+        name: http_request_duration_p95_seconds
+      target:
+        type: AverageValue
+        averageValue: "0.5"  # 500ms
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # 5 minutes
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 4
+        periodSeconds: 60
+      selectPolicy: Max
+
+---
+# Platform Services HPA
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: platform-services-hpa
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: platform-services
+    app.kubernetes.io/component: autoscaler
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: platform-services
+  minReplicas: 2
+  maxReplicas: 15
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+  # Database connection pool metric
+  - type: External
+    external:
+      metric:
+        name: postgres_active_connections
+        selector:
+          matchLabels:
+            service: platform-services
+      target:
+        type: AverageValue
+        averageValue: "40"  # Scale up if avg connections > 40
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600  # 10 minutes for stateful services
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 120
+      selectPolicy: Max
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Percent
+        value: 200
+        periodSeconds: 30
+      selectPolicy: Max
+
+---
+# Vertical Pod Autoscaler for Cost Optimization
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: api-gateway-vpa
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: vpa
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  updatePolicy:
+    updateMode: "Auto"
+    minReplicas: 2
+  resourcePolicy:
+    containerPolicies:
+    - containerName: api-gateway
+      maxAllowed:
+        cpu: 2
+        memory: 4Gi
+      minAllowed:
+        cpu: 100m
+        memory: 128Mi
+      mode: Auto
+      controlledResources: ["cpu", "memory"]
+      controlledValues: RequestsAndLimits
+    - containerName: istio-proxy
+      maxAllowed:
+        cpu: 500m
+        memory: 512Mi
+      minAllowed:
+        cpu: 10m
+        memory: 32Mi
+      mode: Auto
+
+---
+# VPA for Platform Services
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: platform-services-vpa
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: platform-services
+    app.kubernetes.io/component: vpa
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: platform-services
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: platform-services
+      maxAllowed:
+        cpu: 4
+        memory: 8Gi
+      minAllowed:
+        cpu: 200m
+        memory: 256Mi
+      mode: Auto
+      controlledResources: ["cpu", "memory"]
+
+---
+# KEDA ScaledObject for Event-Driven Autoscaling
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: automation-services-scaler
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: automation-services
+    app.kubernetes.io/component: keda-scaler
+spec:
+  scaleTargetRef:
+    name: automation-services
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 0  # Scale to zero when no work
+  maxReplicaCount: 20
+  triggers:
+  # Scale based on Redis queue length
+  - type: redis
+    metadata:
+      address: redis:6379
+      listName: file_processing_queue
+      listLength: "5"
+      enableTLS: "false"
+  # Scale based on Prometheus metrics
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus:9090
+      metricName: pending_file_uploads
+      threshold: "10"
+      query: sum(pending_file_uploads{service="automation-services"})
+
+---
+# KEDA ScaledObject for Analytics Service
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: analytics-service-scaler
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: analytics-service
+    app.kubernetes.io/component: keda-scaler
+spec:
+  scaleTargetRef:
+    name: analytics-service
+  pollingInterval: 30
+  cooldownPeriod: 600
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  triggers:
+  # Scale based on CPU and custom metrics
+  - type: cpu
+    metadata:
+      type: Utilization
+      value: "70"
+  # Scale based on queue depth in Redis
+  - type: redis
+    metadata:
+      address: redis:6379
+      listName: analytics_jobs
+      listLength: "20"
+
+---
+# Pod Disruption Budget for API Gateway
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api-gateway-pdb
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: pdb
+spec:
+  minAvailable: 50%
+  selector:
+    matchLabels:
+      app: api-gateway
+
+---
+# Pod Disruption Budget for Platform Services
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: platform-services-pdb
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: platform-services
+    app.kubernetes.io/component: pdb
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: platform-services
+
+---
+# Pod Disruption Budget for Database
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgres-pdb
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: pdb
+spec:
+  maxUnavailable: 0  # Never disrupt database
+  selector:
+    matchLabels:
+      app: postgres
+
+---
+# Resource Quota for PyAirtable Namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: pyairtable-quota
+  namespace: pyairtable
+spec:
+  hard:
+    requests.cpu: "20"
+    requests.memory: 40Gi
+    limits.cpu: "50"
+    limits.memory: 100Gi
+    persistentvolumeclaims: "10"
+    services: "50"
+    secrets: "20"
+    configmaps: "20"
+    pods: "100"
+
+---
+# Limit Range for Default Resource Limits
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: pyairtable-limits
+  namespace: pyairtable
+spec:
+  limits:
+  - default:
+      cpu: 500m
+      memory: 512Mi
+    defaultRequest:
+      cpu: 100m
+      memory: 128Mi
+    type: Container
+  - max:
+      cpu: 4
+      memory: 8Gi
+    min:
+      cpu: 10m
+      memory: 32Mi
+    type: Container
+  - max:
+      storage: 100Gi
+    min:
+      storage: 1Gi
+    type: PersistentVolumeClaim
+
+---
+# Priority Class for Critical Services
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: pyairtable-critical
+value: 1000
+globalDefault: false
+description: "Priority class for critical PyAirtable services"
+
+---
+# Priority Class for Normal Services
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: pyairtable-normal
+value: 500
+globalDefault: false
+description: "Priority class for normal PyAirtable services"
+
+---
+# Priority Class for Background Jobs
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: pyairtable-background
+value: 100
+globalDefault: false
+description: "Priority class for background PyAirtable jobs"
+
+---
+# Node Affinity Rules for Critical Services
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway-with-affinity
+  namespace: pyairtable
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      priorityClassName: pyairtable-critical
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-type
+                operator: In
+                values: ["compute-optimized", "general-purpose"]
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-type
+                operator: In
+                values: ["compute-optimized"]
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values: ["api-gateway"]
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: api-gateway
+        image: pyairtable/api-gateway:latest
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+
+---
+# Cluster Autoscaler Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-autoscaler-status
+  namespace: kube-system
+data:
+  nodes.max: "50"
+  nodes.min: "3"
+  scale-down-delay-after-add: "10m"
+  scale-down-unneeded-time: "10m"
+  skip-nodes-with-local-storage: "false"
+  skip-nodes-with-system-pods: "false"
+
+---
+# Custom Metrics API Service for Prometheus Adapter
+apiVersion: v1
+kind: Service
+metadata:
+  name: custom-metrics-api
+  namespace: pyairtable-monitoring
+spec:
+  ports:
+  - port: 443
+    targetPort: 6443
+  selector:
+    app: custom-metrics-apiserver
+
+---
+# ServiceMonitor for Custom Metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pyairtable-custom-metrics
+  namespace: pyairtable-monitoring
+  labels:
+    app: pyairtable
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pyairtable
+  namespaceSelector:
+    matchNames:
+    - pyairtable
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+  - port: http
+    interval: 30s
+    path: /metrics
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: 'http_requests_total|http_request_duration_seconds.*'
+      action: keep

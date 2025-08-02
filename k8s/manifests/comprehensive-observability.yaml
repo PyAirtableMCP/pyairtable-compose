@@ -1,0 +1,906 @@
+# Comprehensive Observability Stack for PyAirtable
+# Includes Prometheus, Grafana, Jaeger, OpenTelemetry, and custom metrics
+
+---
+# OpenTelemetry Operator
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opentelemetry-system
+  labels:
+    name: opentelemetry-system
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opentelemetry-operator
+  namespace: opentelemetry-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opentelemetry-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: opentelemetry-operator
+    spec:
+      containers:
+      - name: manager
+        image: ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator:latest
+        args:
+        - --metrics-addr=0.0.0.0:8080
+        - --enable-leader-election
+        env:
+        - name: WATCH_NAMESPACE
+          value: ""
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+
+---
+# OpenTelemetry Collector Configuration
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: pyairtable-collector
+  namespace: pyairtable-monitoring
+spec:
+  mode: deployment
+  replicas: 3
+  config: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+      prometheus:
+        config:
+          scrape_configs:
+          - job_name: 'pyairtable-services'
+            kubernetes_sd_configs:
+            - role: pod
+              namespaces:
+                names:
+                - pyairtable
+            relabel_configs:
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+              action: keep
+              regex: true
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+              action: replace
+              target_label: __metrics_path__
+              regex: (.+)
+            - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+              action: replace
+              regex: ([^:]+)(?::\d+)?;(\d+)
+              replacement: $1:$2
+              target_label: __address__
+      jaeger:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:14250
+          thrift_http:
+            endpoint: 0.0.0.0:14268
+      zipkin:
+        endpoint: 0.0.0.0:9411
+      
+    processors:
+      batch:
+        timeout: 1s
+        send_batch_size: 1024
+      memory_limiter:
+        limit_mib: 512
+      resource:
+        attributes:
+        - key: environment
+          value: ${ENVIRONMENT}
+          action: upsert
+        - key: cluster
+          value: ${CLUSTER_NAME}
+          action: upsert
+      probabilistic_sampler:
+        sampling_percentage: 10
+      
+    exporters:
+      prometheus:
+        endpoint: "0.0.0.0:8889"
+        namespace: pyairtable
+        const_labels:
+          environment: ${ENVIRONMENT}
+      jaeger:
+        endpoint: jaeger-collector:14250
+        tls:
+          insecure: true
+      logging:
+        loglevel: info
+      otlp/jaeger:
+        endpoint: jaeger-collector:4317
+        tls:
+          insecure: true
+      elasticsearch:
+        endpoints: ["http://elasticsearch:9200"]
+        index: "pyairtable-traces"
+    
+    extensions:
+      health_check:
+      pprof:
+        endpoint: 0.0.0.0:1777
+      zpages:
+        endpoint: 0.0.0.0:55679
+    
+    service:
+      extensions: [health_check, pprof, zpages]
+      pipelines:
+        traces:
+          receivers: [otlp, jaeger, zipkin]
+          processors: [memory_limiter, batch, resource, probabilistic_sampler]
+          exporters: [jaeger, otlp/jaeger]
+        metrics:
+          receivers: [otlp, prometheus]
+          processors: [memory_limiter, batch, resource]
+          exporters: [prometheus]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, resource]
+          exporters: [logging, elasticsearch]
+  env:
+  - name: ENVIRONMENT
+    value: "production"
+  - name: CLUSTER_NAME
+    value: "pyairtable-production"
+
+---
+# Jaeger All-in-One for Production
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: pyairtable-monitoring
+  labels:
+    app: jaeger
+    component: jaeger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+      component: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+        component: jaeger
+    spec:
+      containers:
+      - name: jaeger
+        image: jaegertracing/all-in-one:1.50
+        env:
+        - name: COLLECTOR_OTLP_ENABLED
+          value: "true"
+        - name: COLLECTOR_ZIPKIN_HOST_PORT
+          value: ":9411"
+        - name: SPAN_STORAGE_TYPE
+          value: elasticsearch
+        - name: ES_SERVER_URLS
+          value: http://elasticsearch:9200
+        - name: ES_USERNAME
+          value: ""
+        - name: ES_PASSWORD
+          value: ""
+        - name: LOG_LEVEL
+          value: info
+        - name: METRICS_STORAGE_TYPE
+          value: prometheus
+        - name: PROMETHEUS_SERVER_URL
+          value: http://prometheus:9090
+        ports:
+        - containerPort: 16686
+          name: query
+          protocol: TCP
+        - containerPort: 14268
+          name: collector
+          protocol: TCP
+        - containerPort: 14250
+          name: grpc
+          protocol: TCP
+        - containerPort: 9411
+          name: zipkin
+          protocol: TCP
+        - containerPort: 4317
+          name: otlp-grpc
+          protocol: TCP
+        - containerPort: 4318
+          name: otlp-http
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 16686
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 16686
+          initialDelaySeconds: 30
+          periodSeconds: 30
+
+---
+# Elasticsearch for Log Storage
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+  namespace: pyairtable-monitoring
+  labels:
+    app: elasticsearch
+spec:
+  serviceName: elasticsearch
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+    spec:
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+        env:
+        - name: discovery.type
+          value: single-node
+        - name: ES_JAVA_OPTS
+          value: "-Xms512m -Xmx512m"
+        - name: xpack.security.enabled
+          value: "false"
+        - name: xpack.security.enrollment.enabled
+          value: "false"
+        ports:
+        - containerPort: 9200
+          name: http
+        - containerPort: 9300
+          name: transport
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        volumeMounts:
+        - name: elasticsearch-data
+          mountPath: /usr/share/elasticsearch/data
+  volumeClaimTemplates:
+  - metadata:
+      name: elasticsearch-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+# Prometheus with Enhanced Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config-enhanced
+  namespace: pyairtable-monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'pyairtable-production'
+        environment: 'production'
+
+    rule_files:
+      - "/etc/prometheus/rules/*.yml"
+
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+              - alertmanager:9093
+
+    scrape_configs:
+      # Prometheus itself
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      # Kubernetes API server
+      - job_name: 'kubernetes-apiservers'
+        kubernetes_sd_configs:
+        - role: endpoints
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+          action: keep
+          regex: default;kubernetes;https
+
+      # Kubernetes nodes
+      - job_name: 'kubernetes-nodes'
+        kubernetes_sd_configs:
+        - role: node
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+        - action: labelmap
+          regex: __meta_kubernetes_node_label_(.+)
+
+      # PyAirtable services
+      - job_name: 'pyairtable-services'
+        kubernetes_sd_configs:
+        - role: endpoints
+          namespaces:
+            names: ['pyairtable']
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+          action: keep
+          regex: true
+        - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+          action: replace
+          target_label: __metrics_path__
+          regex: (.+)
+        - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+          action: replace
+          regex: ([^:]+)(?::\d+)?;(\d+)
+          replacement: $1:$2
+          target_label: __address__
+        - action: labelmap
+          regex: __meta_kubernetes_service_label_(.+)
+
+      # Istio service mesh metrics
+      - job_name: 'istio-mesh'
+        kubernetes_sd_configs:
+        - role: endpoints
+          namespaces:
+            names: ['istio-system']
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+          action: keep
+          regex: istio-proxy;http-monitoring
+
+      # OpenTelemetry Collector
+      - job_name: 'otel-collector'
+        static_configs:
+          - targets: ['pyairtable-collector:8889']
+
+  recording_rules.yml: |
+    groups:
+    - name: pyairtable.performance
+      rules:
+      # API Gateway SLA metrics
+      - record: pyairtable:request_duration_seconds:mean5m
+        expr: |
+          rate(http_request_duration_seconds_sum{job="api-gateway"}[5m]) /
+          rate(http_request_duration_seconds_count{job="api-gateway"}[5m])
+      
+      # Error rate by service
+      - record: pyairtable:error_rate:rate5m
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m])) by (service) /
+          sum(rate(http_requests_total[5m])) by (service)
+      
+      # Resource utilization efficiency
+      - record: pyairtable:resource_efficiency:ratio
+        expr: |
+          (
+            sum(rate(container_cpu_usage_seconds_total[5m])) by (pod) /
+            sum(container_spec_cpu_quota/container_spec_cpu_period) by (pod)
+          ) * 100
+
+      # Business metrics
+      - record: pyairtable:active_users:5m
+        expr: |
+          count(increase(http_requests_total{job="api-gateway",status=~"2.."}[5m])) by (user_id)
+      
+      - record: pyairtable:api_calls_per_user:5m
+        expr: |
+          sum(rate(http_requests_total{job="api-gateway"}[5m])) by (user_id)
+
+  alerting_rules.yml: |
+    groups:
+    - name: pyairtable.sla
+      rules:
+      - alert: HighLatencyP99
+        expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service)) > 2.0
+        for: 2m
+        labels:
+          severity: warning
+          sla: latency
+        annotations:
+          summary: "High 99th percentile latency on {{ $labels.service }}"
+          description: "{{ $labels.service }} has a 99th percentile latency of {{ $value }}s"
+      
+      - alert: ErrorRateBudgetExhaustion
+        expr: pyairtable:error_rate:rate5m > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          sla: availability
+        annotations:
+          summary: "Error rate budget exhaustion on {{ $labels.service }}"
+          description: "{{ $labels.service }} error rate is {{ $value | humanizePercentage }}"
+
+      - alert: ServiceDown
+        expr: up{job="pyairtable-services"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.instance }} is down"
+          description: "Service {{ $labels.instance }} has been down for more than 1 minute"
+
+      - alert: HighMemoryUsage
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.pod }}"
+          description: "Memory usage is {{ $value }}%"
+
+      - alert: PodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total[5m]) * 60 * 5 > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pod {{ $labels.pod }} is crash looping"
+          description: "Pod {{ $labels.pod }} has restarted {{ $value }} times in the last 5 minutes"
+
+---
+# Grafana with Enhanced Dashboards
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-enhanced
+  namespace: pyairtable-monitoring
+data:
+  pyairtable-sla-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "PyAirtable - SLA Dashboard",
+        "tags": ["pyairtable", "sla"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Service Availability (SLA: 99.9%)",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "(1 - pyairtable:error_rate:rate5m) * 100",
+                "legendFormat": "{{ service }}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 99},
+                    {"color": "green", "value": 99.9}
+                  ]
+                },
+                "unit": "percent"
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Response Time P95 (SLA: <500ms)",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service)) * 1000",
+                "legendFormat": "{{ service }} P95"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": 0},
+                    {"color": "yellow", "value": 300},
+                    {"color": "red", "value": 500}
+                  ]
+                },
+                "unit": "ms"
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Error Rate by Service",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "pyairtable:error_rate:rate5m * 100",
+                "legendFormat": "{{ service }}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": 0},
+                    {"color": "yellow", "value": 0.5},
+                    {"color": "red", "value": 1.0}
+                  ]
+                },
+                "unit": "percent"
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "Throughput (Requests/sec)",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total[5m])) by (service)",
+                "legendFormat": "{{ service }}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "Active Users (5m window)",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "pyairtable:active_users:5m",
+                "legendFormat": "Active Users"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {"mode": "thresholds"},
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": 0}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 4, "w": 6, "x": 0, "y": 16}
+          },
+          {
+            "id": 6,
+            "title": "API Calls per User",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "topk(10, pyairtable:api_calls_per_user:5m)",
+                "legendFormat": "User {{ user_id }}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 18, "x": 6, "y": 16}
+          }
+        ],
+        "time": {"from": "now-1h", "to": "now"},
+        "refresh": "30s"
+      }
+    }
+
+  pyairtable-business-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "PyAirtable - Business Metrics",
+        "tags": ["pyairtable", "business"],
+        "panels": [
+          {
+            "id": 1,
+            "title": "Revenue Impact (Cost per Request)",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "aws_billing_estimated_charges / sum(increase(http_requests_total[1h]))",
+                "legendFormat": "Cost per Request"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "currencyUSD"
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "User Engagement",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{endpoint=~\"/api/airtable/.*\"}[5m]))",
+                "legendFormat": "Airtable API Calls"
+              },
+              {
+                "expr": "sum(rate(http_requests_total{endpoint=~\"/api/chat/.*\"}[5m]))",
+                "legendFormat": "Chat Interactions"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          }
+        ]
+      }
+    }
+
+---
+# AlertManager Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: pyairtable-monitoring
+data:
+  alertmanager.yml: |
+    global:
+      smtp_smarthost: 'smtp.gmail.com:587'
+      smtp_from: 'alerts@pyairtable.com'
+      smtp_auth_username: 'alerts@pyairtable.com'
+      smtp_auth_password: '${SMTP_PASSWORD}'
+
+    route:
+      group_by: ['alertname', 'service']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'web.hook'
+      routes:
+      - match:
+          severity: critical
+        receiver: 'critical-alerts'
+      - match:
+          severity: warning
+        receiver: 'warning-alerts'
+
+    receivers:
+    - name: 'web.hook'
+      webhook_configs:
+      - url: 'http://alertmanager-webhook:8080/webhook'
+
+    - name: 'critical-alerts'
+      email_configs:
+      - to: 'oncall@pyairtable.com'
+        subject: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Labels: {{ range .Labels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
+          {{ end }}
+      slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-critical'
+        title: '🚨 CRITICAL Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+
+    - name: 'warning-alerts'
+      email_configs:
+      - to: 'team@pyairtable.com'
+        subject: '⚠️ WARNING: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          {{ end }}
+
+---
+# Custom Metrics Exporter
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: custom-metrics-exporter
+  namespace: pyairtable
+  labels:
+    app: custom-metrics-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: custom-metrics-exporter
+  template:
+    metadata:
+      labels:
+        app: custom-metrics-exporter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: exporter
+        image: pyairtable/custom-metrics-exporter:latest
+        ports:
+        - containerPort: 8080
+          name: metrics
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: url
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+
+---
+# Service for Custom Metrics
+apiVersion: v1
+kind: Service
+metadata:
+  name: custom-metrics-exporter
+  namespace: pyairtable
+  labels:
+    app: custom-metrics-exporter
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: metrics
+  selector:
+    app: custom-metrics-exporter
+
+---
+# Log Aggregation with Fluent Bit
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluent-bit
+  namespace: pyairtable-monitoring
+  labels:
+    app: fluent-bit
+spec:
+  selector:
+    matchLabels:
+      app: fluent-bit
+  template:
+    metadata:
+      labels:
+        app: fluent-bit
+    spec:
+      serviceAccountName: fluent-bit
+      containers:
+      - name: fluent-bit
+        image: fluent/fluent-bit:2.1.8
+        ports:
+        - containerPort: 2020
+          name: metrics
+        volumeMounts:
+        - name: config
+          mountPath: /fluent-bit/etc
+        - name: varlog
+          mountPath: /var/log
+          readOnly: true
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+      volumes:
+      - name: config
+        configMap:
+          name: fluent-bit-config
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+
+---
+# Fluent Bit Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: pyairtable-monitoring
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         1
+        Log_Level     info
+        Daemon        off
+        Parsers_File  parsers.conf
+        HTTP_Server   On
+        HTTP_Listen   0.0.0.0
+        HTTP_Port     2020
+
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/*.log
+        Parser            docker
+        Tag               kube.*
+        Refresh_Interval  5
+        Mem_Buf_Limit     50MB
+        Skip_Long_Lines   On
+
+    [FILTER]
+        Name                kubernetes
+        Match               kube.*
+        Kube_URL            https://kubernetes.default.svc:443
+        Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+        Kube_Tag_Prefix     kube.var.log.containers.
+        Merge_Log           On
+        Keep_Log            Off
+        K8S-Logging.Parser  On
+        K8S-Logging.Exclude Off
+
+    [FILTER]
+        Name                nest
+        Match               kube.*
+        Operation           lift
+        Nested_under        kubernetes
+        Add_prefix          kubernetes_
+
+    [OUTPUT]
+        Name            es
+        Match           kube.*
+        Host            elasticsearch
+        Port            9200
+        Index           pyairtable-logs
+        Type            _doc
+        Logstash_Format On
+        Logstash_Prefix pyairtable
+        Time_Key        @timestamp
+        Time_Key_Format %Y-%m-%dT%H:%M:%S
+
+  parsers.conf: |
+    [PARSER]
+        Name        docker
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep   On

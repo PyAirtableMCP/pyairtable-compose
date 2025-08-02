@@ -1,0 +1,669 @@
+# Enhanced Istio Service Mesh Configuration for PyAirtable
+# Advanced traffic management, security, and observability
+
+---
+# Istio Gateway with Advanced TLS Configuration
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: pyairtable-gateway-enhanced
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: gateway
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  # HTTP (redirect to HTTPS)
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*.pyairtable.local"
+    - "api.pyairtable.com"
+    tls:
+      httpsRedirect: true
+  # HTTPS with modern TLS
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: pyairtable-tls-secret
+      minProtocolVersion: TLSV1_2
+      maxProtocolVersion: TLSV1_3
+      cipherSuites:
+      - ECDHE-RSA-AES256-GCM-SHA384
+      - ECDHE-RSA-CHACHA20-POLY1305
+      - ECDHE-RSA-AES128-GCM-SHA256
+    hosts:
+    - "*.pyairtable.local"
+    - "api.pyairtable.com"
+
+---
+# Virtual Service with Advanced Routing and Fault Injection
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: pyairtable-routing-enhanced
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: routing
+spec:
+  hosts:
+  - "*.pyairtable.local"
+  - "api.pyairtable.com"
+  gateways:
+  - pyairtable-gateway-enhanced
+  http:
+  # Health check route (highest priority)
+  - match:
+    - uri:
+        exact: /health
+    - uri:
+        exact: /ready
+    route:
+    - destination:
+        host: api-gateway
+        port:
+          number: 8080
+    timeout: 5s
+    retries:
+      attempts: 2
+      perTryTimeout: 2s
+  
+  # API routes with canary deployment
+  - match:
+    - uri:
+        prefix: /api/v1/
+    - uri:
+        prefix: /api/v2/
+    headers:
+      canary:
+        exact: "true"
+    route:
+    - destination:
+        host: api-gateway
+        subset: canary
+      weight: 100
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+      retryOn: 5xx,reset,connect-failure,refused-stream
+    fault:
+      delay:
+        percentage:
+          value: 0.1
+        fixedDelay: 2s
+  
+  # Production API traffic with weighted routing
+  - match:
+    - uri:
+        prefix: /api/
+    route:
+    - destination:
+        host: api-gateway
+        subset: stable
+      weight: 95
+    - destination:
+        host: api-gateway
+        subset: canary
+      weight: 5
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+      retryOn: 5xx,reset,connect-failure,refused-stream
+    mirror:
+      host: api-gateway
+      subset: shadow
+    mirrorPercentage:
+      value: 1.0  # Mirror 1% of traffic for testing
+  
+  # Frontend routes
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: frontend
+        port:
+          number: 3000
+    timeout: 30s
+    retries:
+      attempts: 2
+      perTryTimeout: 15s
+
+---
+# Destination Rules with Circuit Breaker and Load Balancing
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: api-gateway-enhanced
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: destination-rule
+spec:
+  host: api-gateway
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_CONN
+      consistentHash:
+        httpHeaderName: "x-user-id"  # Session affinity
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 30s
+        tcpKeepalive:
+          time: 7200s
+          interval: 75s
+          probes: 9
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 2
+        maxRetries: 3
+        consecutiveGatewayErrors: 5
+        h2UpgradePolicy: UPGRADE
+        useClientProtocol: true
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 30
+      splitExternalLocalOriginErrors: true
+  subsets:
+  - name: stable
+    labels:
+      version: stable
+    trafficPolicy:
+      loadBalancer:
+        simple: ROUND_ROBIN
+  - name: canary
+    labels:
+      version: canary
+    trafficPolicy:
+      loadBalancer:
+        simple: LEAST_CONN
+  - name: shadow
+    labels:
+      version: shadow
+    trafficPolicy:
+      loadBalancer:
+        simple: RANDOM
+
+---
+# Enhanced Security: PeerAuthentication with Strict mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default-strict-mtls
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: security
+spec:
+  mtls:
+    mode: STRICT
+
+---
+# JWT Authentication for API Gateway
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: pyairtable-jwt-auth
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: authentication
+spec:
+  selector:
+    matchLabels:
+      app: api-gateway
+  jwtRules:
+  - issuer: "https://pyairtable.com"
+    jwksUri: "https://pyairtable.com/.well-known/jwks.json"
+    audiences:
+    - "pyairtable-api"
+    - "pyairtable-frontend"
+    fromHeaders:
+    - name: Authorization
+      prefix: "Bearer "
+    fromParams:
+    - "token"
+    forwardOriginalToken: true
+  - issuer: "pyairtable-internal"
+    jwks: |
+      {
+        "keys": [
+          {
+            "kty": "RSA",
+            "use": "sig",
+            "kid": "pyairtable-key-1",
+            "n": "...",
+            "e": "AQAB"
+          }
+        ]
+      }
+    audiences:
+    - "pyairtable-internal"
+
+---
+# Authorization Policies with RBAC
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: pyairtable-rbac
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: authorization
+spec:
+  action: ALLOW
+  rules:
+  # Allow health checks from anywhere
+  - to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/health", "/ready", "/metrics"]
+  
+  # Allow authenticated users to access API
+  - from:
+    - source:
+        requestPrincipals: ["https://pyairtable.com/*"]
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        paths: ["/api/*"]
+    when:
+    - key: request.auth.claims[role]
+      values: ["user", "admin", "service"]
+  
+  # Allow admin-only operations
+  - from:
+    - source:
+        requestPrincipals: ["https://pyairtable.com/*"]
+    to:
+    - operation:
+        methods: ["DELETE"]
+        paths: ["/api/admin/*"]
+    when:
+    - key: request.auth.claims[role]
+      values: ["admin"]
+  
+  # Allow service-to-service communication
+  - from:
+    - source:
+        principals: ["cluster.local/ns/pyairtable/sa/*"]
+    to:
+    - operation:
+        methods: ["*"]
+
+---
+# Rate Limiting with Envoy
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: rate-limit-filter
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: rate-limiting
+spec:
+  workloadSelector:
+    labels:
+      app: api-gateway
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.local_ratelimit
+        typed_config:
+          "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+          type_url: type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+          value:
+            stat_prefix: local_rate_limiter
+            token_bucket:
+              max_tokens: 1000
+              tokens_per_fill: 100
+              fill_interval: 60s
+            filter_enabled:
+              runtime_key: local_rate_limit_enabled
+              default_value:
+                numerator: 100
+                denominator: HUNDRED
+            filter_enforced:
+              runtime_key: local_rate_limit_enforced
+              default_value:
+                numerator: 100
+                denominator: HUNDRED
+            response_headers_to_add:
+            - append: false
+              header:
+                key: x-local-rate-limit
+                value: 'true'
+
+---
+# Telemetry v2 Configuration for Enhanced Observability
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: pyairtable-telemetry
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: telemetry
+spec:
+  metrics:
+  - providers:
+    - name: prometheus
+  - overrides:
+    - match:
+        metric: ALL_METRICS
+      tagOverrides:
+        request_id:
+          operation: UPSERT
+          value: "%{REQUEST_ID}"
+        user_id:
+          operation: UPSERT
+          value: "%{REQUEST_HEADERS['x-user-id']}"
+        tenant_id:
+          operation: UPSERT
+          value: "%{REQUEST_HEADERS['x-tenant-id']}"
+        operation_name:
+          operation: UPSERT
+          value: "%{REQUEST_HEADERS['x-operation']}"
+  tracing:
+  - providers:
+    - name: jaeger
+  - customTags:
+      user_id:
+        header:
+          name: x-user-id
+      tenant_id:
+        header:
+          name: x-tenant-id
+      request_id:
+        header:
+          name: x-request-id
+      operation_name:
+        header:
+          name: x-operation
+  accessLogging:
+  - providers:
+    - name: otel
+
+---
+# Service Entry for External Dependencies
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: external-apis
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: service-entry
+spec:
+  hosts:
+  - generativelanguage.googleapis.com
+  - api.airtable.com
+  - auth0.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+# Workload Entry for External Database (if needed)
+apiVersion: networking.istio.io/v1beta1
+kind: WorkloadEntry
+metadata:
+  name: external-postgres
+  namespace: pyairtable
+  labels:
+    app: postgres
+    version: external
+spec:
+  address: rds.amazonaws.com
+  ports:
+    postgres: 5432
+  labels:
+    app: postgres
+    version: external
+
+---
+# Sidecar Configuration for Resource Optimization
+apiVersion: networking.istio.io/v1beta1
+kind: Sidecar
+metadata:
+  name: default-sidecar
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: sidecar
+spec:
+  workloadSelector:
+    labels:
+      app: api-gateway
+  ingress:
+  - port:
+      number: 8080
+      protocol: HTTP
+      name: http
+    defaultEndpoint: 127.0.0.1:8080
+  egress:
+  - hosts:
+    - "./*"
+    - "istio-system/*"
+    - "pyairtable-monitoring/*"
+  - hosts:
+    - "generativelanguage.googleapis.com"
+    - "api.airtable.com"
+    port:
+      number: 443
+      protocol: HTTPS
+      name: https
+
+---
+# Virtual Service for Canary Deployment Automation
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: canary-deployment
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: canary
+spec:
+  hosts:
+  - api-gateway
+  http:
+  # Canary deployment based on headers
+  - match:
+    - headers:
+        canary-enabled:
+          exact: "true"
+    route:
+    - destination:
+        host: api-gateway
+        subset: canary
+      weight: 100
+  # Progressive traffic shifting
+  - match:
+    - uri:
+        prefix: /api/
+    route:
+    - destination:
+        host: api-gateway
+        subset: stable
+      weight: 90
+    - destination:
+        host: api-gateway
+        subset: canary
+      weight: 10
+    fault:
+      delay:
+        percentage:
+          value: 0.1
+        fixedDelay: 100ms
+
+---
+# Envoy Filter for Custom Headers and Security
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: security-headers
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: security
+spec:
+  workloadSelector:
+    labels:
+      app: api-gateway
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.lua
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+          inline_code: |
+            function envoy_on_request(request_handle)
+              -- Add security headers
+              request_handle:headers():add("X-Frame-Options", "DENY")
+              request_handle:headers():add("X-Content-Type-Options", "nosniff")
+              request_handle:headers():add("X-XSS-Protection", "1; mode=block")
+              request_handle:headers():add("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+              
+              -- Add request tracking
+              local request_id = request_handle:headers():get("x-request-id")
+              if not request_id then
+                request_id = request_handle:headers():get(":authority") .. "-" .. tostring(math.random(1000000, 9999999))
+                request_handle:headers():add("x-request-id", request_id)
+              end
+              
+              -- Rate limiting per user
+              local user_id = request_handle:headers():get("x-user-id")
+              if user_id then
+                -- Custom rate limiting logic could be added here
+                request_handle:headers():add("x-user-tracked", "true")
+              end
+            end
+            
+            function envoy_on_response(response_handle)
+              -- Add response security headers
+              response_handle:headers():add("X-Powered-By", "PyAirtable")
+              response_handle:headers():add("Cache-Control", "no-cache, no-store, must-revalidate")
+              
+              -- Add performance headers
+              local request_id = response_handle:headers():get("x-request-id")
+              if request_id then
+                response_handle:headers():add("x-trace-id", request_id)
+              end
+            end
+
+---
+# Wasm Plugin for Advanced Observability
+apiVersion: extensions.istio.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: observability-plugin
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: observability
+spec:
+  selector:
+    matchLabels:
+      app: api-gateway
+  url: oci://ghcr.io/pyairtable/observability-wasm:latest
+  phase: STATS
+  pluginConfig:
+    custom_metrics:
+      - name: "business_transaction_duration"
+        type: "histogram"
+        description: "Duration of business transactions"
+        tags:
+          - "operation"
+          - "user_type"
+          - "tenant_id"
+      - name: "api_usage_count"
+        type: "counter"
+        description: "API usage by endpoint"
+        tags:
+          - "endpoint"
+          - "method"
+          - "user_id"
+    logging:
+      format: "json"
+      level: "info"
+      fields:
+        - "timestamp"
+        - "method"
+        - "path"
+        - "status"
+        - "duration"
+        - "user_id"
+        - "tenant_id"
+        - "request_id"
+
+---
+# Fault Injection for Chaos Engineering
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: chaos-engineering
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: chaos
+spec:
+  hosts:
+  - platform-services
+  http:
+  # Chaos testing (only when header is present)
+  - match:
+    - headers:
+        x-chaos-test:
+          exact: "enabled"
+    fault:
+      delay:
+        percentage:
+          value: 20.0
+        fixedDelay: 5s
+      abort:
+        percentage:
+          value: 10.0
+        httpStatus: 503
+    route:
+    - destination:
+        host: platform-services
+  # Normal traffic
+  - route:
+    - destination:
+        host: platform-services
