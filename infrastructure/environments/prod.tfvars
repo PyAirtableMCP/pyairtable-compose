@@ -1,94 +1,84 @@
 # Production Environment Configuration
+# High-performance, high-availability setup for Central Europe clients
 
-environment = "prod"
-aws_region  = "us-east-1"
+project_name = "pyairtable"
+environment  = "prod"
+aws_region   = "eu-central-1"
 
-# VPC Configuration
-vpc_cidr = "10.1.0.0/16"
+# Network Configuration
+vpc_cidr = "10.2.0.0/16"
 
-# Domain and SSL (configure these for production)
-domain_name     = "api.yourdomain.com"
-certificate_arn = "arn:aws:acm:us-east-1:ACCOUNT_ID:certificate/CERTIFICATE_ID"
+# EKS Configuration - Production grade
+eks_version = "1.28"
+enable_spot_instances = false  # On-demand for stability
+enable_spot_fleet = false
 
-# Service Configuration for Production
-service_configs = {
-  frontend = {
-    port           = 3000
-    cpu            = 512
-    memory         = 1024
-    desired_count  = 2
-    health_check_path = "/api/health"
-    priority       = 100
-  }
-  api-gateway = {
-    port           = 8000
-    cpu            = 1024
-    memory         = 2048
-    desired_count  = 3
-    health_check_path = "/health"
-    priority       = 200
-  }
-  llm-orchestrator = {
-    port           = 8003
-    cpu            = 2048
-    memory         = 4096
-    desired_count  = 2
-    health_check_path = "/health"
-    priority       = 300
-  }
-  mcp-server = {
-    port           = 8001
-    cpu            = 1024
-    memory         = 2048
-    desired_count  = 2
-    health_check_path = "/health"
-    priority       = 400
-  }
-  airtable-gateway = {
-    port           = 8002
-    cpu            = 512
-    memory         = 1024
-    desired_count  = 2
-    health_check_path = "/health"
-    priority       = 500
-  }
-  platform-services = {
-    port           = 8007
-    cpu            = 1024
-    memory         = 2048
-    desired_count  = 2
-    health_check_path = "/health"
-    priority       = 600
-  }
-  automation-services = {
-    port           = 8006
-    cpu            = 1024
-    memory         = 2048
-    desired_count  = 2
-    health_check_path = "/health"
-    priority       = 700
-  }
+# Node Group Configurations - Production resources
+go_services_node_config = {
+  instance_types = ["c5.large", "c5.xlarge"]  # Compute optimized
+  min_size       = 2
+  max_size       = 10
+  desired_size   = 3
+  capacity_type  = "ON_DEMAND"
 }
 
-# Environment-specific settings
-environment_configs = {
-  prod = {
-    min_capacity = 2
-    max_capacity = 10
-    enable_autoscaling = true
-    enable_deletion_protection = true
-  }
+python_ai_node_config = {
+  instance_types = ["r5.xlarge", "r5.2xlarge"]  # Memory optimized for AI
+  min_size       = 2
+  max_size       = 8
+  desired_size   = 3
+  capacity_type  = "ON_DEMAND"
 }
 
-# Database Configuration
-enable_rds           = true
-db_instance_class    = "db.t3.small"
-db_allocated_storage = 100
+general_services_node_config = {
+  instance_types = ["m5.large", "m5.xlarge"]  # Balanced
+  min_size       = 2
+  max_size       = 6
+  desired_size   = 3
+  capacity_type  = "ON_DEMAND"
+}
 
-# Redis Configuration
-enable_elasticache     = true
-redis_node_type        = "cache.t3.small"
-redis_num_cache_nodes  = 1
+# Database Configuration - Production Aurora Serverless
+aurora_serverless_config = {
+  min_capacity = 1
+  max_capacity = 16
+}
 
-# Logging
+# Resource Quotas - Production appropriate
+resource_quotas = {
+  cpu_requests    = "32"
+  memory_requests = "64Gi"
+  cpu_limits      = "64"
+  memory_limits   = "128Gi"
+  pods           = "100"
+}
+
+# Monitoring - Full monitoring for production
 log_retention_days = 30
+enable_detailed_monitoring = true
+
+# CI/CD Configuration
+github_owner = "reg-kris"
+github_repo = "pyairtable-compose"
+github_branch = "main"
+
+# Cost Optimization - Conservative for production
+cost_optimization_enabled = false  # Prioritize performance over cost
+monthly_budget_limit = 2000
+
+# Backup - Full retention for production
+backup_retention_days = 30
+enable_cross_region_backup = true
+
+# Security - Maximum security for production
+enable_pod_security_standards = true
+enable_network_policies = true
+
+# Lambda - Higher concurrency for production
+lambda_reserved_concurrency = 50
+lambda_provisioned_concurrency = 10  # Some warm instances
+
+# Auto-scaling - Full featured for production
+enable_cluster_autoscaler = true
+enable_vertical_pod_autoscaler = true
+enable_horizontal_pod_autoscaler = true

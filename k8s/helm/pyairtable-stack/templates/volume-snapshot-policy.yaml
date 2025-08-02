@@ -1,0 +1,167 @@
+{{- if and .Values.databases.postgres.enabled .Values.databases.postgres.snapshots.enabled }}
+# Volume Snapshot Class
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres-snapshot-class
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-snapshots
+  annotations:
+    snapshot.storage.kubernetes.io/is-default-class: {{ .Values.databases.postgres.snapshots.isDefault | default "false" | quote }}
+driver: {{ .Values.databases.postgres.snapshots.driver | default "pd.csi.storage.gke.io" }}
+deletionPolicy: {{ .Values.databases.postgres.snapshots.deletionPolicy | default "Retain" }}
+{{- if .Values.databases.postgres.snapshots.parameters }}
+parameters:
+  {{- toYaml .Values.databases.postgres.snapshots.parameters | nindent 2 }}
+{{- end }}
+---
+# CronJob for automated volume snapshots
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres-snapshot
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-snapshots
+spec:
+  schedule: {{ .Values.databases.postgres.snapshots.schedule | default "0 3 * * *" | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.databases.postgres.snapshots.successfulJobsHistoryLimit | default 3 }}
+  failedJobsHistoryLimit: {{ .Values.databases.postgres.snapshots.failedJobsHistoryLimit | default 1 }}
+  startingDeadlineSeconds: {{ .Values.databases.postgres.snapshots.startingDeadlineSeconds | default 300 }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "pyairtable-stack.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: postgres-snapshots
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: {{ include "pyairtable-stack.fullname" . }}-postgres-snapshot
+          containers:
+          - name: volume-snapshot
+            image: {{ .Values.databases.postgres.snapshots.image | default "bitnami/kubectl:latest" }}
+            imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              
+              echo "Starting volume snapshot at $(date)"
+              
+              # Get the PVC name for the PostgreSQL StatefulSet
+              PVC_NAME="{{ include "pyairtable-stack.fullname" . }}-postgres-0"
+              NAMESPACE="{{ .Values.global.namespace }}"
+              TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+              SNAPSHOT_NAME="${PVC_NAME}-snapshot-${TIMESTAMP}"
+              
+              # Check if PVC exists
+              if ! kubectl get pvc "$PVC_NAME" -n "$NAMESPACE" > /dev/null 2>&1; then
+                echo "Error: PVC $PVC_NAME not found in namespace $NAMESPACE"
+                exit 1
+              fi
+              
+              echo "Creating snapshot for PVC: $PVC_NAME"
+              
+              # Create volume snapshot
+              cat <<EOF | kubectl apply -f -
+              apiVersion: snapshot.storage.k8s.io/v1
+              kind: VolumeSnapshot
+              metadata:
+                name: $SNAPSHOT_NAME
+                namespace: $NAMESPACE
+                labels:
+                  app.kubernetes.io/name: {{ include "pyairtable-stack.name" . }}
+                  app.kubernetes.io/instance: {{ .Release.Name }}
+                  app.kubernetes.io/component: postgres-snapshots
+                  backup.type: volume-snapshot
+                  created.by: cronjob
+              spec:
+                volumeSnapshotClassName: {{ include "pyairtable-stack.fullname" . }}-postgres-snapshot-class
+                source:
+                  persistentVolumeClaimName: $PVC_NAME
+              EOF
+              
+              echo "Volume snapshot $SNAPSHOT_NAME created successfully"
+              
+              # Wait for snapshot to be ready
+              echo "Waiting for snapshot to be ready..."
+              kubectl wait --for=condition=ReadyToUse volumesnapshot/$SNAPSHOT_NAME -n $NAMESPACE --timeout=300s
+              
+              echo "Snapshot is ready!"
+              
+              # Clean up old snapshots (keep based on retention policy)
+              RETENTION_COUNT={{ .Values.databases.postgres.snapshots.retentionCount | default 7 }}
+              echo "Cleaning up old snapshots, keeping last $RETENTION_COUNT snapshots..."
+              
+              # Get snapshots sorted by creation time and delete old ones
+              kubectl get volumesnapshots -n $NAMESPACE \
+                -l app.kubernetes.io/component=postgres-snapshots,backup.type=volume-snapshot \
+                --sort-by=.metadata.creationTimestamp \
+                -o jsonpath='{range .items[:-'$RETENTION_COUNT']}{.metadata.name}{"\n"}{end}' | \
+                while read snapshot; do
+                  if [ -n "$snapshot" ]; then
+                    echo "Deleting old snapshot: $snapshot"
+                    kubectl delete volumesnapshot "$snapshot" -n $NAMESPACE
+                  fi
+                done
+              
+              echo "Volume snapshot job completed at $(date)"
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+---
+# ServiceAccount for snapshot operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres-snapshot
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-snapshots
+---
+# ClusterRole for snapshot operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres-snapshot
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-snapshots
+rules:
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["snapshot.storage.k8s.io"]
+  resources: ["volumesnapshots", "volumesnapshotclasses"]
+  verbs: ["get", "list", "watch", "create", "delete"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+---
+# ClusterRoleBinding for snapshot operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres-snapshot
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-snapshots
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres-snapshot
+subjects:
+- kind: ServiceAccount
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres-snapshot
+  namespace: {{ .Values.global.namespace }}
+{{- end }}

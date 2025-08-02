@@ -1,0 +1,563 @@
+# PyAirtable Migration CI/CD Pipeline
+# Supports gradual migration with blue-green deployment and cost optimization
+
+name: Migration Pipeline
+
+on:
+  push:
+    branches: [main, develop, migration/*]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      migration_phase:
+        description: 'Migration phase to deploy (1-4)'
+        required: true
+        default: '1'
+        type: choice
+        options: ['1', '2', '3', '4']
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options: ['dev', 'staging', 'prod']
+      service_group:
+        description: 'Service group to deploy'
+        required: true
+        default: 'all'
+        type: choice
+        options: ['all', 'legacy', 'microservices', 'infrastructure']
+      blue_green:
+        description: 'Use blue-green deployment'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  AWS_REGION: us-east-1
+  REGISTRY: ghcr.io
+  TF_VERSION: '1.6.0'
+  KUBECTL_VERSION: '1.28.0'
+  HELM_VERSION: '3.13.0'
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  # Determine what to build based on changes
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      legacy-services: ${{ steps.changes.outputs.legacy }}
+      go-microservices: ${{ steps.changes.outputs.go-services }}
+      python-microservices: ${{ steps.changes.outputs.python-services }}
+      infrastructure: ${{ steps.changes.outputs.infrastructure }}
+      migration-phase: ${{ steps.phase.outputs.phase }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            legacy:
+              - 'docker-compose.yml'
+              - 'pyairtable-automation-services/**'
+              - 'pyairtable-infrastructure/**'
+            go-services:
+              - 'go-services/**'
+            python-services:
+              - 'python-services/**'
+            infrastructure:
+              - 'infrastructure/**'
+              - 'k8s/**'
+              - '.github/workflows/**'
+
+      - name: Determine Migration Phase
+        id: phase
+        run: |
+          if [[ "${{ github.event.inputs.migration_phase }}" != "" ]]; then
+            echo "phase=${{ github.event.inputs.migration_phase }}" >> $GITHUB_OUTPUT
+          elif [[ -f "MIGRATION_PHASE" ]]; then
+            echo "phase=$(cat MIGRATION_PHASE)" >> $GITHUB_OUTPUT
+          else
+            echo "phase=1" >> $GITHUB_OUTPUT
+          fi
+
+  # Security scanning for all changes
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Docker security scan
+        if: needs.detect-changes.outputs.legacy-services == 'true' || needs.detect-changes.outputs.go-microservices == 'true'
+        run: |
+          # Scan Dockerfiles for security issues
+          docker run --rm -v "$PWD:/project" aquasec/trivy config /project
+
+  # Build legacy services (Phase 1-2)
+  build-legacy-services:
+    name: Build Legacy Services
+    runs-on: ubuntu-latest
+    needs: [detect-changes, security-scan]
+    if: needs.detect-changes.outputs.legacy-services == 'true' || github.event.inputs.service_group == 'legacy' || github.event.inputs.service_group == 'all'
+    strategy:
+      matrix:
+        service: ['api-gateway', 'platform-services', 'automation-services', 'llm-orchestrator', 'mcp-server', 'airtable-gateway']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/legacy/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch,prefix=v1.
+            type=ref,event=pr,prefix=v1.pr-
+            type=sha,prefix=v1.{{branch}}-
+            type=raw,value=v1.latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile  # Service-specific Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            SERVICE_NAME=${{ matrix.service }}
+            MIGRATION_PHASE=${{ needs.detect-changes.outputs.migration-phase }}
+
+  # Build Go microservices (Phase 2-4)
+  build-go-microservices:
+    name: Build Go Microservices
+    runs-on: ubuntu-latest
+    needs: [detect-changes, security-scan]
+    if: needs.detect-changes.outputs.go-microservices == 'true' || github.event.inputs.service_group == 'microservices' || github.event.inputs.service_group == 'all'
+    strategy:
+      matrix:
+        service: 
+          - auth-service
+          - user-service
+          - tenant-service
+          - workspace-service
+          - notification-service
+          - permission-service
+          - file-service
+          - webhook-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+
+      - name: Run tests
+        working-directory: ./go-services/${{ matrix.service }}
+        run: |
+          go mod download
+          go test -v -race -coverprofile=coverage.out ./...
+
+      - name: Build binary
+        working-directory: ./go-services/${{ matrix.service }}
+        run: |
+          CGO_ENABLED=0 GOOS=linux go build \
+            -ldflags="-w -s -X main.version=${{ github.sha }}" \
+            -o bin/${{ matrix.service }} \
+            ./cmd/${{ matrix.service }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/microservices/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch,prefix=v2.
+            type=ref,event=pr,prefix=v2.pr-
+            type=sha,prefix=v2.{{branch}}-
+            type=raw,value=v2.latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./go-services/${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          platforms: linux/amd64,linux/arm64
+
+  # Build Python microservices
+  build-python-microservices:
+    name: Build Python Microservices
+    runs-on: ubuntu-latest
+    needs: [detect-changes, security-scan]
+    if: needs.detect-changes.outputs.python-microservices == 'true' || github.event.inputs.service_group == 'microservices' || github.event.inputs.service_group == 'all'
+    strategy:
+      matrix:
+        service:
+          - analytics-service
+          - workflow-engine
+          - chat-service
+          - embedding-service
+          - formula-engine
+          - schema-service
+          - semantic-search
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies and test
+        working-directory: ./python-services/${{ matrix.service }}
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+          pytest tests/ --cov=src --cov-report=xml
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/microservices/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch,prefix=v2.
+            type=ref,event=pr,prefix=v2.pr-
+            type=sha,prefix=v2.{{branch}}-
+            type=raw,value=v2.latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./python-services/${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          platforms: linux/amd64,linux/arm64
+
+  # Infrastructure deployment
+  deploy-infrastructure:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    needs: [detect-changes, security-scan]
+    if: needs.detect-changes.outputs.infrastructure == 'true' || github.event.inputs.service_group == 'infrastructure' || github.event.inputs.service_group == 'all'
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: migration-infrastructure
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        working-directory: ./infrastructure
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
+            -backend-config="key=${{ github.event.inputs.environment || 'dev' }}/migration.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}"
+
+      - name: Terraform Plan
+        working-directory: ./infrastructure
+        run: |
+          terraform plan \
+            -var="environment=${{ github.event.inputs.environment || 'dev' }}" \
+            -var="migration_phase=${{ needs.detect-changes.outputs.migration-phase }}" \
+            -var="blue_green_enabled=${{ github.event.inputs.blue_green || false }}" \
+            -out=migration.tfplan
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        working-directory: ./infrastructure
+        run: terraform apply -auto-approve migration.tfplan
+
+      - name: Save Terraform Outputs
+        working-directory: ./infrastructure
+        run: terraform output -json > terraform-outputs.json
+
+      - name: Upload Terraform Outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-outputs-${{ github.event.inputs.environment || 'dev' }}
+          path: infrastructure/terraform-outputs.json
+
+  # Deploy services to Kubernetes
+  deploy-services:
+    name: Deploy Services
+    runs-on: ubuntu-latest
+    needs: [build-legacy-services, build-go-microservices, build-python-microservices, deploy-infrastructure]
+    if: always() && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    strategy:
+      matrix:
+        deployment_group: ['core', 'microservices', 'supporting']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: migration-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download Terraform Outputs
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-outputs-${{ github.event.inputs.environment || 'dev' }}
+          path: ./
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Update kubeconfig
+        run: |
+          CLUSTER_NAME=$(jq -r '.cluster_name.value' terraform-outputs.json)
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name $CLUSTER_NAME
+
+      - name: Deploy Migration Phase Services
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
+          MIGRATION_PHASE: ${{ needs.detect-changes.outputs.migration-phase }}
+          BLUE_GREEN: ${{ github.event.inputs.blue_green || false }}
+        run: |
+          # Create namespace
+          kubectl create namespace pyairtable --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Apply migration-specific configurations
+          envsubst < k8s/migration-configs.yaml | kubectl apply -f -
+          
+          # Deploy based on migration phase and deployment group
+          case "${{ matrix.deployment_group }}" in
+            "core")
+              if [[ "$MIGRATION_PHASE" -ge "1" ]]; then
+                kubectl apply -f k8s/postgres-deployment.yaml
+                kubectl apply -f k8s/redis-deployment.yaml
+                kubectl apply -f k8s/api-gateway-deployment.yaml
+              fi
+              ;;
+            "microservices")
+              if [[ "$MIGRATION_PHASE" -ge "2" ]]; then
+                kubectl apply -f k8s/go-services-deployment.yaml
+                kubectl apply -f k8s/python-services-deployment.yaml
+              fi
+              ;;
+            "supporting")
+              if [[ "$MIGRATION_PHASE" -ge "3" ]]; then
+                kubectl apply -f k8s/monitoring-stack.yaml
+                kubectl apply -f k8s/service-mesh.yaml
+              fi
+              ;;
+          esac
+
+      - name: Wait for deployment
+        run: |
+          # Wait for deployments to be ready
+          kubectl wait --for=condition=available --timeout=300s deployment --all -n pyairtable
+
+      - name: Run health checks
+        run: |
+          # Verify services are responding
+          kubectl get pods -n pyairtable
+          kubectl get services -n pyairtable
+          
+          # Test API Gateway health endpoint
+          API_GATEWAY_URL=$(kubectl get service api-gateway -n pyairtable -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          if [[ -n "$API_GATEWAY_URL" ]]; then
+            curl -f http://$API_GATEWAY_URL/health || echo "Health check failed"
+          fi
+
+  # Cost monitoring and optimization
+  cost-monitoring:
+    name: Cost Monitoring
+    runs-on: ubuntu-latest
+    needs: [deploy-services]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: cost-monitoring
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Generate cost report
+        run: |
+          # Get current month's costs
+          aws ce get-cost-and-usage \
+            --time-period Start=$(date -d "$(date +%Y-%m-01)" +%Y-%m-%d),End=$(date +%Y-%m-%d) \
+            --granularity MONTHLY \
+            --metrics BlendedCost \
+            --group-by Type=DIMENSION,Key=SERVICE \
+            --query 'ResultsByTime[0].Groups[?Metrics.BlendedCost.Amount>`10`]' \
+            > cost-report.json
+
+      - name: Check cost thresholds
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
+        run: |
+          # Set cost thresholds based on environment
+          case "$ENVIRONMENT" in
+            "dev") THRESHOLD=100 ;;
+            "staging") THRESHOLD=200 ;;
+            "prod") THRESHOLD=500 ;;
+          esac
+          
+          CURRENT_COST=$(jq -r '.[] | select(.Keys[0]=="Amazon Elastic Compute Cloud - Compute") | .Metrics.BlendedCost.Amount' cost-report.json)
+          
+          if (( $(echo "$CURRENT_COST > $THRESHOLD" | bc -l) )); then
+            echo "::warning::Cost threshold exceeded: \$${CURRENT_COST} > \$${THRESHOLD}"
+          fi
+
+  # Notification and summary
+  migration-summary:
+    name: Migration Summary
+    runs-on: ubuntu-latest
+    needs: [deploy-services, cost-monitoring]
+    if: always()
+    steps:
+      - name: Generate Migration Summary
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
+          MIGRATION_PHASE: ${{ needs.detect-changes.outputs.migration-phase }}
+        run: |
+          cat << EOF > migration-summary.md
+          # Migration Summary
+          
+          ## Environment: $ENVIRONMENT
+          ## Phase: $MIGRATION_PHASE
+          
+          ### Deployment Status
+          - Infrastructure: ${{ needs.deploy-infrastructure.result }}
+          - Services: ${{ needs.deploy-services.result }}
+          - Cost Monitoring: ${{ needs.cost-monitoring.result }}
+          
+          ### Next Steps
+          $([ "$MIGRATION_PHASE" -lt "4" ] && echo "- Proceed to phase $((MIGRATION_PHASE + 1))" || echo "- Migration complete!")
+          
+          ### Cost Optimization
+          - Spot instances enabled for non-production
+          - Auto-scaling configured based on environment
+          - Resource limits optimized for workload
+          
+          EOF
+
+      - name: Comment PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('migration-summary.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+      - name: Slack notification
+        if: github.ref == 'refs/heads/main'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#migration'
+          text: |
+            Migration Phase ${{ needs.detect-changes.outputs.migration-phase }} deployment completed
+            Environment: ${{ github.event.inputs.environment || 'dev' }}
+            Status: ${{ needs.deploy-services.result }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

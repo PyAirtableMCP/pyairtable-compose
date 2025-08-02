@@ -1,0 +1,178 @@
+# PyAirtable Platform Alert Rules
+# Basic alerting rules for production monitoring
+
+groups:
+  - name: pyairtable.rules
+    rules:
+    
+    # Service availability alerts
+    - alert: ServiceDown
+      expr: up == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Service {{ $labels.job }} is down"
+        description: "Service {{ $labels.job }} on instance {{ $labels.instance }} has been down for more than 1 minute."
+
+    - alert: HighErrorRate
+      expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High error rate detected"
+        description: "Error rate is {{ $value }} errors per second for {{ $labels.job }}"
+
+    # Performance alerts
+    - alert: HighResponseTime
+      expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1.0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High response time detected"
+        description: "95th percentile response time is {{ $value }}s for {{ $labels.job }}"
+
+    - alert: HighCPUUsage
+      expr: rate(container_cpu_usage_seconds_total[5m]) * 100 > 80
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High CPU usage"
+        description: "CPU usage is {{ $value }}% for {{ $labels.container_label_com_docker_compose_service }}"
+
+    - alert: HighMemoryUsage
+      expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) * 100 > 85
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High memory usage"
+        description: "Memory usage is {{ $value }}% for {{ $labels.container_label_com_docker_compose_service }}"
+
+    # Database alerts
+    - alert: PostgreSQLDown
+      expr: up{job="postgres"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "PostgreSQL is down"
+        description: "PostgreSQL database has been down for more than 1 minute."
+
+    - alert: PostgreSQLTooManyConnections
+      expr: pg_stat_database_numbackends / pg_settings_max_connections * 100 > 80
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "PostgreSQL too many connections"
+        description: "PostgreSQL connection usage is {{ $value }}%"
+
+    - alert: RedisDown
+      expr: up{job="redis"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Redis is down"
+        description: "Redis cache has been down for more than 1 minute."
+
+    - alert: RedisHighMemoryUsage
+      expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 90
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Redis high memory usage"
+        description: "Redis memory usage is {{ $value }}%"
+
+    # API Gateway specific alerts
+    - alert: APIGatewayHighLatency
+      expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="api-gateway"}[5m])) > 2.0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "API Gateway high latency"
+        description: "API Gateway 95th percentile latency is {{ $value }}s"
+
+    - alert: APIGatewayRateLimitExceeded
+      expr: rate(rate_limit_exceeded_total{job="api-gateway"}[5m]) > 10
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "API Gateway rate limit frequently exceeded"
+        description: "Rate limit exceeded {{ $value }} times per second"
+
+    # Authentication service alerts
+    - alert: AuthServiceHighFailureRate
+      expr: rate(auth_login_failures_total[5m]) / rate(auth_login_attempts_total[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Authentication service high failure rate"
+        description: "Authentication failure rate is {{ $value }}%"
+
+    # LLM Orchestrator alerts
+    - alert: LLMOrchestratorHighTokenUsage
+      expr: llm_tokens_used_total > 1000000
+      for: 1m
+      labels:
+        severity: warning
+      annotations:
+        summary: "LLM Orchestrator high token usage"
+        description: "Token usage is {{ $value }} - approaching budget limits"
+
+    - alert: LLMOrchestratorHighErrorRate
+      expr: rate(llm_requests_failed_total[5m]) / rate(llm_requests_total[5m]) > 0.05
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "LLM Orchestrator high error rate"
+        description: "LLM error rate is {{ $value }}%"
+
+    # Airtable Gateway alerts
+    - alert: AirtableGatewayRateLimited
+      expr: rate(airtable_rate_limited_total[5m]) > 0.1
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Airtable Gateway being rate limited"
+        description: "Airtable API rate limiting detected at {{ $value }} requests per second"
+
+    # File processing alerts
+    - alert: FileProcessingQueueBacklog
+      expr: file_processing_queue_size > 100
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "File processing queue backlog"
+        description: "File processing queue has {{ $value }} pending items"
+
+    # Disk space alerts
+    - alert: DiskSpaceLow
+      expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Disk space low"
+        description: "Disk space is below 10% on {{ $labels.instance }}"
+
+    # Network alerts
+    - alert: NetworkHighTraffic
+      expr: rate(node_network_receive_bytes_total[5m]) > 100000000  # 100MB/s
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High network traffic"
+        description: "Network traffic is {{ $value }} bytes/s on {{ $labels.instance }}"

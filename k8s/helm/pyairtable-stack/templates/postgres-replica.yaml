@@ -1,0 +1,337 @@
+{{- if and .Values.databases.postgres.enabled .Values.databases.postgres.replication.enabled }}
+# Read-only PostgreSQL replica StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres-replica
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-replica
+spec:
+  serviceName: {{ .Values.databases.postgres.name }}-replica-headless
+  replicas: {{ .Values.databases.postgres.replication.replicas | default 1 }}
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0
+  selector:
+    matchLabels:
+      {{- include "pyairtable-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgres-replica
+  template:
+    metadata:
+      labels:
+        {{- include "pyairtable-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres-replica
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/postgres-replica-config.yaml") . | sha256sum }}
+    spec:
+      {{- if .Values.databases.postgres.replication.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.databases.postgres.replication.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.databases.postgres.replication.tolerations }}
+      tolerations:
+        {{- toYaml .Values.databases.postgres.replication.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.databases.postgres.replication.affinity }}
+      affinity:
+        {{- toYaml .Values.databases.postgres.replication.affinity | nindent 8 }}
+      {{- else }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  {{- include "pyairtable-stack.selectorLabels" . | nindent 18 }}
+                  app.kubernetes.io/component: postgres
+              topologyKey: kubernetes.io/hostname
+      {{- end }}
+      initContainers:
+      - name: postgres-replica-init
+        image: "{{ .Values.databases.postgres.image }}:{{ .Values.databases.postgres.tag }}"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          
+          echo "Initializing PostgreSQL replica..."
+          
+          # Wait for primary to be ready
+          until pg_isready -h {{ .Values.databases.postgres.name }} -p {{ .Values.databases.postgres.port }} -U $POSTGRES_USER; do
+            echo "Waiting for primary PostgreSQL..."
+            sleep 5
+          done
+          
+          # Remove any existing data
+          rm -rf /var/lib/postgresql/data/*
+          
+          # Take base backup from primary
+          echo "Taking base backup from primary..."
+          pg_basebackup -h {{ .Values.databases.postgres.name }} \
+                        -p {{ .Values.databases.postgres.port }} \
+                        -U replication \
+                        -D /var/lib/postgresql/data/pgdata \
+                        -W \
+                        -v \
+                        -P \
+                        -R \
+                        -X stream
+          
+          echo "Base backup completed"
+          
+          # Set proper permissions
+          chown -R postgres:postgres /var/lib/postgresql/data
+          chmod 700 /var/lib/postgresql/data/pgdata
+          
+          echo "Replica initialization completed"
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_USER
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_REPLICATION_PASSWORD
+        volumeMounts:
+        - name: postgres-replica-storage
+          mountPath: /var/lib/postgresql/data
+      containers:
+      - name: postgres-replica
+        image: "{{ .Values.databases.postgres.image }}:{{ .Values.databases.postgres.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - name: postgres
+          containerPort: {{ .Values.databases.postgres.port }}
+          protocol: TCP
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_PASSWORD
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        - name: POSTGRES_REPLICA_MODE
+          value: "slave"
+        - name: POSTGRES_MASTER_SERVICE
+          value: {{ .Values.databases.postgres.name }}
+        - name: POSTGRES_REPLICATION_USER
+          value: replication
+        - name: POSTGRES_REPLICATION_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_REPLICATION_PASSWORD
+        resources:
+          {{- toYaml .Values.databases.postgres.replication.resources | nindent 10 }}
+        volumeMounts:
+        - name: postgres-replica-storage
+          mountPath: /var/lib/postgresql/data
+        - name: postgres-replica-config
+          mountPath: /etc/postgresql/postgresql.conf
+          subPath: postgresql.conf
+        - name: postgres-replica-config
+          mountPath: /etc/postgresql/recovery.conf
+          subPath: recovery.conf
+        livenessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - |
+              pg_isready -U $POSTGRES_USER -h localhost -p {{ .Values.databases.postgres.port }}
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+        readinessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - |
+              pg_isready -U $POSTGRES_USER -h localhost -p {{ .Values.databases.postgres.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: postgres-replica-config
+        configMap:
+          name: {{ include "pyairtable-stack.fullname" . }}-postgres-replica-config
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-replica-storage
+      labels:
+        {{- include "pyairtable-stack.labels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres-replica
+    spec:
+      accessModes:
+      {{- range .Values.databases.postgres.replication.persistence.accessModes }}
+        - {{ . | quote }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.databases.postgres.replication.persistence.size | quote }}
+      {{- if .Values.databases.postgres.replication.persistence.storageClass }}
+      storageClassName: {{ .Values.databases.postgres.replication.persistence.storageClass | quote }}
+      {{- end }}
+---
+# Headless service for replica
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.databases.postgres.name }}-replica-headless
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-replica
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: {{ .Values.databases.postgres.port }}
+    targetPort: postgres
+    protocol: TCP
+    name: postgres
+  selector:
+    {{- include "pyairtable-stack.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-replica
+---
+# Read-only service for replica
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.databases.postgres.name }}-readonly
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-replica
+spec:
+  type: ClusterIP
+  ports:
+  - port: {{ .Values.databases.postgres.port }}
+    targetPort: postgres
+    protocol: TCP
+    name: postgres
+  selector:
+    {{- include "pyairtable-stack.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-replica
+---
+# Cross-region replication setup (if enabled)
+{{- if .Values.databases.postgres.replication.crossRegion.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres-cross-region-sync
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-cross-region
+spec:
+  schedule: {{ .Values.databases.postgres.replication.crossRegion.schedule | default "0 */6 * * *" | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "pyairtable-stack.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: postgres-cross-region
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: cross-region-sync
+            image: "{{ .Values.databases.postgres.image }}:{{ .Values.databases.postgres.tag }}"
+            imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              
+              echo "Starting cross-region PostgreSQL sync at $(date)"
+              
+              # Create backup of current state
+              BACKUP_FILE="/tmp/cross_region_backup_$(date +%Y%m%d_%H%M%S).sql"
+              
+              pg_dump -h {{ .Values.databases.postgres.name }} \
+                      -p {{ .Values.databases.postgres.port }} \
+                      -U "$POSTGRES_USER" \
+                      -d "$POSTGRES_DB" \
+                      --verbose \
+                      --no-password \
+                      --format=custom \
+                      --file="$BACKUP_FILE"
+              
+              echo "Database backup created: $BACKUP_FILE"
+              
+              # Upload to cross-region storage
+              {{- if eq .Values.databases.postgres.replication.crossRegion.provider "gcs" }}
+              gsutil cp "$BACKUP_FILE" "{{ .Values.databases.postgres.replication.crossRegion.bucket }}/postgres-backups/"
+              {{- else if eq .Values.databases.postgres.replication.crossRegion.provider "s3" }}
+              aws s3 cp "$BACKUP_FILE" "{{ .Values.databases.postgres.replication.crossRegion.bucket }}/postgres-backups/"
+              {{- else if eq .Values.databases.postgres.replication.crossRegion.provider "azure" }}
+              az storage blob upload --file "$BACKUP_FILE" --container-name "{{ .Values.databases.postgres.replication.crossRegion.container }}" --name "postgres-backups/$(basename $BACKUP_FILE)"
+              {{- end }}
+              
+              echo "Backup uploaded to cross-region storage"
+              
+              # Clean up local backup
+              rm -f "$BACKUP_FILE"
+              
+              echo "Cross-region sync completed at $(date)"
+            env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pyairtable-stack.fullname" . }}-secrets
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pyairtable-stack.fullname" . }}-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pyairtable-stack.fullname" . }}-secrets
+                  key: POSTGRES_PASSWORD
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pyairtable-stack.fullname" . }}-secrets
+                  key: POSTGRES_PASSWORD
+            {{- if .Values.databases.postgres.replication.crossRegion.credentials }}
+            {{- range $key, $value := .Values.databases.postgres.replication.crossRegion.credentials }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pyairtable-stack.fullname" $ }}-cross-region-credentials
+                  key: {{ $key }}
+            {{- end }}
+            {{- end }}
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+{{- end }}
+{{- end }}

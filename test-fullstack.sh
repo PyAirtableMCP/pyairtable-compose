@@ -15,6 +15,9 @@ API_BASE_URL="http://localhost:8000"
 FRONTEND_URL="http://localhost:3000"
 TEST_SESSION_ID="fullstack-test-$(date +%s)"
 
+# Load API key from environment or use default for testing
+TEST_API_KEY="${PYAIRTABLE_API_KEY:-${API_KEY:-internal_api_key_123}}"
+
 print_status() {
     echo -e "${GREEN}✅ $1${NC}"
 }
@@ -64,7 +67,7 @@ test_api_endpoints() {
     print_info "Testing API endpoints..."
     
     # Test tools endpoint
-    if curl -s -H "X-API-Key: internal_api_key_123" "$API_BASE_URL/api/tools" | jq . > /dev/null; then
+    if curl -s -H "X-API-Key: $TEST_API_KEY" "$API_BASE_URL/api/tools" | jq . > /dev/null; then
         print_status "Tools endpoint working"
     else
         print_error "Tools endpoint failed"
@@ -72,7 +75,7 @@ test_api_endpoints() {
     fi
     
     # Test chat endpoint (basic connectivity)
-    if curl -s -X POST -H "Content-Type: application/json" -H "X-API-Key: internal_api_key_123" \
+    if curl -s -X POST -H "Content-Type: application/json" -H "X-API-Key: $TEST_API_KEY" \
            -d '{"message": "test", "session_id": "'$TEST_SESSION_ID'"}' \
            "$API_BASE_URL/api/chat" > /dev/null; then
         print_status "Chat endpoint is accessible"
@@ -120,7 +123,7 @@ test_data_flow() {
     # Test complete request flow through API gateway
     response=$(curl -s -X POST \
         -H "Content-Type: application/json" \
-        -H "X-API-Key: internal_api_key_123" \
+        -H "X-API-Key: $TEST_API_KEY" \
         -d '{"message": "What tools are available?", "session_id": "'$TEST_SESSION_ID'"}' \
         "$API_BASE_URL/api/chat")
     
@@ -142,7 +145,7 @@ generate_test_report() {
         curl -s "$API_BASE_URL/api/health" | jq . || echo "Health check failed"
         echo ""
         echo "## Available Tools"
-        curl -s -H "X-API-Key: internal_api_key_123" "$API_BASE_URL/api/tools" | jq . || echo "Tools check failed"
+        curl -s -H "X-API-Key: $TEST_API_KEY" "$API_BASE_URL/api/tools" | jq . || echo "Tools check failed"
         echo ""
         echo "## Test Session: $TEST_SESSION_ID"
         echo "Used for testing API integration"

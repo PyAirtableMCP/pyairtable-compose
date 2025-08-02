@@ -65,7 +65,7 @@ create_env_file() {
             "llm-orchestrator-py")
                 cat > "$env_file" << 'EOF'
 # LLM Orchestrator Configuration
-GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_API_KEY=\${GEMINI_API_KEY:-REPLACE_WITH_GEMINI_API_KEY_FROM_GITHUB_SECRETS}
 REDIS_URL=redis://localhost:6379
 REDIS_PASSWORD=
 MCP_SERVER_HTTP_URL=http://localhost:8001
@@ -79,26 +79,26 @@ USE_REDIS_SESSIONS=true
 LOG_LEVEL=INFO
 CORS_ORIGINS=http://localhost:3000,http://localhost:8000
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/pyairtable
-API_KEY=internal_api_key_123
+API_KEY=\${PYAIRTABLE_API_KEY:-REPLACE_WITH_SECURE_API_KEY_FROM_GITHUB_SECRETS}
 EOF
                 ;;
             "mcp-server-py")
                 cat > "$env_file" << 'EOF'
 # MCP Server Configuration
 AIRTABLE_GATEWAY_URL=http://localhost:8002
-AIRTABLE_GATEWAY_API_KEY=internal_api_key_123
+AIRTABLE_GATEWAY_API_KEY=\${PYAIRTABLE_API_KEY:-REPLACE_WITH_SECURE_API_KEY_FROM_GITHUB_SECRETS}
 MCP_SERVER_MODE=http
 MCP_SERVER_PORT=8001
 LOG_LEVEL=INFO
 CORS_ORIGINS=http://localhost:3000,http://localhost:8000
-API_KEY=internal_api_key_123
+API_KEY=\${PYAIRTABLE_API_KEY:-REPLACE_WITH_SECURE_API_KEY_FROM_GITHUB_SECRETS}
 EOF
                 ;;
             "airtable-gateway-py")
                 cat > "$env_file" << 'EOF'
 # Airtable Gateway Configuration
-AIRTABLE_TOKEN=your_airtable_token_here
-API_KEY=internal_api_key_123
+AIRTABLE_TOKEN=\${AIRTABLE_TOKEN:-REPLACE_WITH_AIRTABLE_TOKEN_FROM_GITHUB_SECRETS}
+API_KEY=\${PYAIRTABLE_API_KEY:-REPLACE_WITH_SECURE_API_KEY_FROM_GITHUB_SECRETS}
 REDIS_URL=redis://localhost:6379
 REDIS_PASSWORD=
 LOG_LEVEL=INFO
@@ -118,8 +118,8 @@ MCP_SERVER_URL=http://localhost:8001
 AIRTABLE_GATEWAY_URL=http://localhost:8002
 
 # Authentication and security
-API_KEY=internal_api_key_123
-NEXTAUTH_SECRET=your-secret-key-change-in-production
+API_KEY=\${PYAIRTABLE_API_KEY:-REPLACE_WITH_SECURE_API_KEY_FROM_GITHUB_SECRETS}
+NEXTAUTH_SECRET=\${NEXTAUTH_SECRET:-REPLACE_WITH_NEXTAUTH_SECRET_FROM_GITHUB_SECRETS}
 NEXTAUTH_URL=http://localhost:3000
 
 # Development configuration
@@ -134,9 +134,9 @@ EOF
             "pyairtable-auth-service")
                 cat > "$env_file" << 'EOF'
 # Auth Service Configuration
-JWT_SECRET=your-jwt-secret-change-in-production
+JWT_SECRET=\${JWT_SECRET:-REPLACE_WITH_JWT_SECRET_FROM_GITHUB_SECRETS}
 JWT_EXPIRES_IN=24h
-API_KEY=internal_api_key_123
+API_KEY=\${PYAIRTABLE_API_KEY:-REPLACE_WITH_SECURE_API_KEY_FROM_GITHUB_SECRETS}
 LOG_LEVEL=INFO
 REDIS_URL=redis://localhost:6379
 REDIS_PASSWORD=
@@ -149,7 +149,7 @@ EOF
 # Workflow Engine Configuration
 MCP_SERVER_URL=http://localhost:8001
 AUTH_SERVICE_URL=http://localhost:8007
-API_KEY=internal_api_key_123
+API_KEY=\${PYAIRTABLE_API_KEY:-REPLACE_WITH_SECURE_API_KEY_FROM_GITHUB_SECRETS}
 LOG_LEVEL=INFO
 REDIS_URL=redis://localhost:6379
 REDIS_PASSWORD=
@@ -161,7 +161,7 @@ EOF
                 cat > "$env_file" << 'EOF'
 # Analytics Service Configuration
 AUTH_SERVICE_URL=http://localhost:8007
-API_KEY=internal_api_key_123
+API_KEY=\${PYAIRTABLE_API_KEY:-REPLACE_WITH_SECURE_API_KEY_FROM_GITHUB_SECRETS}
 LOG_LEVEL=INFO
 REDIS_URL=redis://localhost:6379
 REDIS_PASSWORD=
@@ -173,7 +173,7 @@ EOF
                 cat > "$env_file" << 'EOF'
 # File Processor Configuration
 AUTH_SERVICE_URL=http://localhost:8007
-API_KEY=internal_api_key_123
+API_KEY=\${PYAIRTABLE_API_KEY:-REPLACE_WITH_SECURE_API_KEY_FROM_GITHUB_SECRETS}
 LOG_LEVEL=INFO
 REDIS_URL=redis://localhost:6379
 REDIS_PASSWORD=
@@ -397,16 +397,16 @@ main() {
 # Copy the API keys from individual service .env files
 
 # Required: Get from Google AI Studio
-GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_API_KEY=\${GEMINI_API_KEY:-REPLACE_WITH_GEMINI_API_KEY_FROM_GITHUB_SECRETS}
 
 # Required: Get from Airtable > Account > Developer hub > Personal access tokens
-AIRTABLE_TOKEN=your_airtable_token_here
+AIRTABLE_TOKEN=\${AIRTABLE_TOKEN:-REPLACE_WITH_AIRTABLE_TOKEN_FROM_GITHUB_SECRETS}
 
 # Internal API keys (can leave as default for local development)
-API_KEY=internal_api_key_123
+API_KEY=\${PYAIRTABLE_API_KEY:-REPLACE_WITH_SECURE_API_KEY_FROM_GITHUB_SECRETS}
 
 # JWT Configuration for Auth Service
-JWT_SECRET=your-jwt-secret-change-in-production 
+JWT_SECRET=\${JWT_SECRET:-REPLACE_WITH_JWT_SECRET_FROM_GITHUB_SECRETS} 
 JWT_EXPIRES_IN=24h
 
 # Database Configuration
@@ -434,7 +434,7 @@ CORS_ORIGINS=http://localhost:3000,http://localhost:8000
 
 # Frontend Configuration
 NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXTAUTH_SECRET=your-secret-key-change-in-production
+NEXTAUTH_SECRET=\${NEXTAUTH_SECRET:-REPLACE_WITH_NEXTAUTH_SECRET_FROM_GITHUB_SECRETS}
 NEXTAUTH_URL=http://localhost:3000
 NODE_ENV=development
 ENABLE_DEBUG=false

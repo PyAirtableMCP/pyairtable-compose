@@ -67,7 +67,7 @@ export type ApiClient = {
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-const API_KEY = process.env.NEXT_PUBLIC_API_KEY || 'internal_api_key_123'
+const API_KEY = process.env.NEXT_PUBLIC_API_KEY || process.env.PYAIRTABLE_API_KEY || 'REPLACE_WITH_SECURE_API_KEY'
 
 class PyAirtableApiClient implements ApiClient {
   private async request(endpoint: string, options: RequestInit = {}) {

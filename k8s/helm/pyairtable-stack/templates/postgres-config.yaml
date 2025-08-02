@@ -1,0 +1,207 @@
+{{- if .Values.databases.postgres.enabled }}
+{{- if .Values.databases.postgres.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+  {{- if .Values.databases.postgres.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml .Values.databases.postgres.serviceAccount.annotations | nindent 4 }}
+  {{- end }}
+---
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres-config
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+data:
+  postgresql.conf: |
+    # PostgreSQL configuration for Kubernetes
+    
+    # Connection settings
+    listen_addresses = '*'
+    port = {{ .Values.databases.postgres.port }}
+    max_connections = {{ .Values.databases.postgres.config.maxConnections | default 200 }}
+    
+    # Memory settings
+    shared_buffers = {{ .Values.databases.postgres.config.sharedBuffers | default "256MB" }}
+    effective_cache_size = {{ .Values.databases.postgres.config.effectiveCacheSize | default "1GB" }}
+    work_mem = {{ .Values.databases.postgres.config.workMem | default "4MB" }}
+    maintenance_work_mem = {{ .Values.databases.postgres.config.maintenanceWorkMem | default "64MB" }}
+    
+    # Checkpoint settings
+    checkpoint_completion_target = {{ .Values.databases.postgres.config.checkpointCompletionTarget | default 0.9 }}
+    max_wal_size = {{ .Values.databases.postgres.config.maxWalSize | default "1GB" }}
+    min_wal_size = {{ .Values.databases.postgres.config.minWalSize | default "80MB" }}
+    
+    # Logging
+    log_destination = 'stderr'
+    logging_collector = off
+    log_statement = {{ .Values.databases.postgres.config.logStatement | default "'none'" }}
+    log_duration = {{ .Values.databases.postgres.config.logDuration | default "off" }}
+    log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+    
+    # Replication settings
+    wal_level = {{ .Values.databases.postgres.config.walLevel | default "replica" }}
+    max_wal_senders = {{ .Values.databases.postgres.config.maxWalSenders | default 3 }}
+    max_replication_slots = {{ .Values.databases.postgres.config.maxReplicationSlots | default 3 }}
+    hot_standby = {{ .Values.databases.postgres.config.hotStandby | default "on" }}
+    
+    # Performance tuning
+    random_page_cost = {{ .Values.databases.postgres.config.randomPageCost | default 1.1 }}
+    effective_io_concurrency = {{ .Values.databases.postgres.config.effectiveIoConcurrency | default 200 }}
+    
+    # Additional settings
+    timezone = 'UTC'
+    datestyle = 'iso, mdy'
+    default_text_search_config = 'pg_catalog.english'
+    
+    {{- if .Values.databases.postgres.config.extraConfig }}
+    # Extra configuration
+    {{- .Values.databases.postgres.config.extraConfig | nindent 4 }}
+    {{- end }}
+  
+  pg_hba.conf: |
+    # PostgreSQL Client Authentication Configuration File
+    
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+    
+    # "local" is for Unix domain socket connections only
+    local   all             all                                     trust
+    
+    # IPv4 local connections:
+    host    all             all             127.0.0.1/32            md5
+    
+    # IPv6 local connections:
+    host    all             all             ::1/128                 md5
+    
+    # Allow replication connections from localhost
+    local   replication     all                                     trust
+    host    replication     all             127.0.0.1/32            md5
+    host    replication     all             ::1/128                 md5
+    
+    # Allow connections from within the cluster
+    host    all             all             10.0.0.0/8              md5
+    host    all             all             172.16.0.0/12           md5
+    host    all             all             192.168.0.0/16          md5
+    
+    {{- if .Values.databases.postgres.config.extraHbaConfig }}
+    # Extra HBA configuration
+    {{- .Values.databases.postgres.config.extraHbaConfig | nindent 4 }}
+    {{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres-init
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+data:
+  01-init-db.sql: |
+    -- Create databases and extensions
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+    CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
+    
+    -- Session management tables
+    CREATE TABLE IF NOT EXISTS sessions (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        session_id VARCHAR(255) UNIQUE NOT NULL,
+        user_id VARCHAR(255),
+        data JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        expires_at TIMESTAMP WITH TIME ZONE
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_sessions_session_id ON sessions(session_id);
+    CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+    
+    -- Create monitoring user for postgres_exporter
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'postgres_exporter') THEN
+            CREATE USER postgres_exporter WITH PASSWORD 'exporter_password';
+        END IF;
+    END
+    $$;
+    
+    GRANT pg_monitor TO postgres_exporter;
+    GRANT SELECT ON pg_stat_database TO postgres_exporter;
+    GRANT SELECT ON pg_stat_replication TO postgres_exporter;
+---
+{{- if .Values.databases.postgres.backup.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres-backup
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+data:
+  backup.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    # Backup configuration
+    BACKUP_DIR="/var/lib/postgresql/backups"
+    TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+    BACKUP_FILE="${BACKUP_DIR}/postgres_backup_${TIMESTAMP}.sql"
+    
+    echo "Starting PostgreSQL backup at $(date)"
+    
+    # Create backup directory if it doesn't exist
+    mkdir -p "$BACKUP_DIR"
+    
+    # Perform the backup
+    pg_dump -h localhost -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+        --verbose --no-password --format=custom \
+        --file="$BACKUP_FILE"
+    
+    # Compress the backup
+    gzip "$BACKUP_FILE"
+    
+    echo "Backup completed: ${BACKUP_FILE}.gz"
+    
+    # Clean up old backups (keep last 7 days)
+    find "$BACKUP_DIR" -name "postgres_backup_*.sql.gz" -mtime +7 -delete
+    
+    echo "Backup cleanup completed"
+  
+  restore.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    if [ $# -ne 1 ]; then
+        echo "Usage: $0 <backup_file.sql.gz>"
+        exit 1
+    fi
+    
+    BACKUP_FILE="$1"
+    
+    if [ ! -f "$BACKUP_FILE" ]; then
+        echo "Error: Backup file '$BACKUP_FILE' not found"
+        exit 1
+    fi
+    
+    echo "Starting PostgreSQL restore from $BACKUP_FILE at $(date)"
+    
+    # Decompress and restore
+    gunzip -c "$BACKUP_FILE" | pg_restore -h localhost -U "$POSTGRES_USER" \
+        -d "$POSTGRES_DB" --verbose --no-password
+    
+    echo "Restore completed at $(date)"
+{{- end }}
+{{- end }}

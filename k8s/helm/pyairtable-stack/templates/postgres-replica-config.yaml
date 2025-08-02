@@ -1,0 +1,86 @@
+{{- if and .Values.databases.postgres.enabled .Values.databases.postgres.replication.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres-replica-config
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-replica
+data:
+  postgresql.conf: |
+    # PostgreSQL Replica Configuration
+    
+    # Connection settings
+    listen_addresses = '*'
+    port = {{ .Values.databases.postgres.port }}
+    max_connections = {{ .Values.databases.postgres.replication.config.maxConnections | default 100 }}
+    
+    # Memory settings (reduced for replica)
+    shared_buffers = {{ .Values.databases.postgres.replication.config.sharedBuffers | default "128MB" }}
+    effective_cache_size = {{ .Values.databases.postgres.replication.config.effectiveCacheSize | default "512MB" }}
+    work_mem = {{ .Values.databases.postgres.replication.config.workMem | default "2MB" }}
+    maintenance_work_mem = {{ .Values.databases.postgres.replication.config.maintenanceWorkMem | default "32MB" }}
+    
+    # Replica-specific settings
+    hot_standby = on
+    hot_standby_feedback = {{ .Values.databases.postgres.replication.config.hotStandbyFeedback | default "on" }}
+    max_standby_archive_delay = {{ .Values.databases.postgres.replication.config.maxStandbyArchiveDelay | default "30s" }}
+    max_standby_streaming_delay = {{ .Values.databases.postgres.replication.config.maxStandbyStreamingDelay | default "30s" }}
+    
+    # WAL settings
+    wal_level = replica
+    max_wal_senders = 0  # Replica doesn't send WAL
+    max_replication_slots = 0  # Replica doesn't have replication slots
+    
+    # Logging
+    log_destination = 'stderr'
+    logging_collector = off
+    log_statement = 'none'
+    log_duration = off
+    log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+    
+    # Performance tuning for read workloads
+    random_page_cost = {{ .Values.databases.postgres.replication.config.randomPageCost | default 1.1 }}
+    effective_io_concurrency = {{ .Values.databases.postgres.replication.config.effectiveIoConcurrency | default 200 }}
+    
+    # Additional settings
+    timezone = 'UTC'
+    datestyle = 'iso, mdy'
+    default_text_search_config = 'pg_catalog.english'
+    
+    {{- if .Values.databases.postgres.replication.config.extraConfig }}
+    # Extra replica configuration
+    {{- .Values.databases.postgres.replication.config.extraConfig | nindent 4 }}
+    {{- end }}
+  
+  recovery.conf: |
+    # PostgreSQL Recovery Configuration for Streaming Replication
+    
+    standby_mode = 'on'
+    primary_conninfo = 'host={{ .Values.databases.postgres.name }} port={{ .Values.databases.postgres.port }} user=replication password={{ .Values.databases.postgres.replication.password | default "replication_password" }} application_name=replica1'
+    primary_slot_name = {{ .Values.databases.postgres.replication.config.primarySlotName | default "'replica_slot'" }}
+    trigger_file = '/tmp/postgresql.trigger'
+    
+    # Archive recovery settings
+    restore_command = {{ .Values.databases.postgres.replication.config.restoreCommand | default "'cp /var/lib/postgresql/archive/%f %p'" }}
+    archive_cleanup_command = {{ .Values.databases.postgres.replication.config.archiveCleanupCommand | default "'pg_archivecleanup /var/lib/postgresql/archive %r'" }}
+    
+    # Recovery target settings (for point-in-time recovery)
+    {{- if .Values.databases.postgres.replication.config.recoveryTargetTime }}
+    recovery_target_time = '{{ .Values.databases.postgres.replication.config.recoveryTargetTime }}'
+    {{- end }}
+    {{- if .Values.databases.postgres.replication.config.recoveryTargetXid }}
+    recovery_target_xid = '{{ .Values.databases.postgres.replication.config.recoveryTargetXid }}'
+    {{- end }}
+    {{- if .Values.databases.postgres.replication.config.recoveryTargetName }}
+    recovery_target_name = '{{ .Values.databases.postgres.replication.config.recoveryTargetName }}'
+    {{- end }}
+    
+    recovery_target_action = {{ .Values.databases.postgres.replication.config.recoveryTargetAction | default "'promote'" }}
+    
+    {{- if .Values.databases.postgres.replication.config.extraRecoveryConfig }}
+    # Extra recovery configuration
+    {{- .Values.databases.postgres.replication.config.extraRecoveryConfig | nindent 4 }}
+    {{- end }}
+{{- end }}

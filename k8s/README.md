@@ -1,335 +1,273 @@
-# PyAirtable Kubernetes Migration
+# PyAirtable Kubernetes Deployment
 
-This directory contains the complete Kubernetes deployment configuration for the PyAirtable microservices stack, migrated from docker-compose to run on Minikube for local development.
+This directory contains Kubernetes manifests and scripts for deploying the PyAirtable microservices platform.
 
-## 🏗️ Architecture Overview
+## Prerequisites
 
-The application consists of 8 microservices:
+- Kubernetes cluster (Minikube, Docker Desktop, or cloud provider)
+- kubectl CLI installed and configured
+- Docker for building images
+- At least 8GB RAM available for the cluster
+- 20GB disk space for images and data
 
-### Application Services
-- **Frontend** (port 3000) - Next.js web interface
-- **API Gateway** (port 8000) - Main entry point and request routing
-- **LLM Orchestrator** (port 8003) - Gemini 2.5 Flash integration
-- **MCP Server** (port 8001) - Protocol implementation
-- **Airtable Gateway** (port 8002) - Direct Airtable API integration
-- **Platform Services** (port 8007) - Unified auth & analytics
-- **Automation Services** (port 8006) - File processing and workflow automation
+## Quick Start
 
-### Infrastructure Services
-- **PostgreSQL** (port 5432) - Primary database for sessions and metadata
-- **Redis** (port 6379) - Caching and session storage
+1. **Set up environment variables**:
+   ```bash
+   export AIRTABLE_TOKEN=your-airtable-token
+   export GEMINI_API_KEY=your-gemini-api-key
+   ```
 
-## 📁 Directory Structure
+2. **Deploy everything**:
+   ```bash
+   ./deploy-local.sh
+   ```
+
+3. **Test the deployment**:
+   ```bash
+   ./test-deployment.sh
+   ```
+
+4. **Access the API Gateway**:
+   - Minikube: The script will show the URL
+   - Docker Desktop: http://localhost:30080
+
+## Directory Structure
 
 ```
 k8s/
-├── helm/pyairtable-stack/           # Helm chart for the entire stack
-│   ├── Chart.yaml                   # Chart metadata
-│   ├── values.yaml                  # Default configuration values
-│   ├── values-dev.yaml              # Development-specific overrides
-│   └── templates/                   # Kubernetes resource templates
-│       ├── _helpers.tpl             # Template helpers
-│       ├── secrets.yaml             # Secrets and ConfigMaps
-│       ├── persistent-volumes.yaml  # PVC definitions
-│       ├── postgres.yaml            # PostgreSQL deployment
-│       ├── redis.yaml               # Redis deployment
-│       ├── api-gateway.yaml         # API Gateway service
-│       ├── llm-orchestrator.yaml    # LLM Orchestrator service
-│       ├── mcp-server.yaml          # MCP Server service
-│       ├── airtable-gateway.yaml    # Airtable Gateway service
-│       ├── platform-services.yaml   # Platform Services
-│       ├── automation-services.yaml # Automation Services
-│       ├── frontend.yaml            # Frontend service
-│       └── ingress.yaml             # Ingress configuration
-├── deploy-dev.sh                    # Development deployment script
-├── cleanup-dev.sh                   # Cleanup script
-├── monitor-dev.sh                   # Monitoring and debugging script
-└── README.md                        # This file
+├── namespace.yaml                  # PyAirtable namespace
+├── configmap.yaml                  # Service URLs and configuration
+├── postgres-deployment.yaml        # PostgreSQL with persistent storage
+├── redis-deployment.yaml           # Redis for caching
+├── api-gateway-deployment.yaml     # API Gateway (NodePort)
+├── auth-service-deployment.yaml    # Authentication service
+├── core-services-deployment.yaml   # Airtable Gateway, LLM, MCP
+├── go-services-deployment.yaml     # All Go microservices
+├── python-services-deployment.yaml # All Python microservices
+├── deploy-local.sh                 # Deployment automation script
+├── test-deployment.sh              # Test script
+└── cleanup.sh                      # Clean up all resources
 ```
 
-## 🚀 Quick Start
+## Services Overview
 
-### Prerequisites
+### Core Services
+- **API Gateway** (8080/30080): Routes all traffic to backend services
+- **Auth Service** (8081): JWT authentication and user management
+- **Airtable Gateway** (8093): Airtable API integration with caching
+- **LLM Orchestrator** (8091): Gemini integration for chat
+- **MCP Server** (8092): Model Context Protocol tools
 
-1. **Docker Desktop** - Running and properly configured
-2. **Minikube** - For local Kubernetes cluster
-3. **kubectl** - Kubernetes command-line tool
-4. **Helm** - Package manager for Kubernetes
+### Go Services (8082-8090)
+- User Service: User profile management
+- Notification Service: Email/SMS notifications
+- Audit Service: Activity logging
+- Config Service: Dynamic configuration
+- Metrics Service: Performance metrics
+- Scheduler Service: Cron job management
+- Webhook Service: Webhook processing
+- Cache Service: Distributed caching
+- Search Service: Full-text search
 
-All prerequisites are automatically installed by the deployment script if missing.
+### Python Services (8094-8100)
+- Analytics Service: Data analytics
+- Workflow Engine: Business automation
+- File Processor: Document processing
+- Data Pipeline: ETL operations
+- Report Generator: PDF/Excel reports
+- Webhook Handler: Incoming webhooks
+- Storage Service: File storage
 
-### 1. Start Minikube
+## Deployment Commands
 
+### Full Deployment
 ```bash
-minikube start --memory=2500 --cpus=2
+# Deploy everything with image building
+./deploy-local.sh
+
+# Deploy without building (images must exist)
+kubectl apply -f k8s/
 ```
 
-### 2. Deploy the Application
-
+### Individual Components
 ```bash
-cd k8s
-./deploy-dev.sh
+# Deploy infrastructure only
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/postgres-deployment.yaml
+kubectl apply -f k8s/redis-deployment.yaml
+
+# Deploy specific service group
+kubectl apply -f k8s/core-services-deployment.yaml
+kubectl apply -f k8s/go-services-deployment.yaml
+kubectl apply -f k8s/python-services-deployment.yaml
 ```
 
-This script will:
-- Check and install missing prerequisites
-- Create the `pyairtable` namespace
-- Deploy all services using Helm
-- Set up port forwarding options
-- Provide service access information
+## Configuration
 
-### 3. Access the Application
-
-After deployment, access services via port forwarding:
-
+### Secrets
+The deployment script creates secrets automatically. To customize:
 ```bash
-# Frontend
-kubectl port-forward -n pyairtable service/frontend 3000:3000
-
-# API Gateway  
-kubectl port-forward -n pyairtable service/api-gateway 8000:8000
+kubectl create secret generic pyairtable-secrets \
+    --namespace=pyairtable \
+    --from-literal=postgres-password=your-password \
+    --from-literal=redis-password=your-password \
+    --from-literal=jwt-secret=your-32-char-secret \
+    --from-literal=airtable-token=$AIRTABLE_TOKEN \
+    --from-literal=gemini-api-key=$GEMINI_API_KEY \
+    --from-literal=api-key=your-internal-api-key
 ```
 
-Then open:
-- Frontend: http://localhost:3000
-- API Gateway: http://localhost:8000
+### ConfigMap
+Edit `configmap.yaml` to change service URLs or add configuration.
 
-## 🛠️ Configuration
+### Resource Limits
+Each deployment has resource requests and limits:
+- Core services: 128-256Mi memory, 100-500m CPU
+- Data services: 512Mi-1Gi memory, 300-1000m CPU
+- Adjust in deployment files based on your needs
 
-### Environment Variables
+## Monitoring
 
-All sensitive configuration is managed through Kubernetes Secrets and ConfigMaps. Key variables to configure in `values-dev.yaml`:
-
-```yaml
-secrets:
-  apiKey: "your-api-key-here"
-  geminiApiKey: "your-gemini-api-key-here"
-  airtableToken: "your-airtable-token-here"
-  airtableBase: "your-airtable-base-here"
-  # ... other secrets
-```
-
-### Resource Allocation
-
-Development resource limits are optimized for local machines:
-
-```yaml
-services:
-  apiGateway:
-    resources:
-      limits:
-        cpu: 200m
-        memory: 256Mi
-      requests:
-        cpu: 100m
-        memory: 128Mi
-```
-
-### Storage
-
-Persistent volumes are created for:
-- PostgreSQL data (2Gi in development)
-- Redis data (500Mi in development)  
-- File uploads (1Gi in development)
-
-## 📊 Monitoring and Debugging
-
-### Monitor Services
-
+### View Logs
 ```bash
-./monitor-dev.sh
+# Single service
+kubectl logs -n pyairtable deployment/api-gateway
+
+# Follow logs
+kubectl logs -n pyairtable deployment/api-gateway -f
+
+# All containers in a pod
+kubectl logs -n pyairtable <pod-name> --all-containers
 ```
 
-This interactive script provides:
-- Pod status overview
-- Log viewing for individual services
-- Port forwarding setup
-- Issue debugging
-- Real-time pod watching
-- Kubernetes dashboard access
+### Check Status
+```bash
+# All resources
+kubectl get all -n pyairtable
 
-### Manual Commands
+# Detailed pod info
+kubectl describe pod -n pyairtable <pod-name>
 
+# Service endpoints
+kubectl get endpoints -n pyairtable
+
+# Events
+kubectl get events -n pyairtable --sort-by='.lastTimestamp'
+```
+
+## Scaling
+
+### Manual Scaling
+```bash
+# Scale a deployment
+kubectl scale deployment/api-gateway --replicas=3 -n pyairtable
+
+# Scale multiple deployments
+kubectl scale deployment/api-gateway deployment/auth-service --replicas=3 -n pyairtable
+```
+
+### Horizontal Pod Autoscaler
+```bash
+# Create HPA (requires metrics-server)
+kubectl autoscale deployment/api-gateway \
+    --cpu-percent=70 \
+    --min=2 \
+    --max=10 \
+    -n pyairtable
+```
+
+## Troubleshooting
+
+### Pod Not Starting
 ```bash
 # Check pod status
 kubectl get pods -n pyairtable
 
-# View logs for a specific service
-kubectl logs -f deployment/pyairtable-dev-api-gateway -n pyairtable
+# View pod events
+kubectl describe pod -n pyairtable <pod-name>
 
-# Check service endpoints
-kubectl get services -n pyairtable
-
-# Debug failing pods
-kubectl describe pod POD_NAME -n pyairtable
+# Check logs
+kubectl logs -n pyairtable <pod-name> --previous
 ```
 
-## 🔧 Development Workflow
-
-### Making Changes
-
-1. **Update Helm Values**: Modify `values-dev.yaml` for configuration changes
-2. **Update Templates**: Modify files in `templates/` for structural changes
-3. **Redeploy**: Run `./deploy-dev.sh` to apply changes
-
-### Upgrading Services
-
-```bash
-# Upgrade specific release
-helm upgrade pyairtable-dev ./helm/pyairtable-stack \
-    --namespace pyairtable \
-    --values ./helm/pyairtable-stack/values-dev.yaml
-```
-
-### Scaling Services
-
-```bash
-# Scale a specific service
-kubectl scale deployment pyairtable-dev-api-gateway --replicas=2 -n pyairtable
-```
-
-## 🧹 Cleanup
-
-### Remove Application Only
-
-```bash
-./cleanup-dev.sh
-```
-
-### Remove Everything (including Minikube)
-
-```bash
-./cleanup-dev.sh
-# Then select 'y' when prompted to delete Minikube cluster
-```
-
-## 🆚 Docker Compose vs Kubernetes Comparison
-
-| Aspect | Docker Compose | Kubernetes |
-|--------|----------------|------------|
-| **Orchestration** | Simple, single-host | Advanced, multi-host capable |
-| **Service Discovery** | Built-in DNS | Native service discovery |
-| **Load Balancing** | Basic | Advanced with multiple algorithms |
-| **Health Checks** | Limited | Comprehensive liveness/readiness |
-| **Scaling** | Manual | Manual and automatic (HPA) |
-| **Rolling Updates** | Not supported | Built-in |
-| **Configuration** | Environment files | ConfigMaps and Secrets |
-| **Storage** | Named volumes | Persistent Volumes with classes |
-| **Networking** | Bridge networks | CNI with network policies |
-| **Resource Limits** | Basic | Granular CPU/memory controls |
-
-## 🎯 Benefits of Kubernetes Migration
-
-### 1. **Production Readiness**
-- Industry-standard container orchestration
-- Battle-tested in production environments
-- Mature ecosystem of tools and practices
-
-### 2. **Enhanced Observability**
-- Built-in health checks and readiness probes
-- Resource usage monitoring
-- Structured logging integration
-- Metrics collection endpoints
-
-### 3. **Improved Resource Management**
-- Granular CPU and memory limits
-- Quality of Service (QoS) classes
-- Resource quotas and limits
-- Efficient resource utilization
-
-### 4. **Better Service Management**
-- Rolling updates with zero downtime
-- Automatic service discovery
-- Load balancing across replicas
-- Service mesh integration capabilities
-
-### 5. **Configuration Management**
-- Secrets management with encryption at rest
-- ConfigMaps for non-sensitive configuration
-- Environment-specific value overrides
-- Centralized configuration management
-
-### 6. **Development to Production Parity**
-- Same orchestration platform from dev to prod
-- Consistent deployment patterns
-- Infrastructure as Code with Helm charts
-- Environment promotion workflows
-
-## ⚠️ Known Issues and Solutions
-
-### 1. **Image Pull Errors**
-```bash
-# If you see ImagePullBackOff errors
-minikube ssh
-docker pull ghcr.io/reg-kris/SERVICE_NAME:latest
-```
-
-### 2. **Resource Constraints**
-```bash
-# Increase Minikube resources
-minikube delete
-minikube start --memory=4000 --cpus=3
-```
-
-### 3. **Persistent Volume Issues**
-```bash
-# Check storage class
-kubectl get storageclass
-
-# Manually create PVs if needed
-kubectl apply -f templates/persistent-volumes.yaml
-```
-
-### 4. **Service Communication Issues**
+### Service Not Accessible
 ```bash
 # Check service endpoints
 kubectl get endpoints -n pyairtable
 
-# Test internal DNS resolution
-kubectl run -it --rm debug --image=busybox --restart=Never -- nslookup api-gateway.pyairtable.svc.cluster.local
+# Test from inside cluster
+kubectl run test-pod --rm -it --image=busybox --restart=Never -- wget -qO- http://api-gateway.pyairtable:8080/health
 ```
 
-## 🔮 Future Enhancements
+### Database Connection Issues
+```bash
+# Check PostgreSQL
+kubectl exec -it -n pyairtable deployment/postgres -- psql -U admin -d pyairtablemcp
 
-### 1. **Production Deployment**
-- Create production-ready Helm values
-- Implement proper secrets management (Vault, External Secrets)
-- Add network policies for security
-- Configure resource quotas and limits
+# Check Redis
+kubectl exec -it -n pyairtable deployment/redis -- redis-cli -a changeme ping
+```
 
-### 2. **CI/CD Integration**
-- GitHub Actions workflows for automated deployment
-- Helm chart testing and validation
-- Security scanning integration
-- Automated rollback capabilities
+## Cleanup
 
-### 3. **Monitoring Stack**
-- Prometheus and Grafana integration
-- Application metrics collection
-- Distributed tracing with Jaeger
-- Log aggregation with ELK stack
+### Remove Everything
+```bash
+# Interactive cleanup script
+./cleanup.sh
 
-### 4. **Service Mesh**
-- Istio integration for advanced traffic management
-- mTLS between services
-- Circuit breakers and retry policies
-- Canary deployments
+# Manual cleanup
+kubectl delete namespace pyairtable
+```
 
-## 🤝 Contributing
+### Partial Cleanup
+```bash
+# Delete deployments only
+kubectl delete deployments --all -n pyairtable
 
-1. **Testing Changes**: Always test changes in development environment
-2. **Documentation**: Update this README for any architectural changes
-3. **Resource Limits**: Be mindful of resource consumption in shared environments
-4. **Security**: Never commit secrets to version control
+# Delete a specific service
+kubectl delete -f k8s/api-gateway-deployment.yaml
+```
 
-## 📞 Support
+## Production Considerations
 
-For issues and questions:
-1. Check the monitoring dashboard: `./monitor-dev.sh`
-2. Review pod logs for error messages
-3. Verify resource constraints and limits
-4. Check Kubernetes events: `kubectl get events -n pyairtable`
+1. **Secrets Management**: Use Kubernetes Secrets management or external secret stores
+2. **Persistent Storage**: Configure proper StorageClass for production PostgreSQL
+3. **Ingress**: Set up Ingress controller instead of NodePort
+4. **TLS**: Configure TLS certificates for all services
+5. **Monitoring**: Deploy Prometheus and Grafana
+6. **Backup**: Implement automated PostgreSQL backups
+7. **High Availability**: Increase replica counts and configure pod disruption budgets
+8. **Network Policies**: Implement network segmentation
+9. **Resource Limits**: Fine-tune based on actual usage
+10. **Security**: Run security scans and implement pod security policies
 
----
+## Local Development Tips
 
-**Happy Kuberneting! 🚢**
+### Minikube
+```bash
+# Start with enough resources
+minikube start --cpus=4 --memory=8192 --disk-size=30g
+
+# Enable ingress
+minikube addons enable ingress
+
+# Access services
+minikube service api-gateway -n pyairtable
+```
+
+### Docker Desktop
+- Enable Kubernetes in Docker Desktop settings
+- Allocate at least 4 CPUs and 8GB RAM
+- Services available at localhost:30080
+
+### Port Forwarding
+```bash
+# Forward API Gateway
+kubectl port-forward -n pyairtable service/api-gateway 8080:8080
+
+# Forward multiple services
+kubectl port-forward -n pyairtable service/postgres 5432:5432 &
+kubectl port-forward -n pyairtable service/redis 6379:6379 &
+```

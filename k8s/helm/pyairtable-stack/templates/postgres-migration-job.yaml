@@ -1,0 +1,389 @@
+{{- if and .Values.databases.postgres.enabled .Values.databases.postgres.migration.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres-migration-{{ .Values.databases.postgres.migration.version }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-migration
+    migration.version: {{ .Values.databases.postgres.migration.version | quote }}
+spec:
+  ttlSecondsAfterFinished: {{ .Values.databases.postgres.migration.ttlSecondsAfterFinished | default 86400 }}
+  backoffLimit: {{ .Values.databases.postgres.migration.backoffLimit | default 3 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pyairtable-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres-migration
+        migration.version: {{ .Values.databases.postgres.migration.version | quote }}
+    spec:
+      restartPolicy: Never
+      initContainers:
+      - name: wait-for-postgres
+        image: "{{ .Values.databases.postgres.image }}:{{ .Values.databases.postgres.tag }}"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Waiting for PostgreSQL to be ready..."
+          until pg_isready -h {{ .Values.databases.postgres.name }} -p {{ .Values.databases.postgres.port }} -U $POSTGRES_USER; do
+            echo "PostgreSQL is not ready yet, waiting..."
+            sleep 5
+          done
+          echo "PostgreSQL is ready!"
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_USER
+      containers:
+      - name: postgres-migration
+        image: "{{ .Values.databases.postgres.image }}:{{ .Values.databases.postgres.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          
+          echo "Starting PostgreSQL migration at $(date)"
+          echo "Migration version: {{ .Values.databases.postgres.migration.version }}"
+          
+          # Create migration tracking table if it doesn't exist
+          psql -h {{ .Values.databases.postgres.name }} \
+               -p {{ .Values.databases.postgres.port }} \
+               -U "$POSTGRES_USER" \
+               -d "$POSTGRES_DB" \
+               -c "
+                 CREATE TABLE IF NOT EXISTS schema_migrations (
+                   id SERIAL PRIMARY KEY,
+                   version VARCHAR(255) NOT NULL UNIQUE,
+                   description TEXT,
+                   applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                   applied_by VARCHAR(255) DEFAULT CURRENT_USER,
+                   checksum VARCHAR(64),
+                   execution_time_ms INTEGER
+                 );
+                 CREATE INDEX IF NOT EXISTS idx_schema_migrations_version ON schema_migrations(version);
+               "
+          
+          # Check if migration already applied
+          MIGRATION_EXISTS=$(psql -h {{ .Values.databases.postgres.name }} \
+                                 -p {{ .Values.databases.postgres.port }} \
+                                 -U "$POSTGRES_USER" \
+                                 -d "$POSTGRES_DB" \
+                                 -t -c "SELECT COUNT(*) FROM schema_migrations WHERE version = '{{ .Values.databases.postgres.migration.version }}';")
+          
+          if [ "$MIGRATION_EXISTS" -gt 0 ]; then
+            echo "Migration {{ .Values.databases.postgres.migration.version }} already applied, skipping..."
+            exit 0
+          fi
+          
+          echo "Applying migration {{ .Values.databases.postgres.migration.version }}..."
+          
+          # Start timing
+          START_TIME=$(date +%s%3N)
+          
+          # Create backup before migration (if enabled)
+          {{- if .Values.databases.postgres.migration.createBackup }}
+          echo "Creating pre-migration backup..."
+          BACKUP_FILE="/tmp/pre_migration_{{ .Values.databases.postgres.migration.version }}_$(date +%Y%m%d_%H%M%S).sql"
+          pg_dump -h {{ .Values.databases.postgres.name }} \
+                  -p {{ .Values.databases.postgres.port }} \
+                  -U "$POSTGRES_USER" \
+                  -d "$POSTGRES_DB" \
+                  --verbose \
+                  --no-password \
+                  --format=custom \
+                  --file="$BACKUP_FILE"
+          echo "Pre-migration backup created: $BACKUP_FILE"
+          {{- end }}
+          
+          # Apply migration scripts
+          if [ -d "/migrations" ]; then
+            echo "Applying migration scripts from /migrations directory..."
+            
+            # Sort and apply migration files
+            for migration_file in $(ls /migrations/*.sql | sort -V); do
+              if [ -f "$migration_file" ]; then
+                echo "Applying migration file: $migration_file"
+                psql -h {{ .Values.databases.postgres.name }} \
+                     -p {{ .Values.databases.postgres.port }} \
+                     -U "$POSTGRES_USER" \
+                     -d "$POSTGRES_DB" \
+                     -f "$migration_file"
+                echo "Applied: $migration_file"
+              fi
+            done
+          else
+            echo "No migration files found in /migrations directory"
+          fi
+          
+          # Calculate execution time
+          END_TIME=$(date +%s%3N)
+          EXECUTION_TIME=$((END_TIME - START_TIME))
+          
+          # Calculate checksum of applied migration
+          if [ -d "/migrations" ]; then
+            CHECKSUM=$(find /migrations -name "*.sql" -type f -exec cat {} \; | sha256sum | cut -d' ' -f1)
+          else
+            CHECKSUM="no-files"
+          fi
+          
+          # Record migration in tracking table
+          psql -h {{ .Values.databases.postgres.name }} \
+               -p {{ .Values.databases.postgres.port }} \
+               -U "$POSTGRES_USER" \
+               -d "$POSTGRES_DB" \
+               -c "
+                 INSERT INTO schema_migrations (version, description, checksum, execution_time_ms) 
+                 VALUES (
+                   '{{ .Values.databases.postgres.migration.version }}',
+                   '{{ .Values.databases.postgres.migration.description | default "Database migration" }}',
+                   '$CHECKSUM',
+                   $EXECUTION_TIME
+                 );
+               "
+          
+          echo "Migration {{ .Values.databases.postgres.migration.version }} completed successfully"
+          echo "Execution time: ${EXECUTION_TIME}ms"
+          echo "Checksum: $CHECKSUM"
+          
+          # Run post-migration validation (if configured)
+          {{- if .Values.databases.postgres.migration.validation.enabled }}
+          echo "Running post-migration validation..."
+          
+          # Check table counts
+          TABLE_COUNT=$(psql -h {{ .Values.databases.postgres.name }} \
+                            -p {{ .Values.databases.postgres.port }} \
+                            -U "$POSTGRES_USER" \
+                            -d "$POSTGRES_DB" \
+                            -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';")
+          echo "Total tables after migration: $TABLE_COUNT"
+          
+          # Run custom validation queries
+          {{- range .Values.databases.postgres.migration.validation.queries }}
+          echo "Running validation query: {{ . }}"
+          psql -h {{ $.Values.databases.postgres.name }} \
+               -p {{ $.Values.databases.postgres.port }} \
+               -U "$POSTGRES_USER" \
+               -d "$POSTGRES_DB" \
+               -c "{{ . }}"
+          {{- end }}
+          
+          echo "Post-migration validation completed"
+          {{- end }}
+          
+          echo "PostgreSQL migration completed at $(date)"
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_DB
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_PASSWORD
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_PASSWORD
+        - name: MIGRATION_VERSION
+          value: {{ .Values.databases.postgres.migration.version | quote }}
+        volumeMounts:
+        - name: migration-scripts
+          mountPath: /migrations
+          readOnly: true
+        {{- if .Values.databases.postgres.migration.createBackup }}
+        - name: backup-storage
+          mountPath: /tmp
+        {{- end }}
+        resources:
+          {{- toYaml .Values.databases.postgres.migration.resources | nindent 10 }}
+      volumes:
+      - name: migration-scripts
+        configMap:
+          name: {{ include "pyairtable-stack.fullname" . }}-postgres-migration-scripts
+      {{- if .Values.databases.postgres.migration.createBackup }}
+      - name: backup-storage
+        persistentVolumeClaim:
+          claimName: {{ include "pyairtable-stack.fullname" . }}-postgres-backup-pvc
+      {{- end }}
+---
+# ConfigMap with migration scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres-migration-scripts
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-migration
+    migration.version: {{ .Values.databases.postgres.migration.version | quote }}
+data:
+  {{- if .Values.databases.postgres.migration.scripts }}
+  {{- range $filename, $content := .Values.databases.postgres.migration.scripts }}
+  {{ $filename }}: |
+    {{- $content | nindent 4 }}
+  {{- end }}
+  {{- else }}
+  # Default migration scripts
+  001_example_migration.sql: |
+    -- Example migration script
+    -- Add your migration SQL here
+    
+    BEGIN;
+    
+    -- Create example table
+    CREATE TABLE IF NOT EXISTS example_migration_table (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- Add indexes
+    CREATE INDEX IF NOT EXISTS idx_example_migration_table_name ON example_migration_table(name);
+    
+    -- Insert sample data
+    INSERT INTO example_migration_table (name) VALUES ('migration_test') ON CONFLICT DO NOTHING;
+    
+    COMMIT;
+    
+    -- Log migration completion
+    \echo 'Migration 001_example_migration.sql completed successfully'
+  {{- end }}
+---
+# Pre-flight check job to validate environment before migration
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres-preflight-{{ .Values.databases.postgres.migration.version }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-preflight
+    migration.version: {{ .Values.databases.postgres.migration.version | quote }}
+spec:
+  ttlSecondsAfterFinished: {{ .Values.databases.postgres.migration.ttlSecondsAfterFinished | default 3600 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pyairtable-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres-preflight
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: preflight-check
+        image: "{{ .Values.databases.postgres.image }}:{{ .Values.databases.postgres.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          
+          echo "Starting pre-flight checks for migration {{ .Values.databases.postgres.migration.version }}"
+          
+          # Check PostgreSQL connectivity
+          echo "Checking PostgreSQL connectivity..."
+          pg_isready -h {{ .Values.databases.postgres.name }} -p {{ .Values.databases.postgres.port }} -U $POSTGRES_USER
+          
+          # Check database size
+          DB_SIZE=$(psql -h {{ .Values.databases.postgres.name }} \
+                        -p {{ .Values.databases.postgres.port }} \
+                        -U "$POSTGRES_USER" \
+                        -d "$POSTGRES_DB" \
+                        -t -c "SELECT pg_size_pretty(pg_database_size('$POSTGRES_DB'));")
+          echo "Current database size: $DB_SIZE"
+          
+          # Check available disk space
+          AVAILABLE_SPACE=$(df -h /var/lib/postgresql/data | awk 'NR==2 {print $4}')
+          echo "Available disk space: $AVAILABLE_SPACE"
+          
+          # Check for long-running transactions
+          LONG_TRANSACTIONS=$(psql -h {{ .Values.databases.postgres.name }} \
+                                  -p {{ .Values.databases.postgres.port }} \
+                                  -U "$POSTGRES_USER" \
+                                  -d "$POSTGRES_DB" \
+                                  -t -c "SELECT COUNT(*) FROM pg_stat_activity WHERE state = 'active' AND query_start < NOW() - INTERVAL '5 minutes';")
+          
+          if [ "$LONG_TRANSACTIONS" -gt 0 ]; then
+            echo "Warning: $LONG_TRANSACTIONS long-running transactions detected"
+            echo "Consider waiting for these transactions to complete before migration"
+          else
+            echo "No long-running transactions detected"
+          fi
+          
+          # Check for locks
+          LOCKS=$(psql -h {{ .Values.databases.postgres.name }} \
+                      -p {{ .Values.databases.postgres.port }} \
+                      -U "$POSTGRES_USER" \
+                      -d "$POSTGRES_DB" \
+                      -t -c "SELECT COUNT(*) FROM pg_locks WHERE NOT granted;")
+          
+          if [ "$LOCKS" -gt 0 ]; then
+            echo "Warning: $LOCKS ungranted locks detected"
+          else
+            echo "No blocking locks detected"
+          fi
+          
+          # Check replication status (if replica exists)
+          REPLICA_COUNT=$(psql -h {{ .Values.databases.postgres.name }} \
+                              -p {{ .Values.databases.postgres.port }} \
+                              -U "$POSTGRES_USER" \
+                              -d "$POSTGRES_DB" \
+                              -t -c "SELECT COUNT(*) FROM pg_stat_replication;" 2>/dev/null || echo "0")
+          
+          if [ "$REPLICA_COUNT" -gt 0 ]; then
+            echo "Replication active with $REPLICA_COUNT replica(s)"
+            # Check replication lag
+            MAX_LAG=$(psql -h {{ .Values.databases.postgres.name }} \
+                          -p {{ .Values.databases.postgres.port }} \
+                          -U "$POSTGRES_USER" \
+                          -d "$POSTGRES_DB" \
+                          -t -c "SELECT COALESCE(MAX(EXTRACT(EPOCH FROM (now() - backend_start))), 0) FROM pg_stat_replication;")
+            echo "Maximum replication lag: ${MAX_LAG}s"
+          else
+            echo "No active replication"
+          fi
+          
+          echo "Pre-flight checks completed successfully"
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_DB
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_PASSWORD
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_PASSWORD
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+{{- end }}

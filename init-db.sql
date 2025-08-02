@@ -1,5 +1,8 @@
 -- Initialize PyAirtable database schema
--- Updated: 2025-08-01 - Added new session management tables
+-- Updated: 2025-08-02 - Added permissions database setup
+
+-- Create separate database for permissions service
+CREATE DATABASE pyairtable_permissions OWNER postgres;
 
 -- Import the new session management schema
 \i /docker-entrypoint-initdb.d/migrations/001_create_session_tables.sql

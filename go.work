@@ -1,0 +1,16 @@
+go 1.24.5
+
+use (
+	./go-services/api-gateway
+	./go-services/auth-service
+	./go-services/file-service
+	./go-services/mobile-bff
+	./go-services/notification-service
+	./go-services/permission-service
+	./go-services/tenant-service
+	./go-services/user-service
+	./go-services/web-bff
+	./go-services/webhook-service
+	./go-services/workspace-service
+	./pyairtable-infrastructure/pyairtable-go-shared
+)

@@ -1,0 +1,861 @@
+# PyAirtable Istio Service Mesh Configuration
+# Production-ready service mesh setup with security, observability, and traffic management
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pyairtable
+  labels:
+    istio-injection: enabled
+    name: pyairtable
+
+---
+# =============================================================================
+# SECURITY POLICIES
+# =============================================================================
+
+# Enable strict mTLS for all services
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: pyairtable
+spec:
+  mtls:
+    mode: STRICT
+
+---
+# API Gateway specific authentication (allow external traffic)
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: api-gateway
+  namespace: pyairtable
+spec:
+  selector:
+    matchLabels:
+      app: api-gateway
+  portLevelMtls:
+    8000:
+      mode: PERMISSIVE  # Allow external HTTP/HTTPS traffic
+
+---
+# Service-to-service authorization policy
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: service-to-service
+  namespace: pyairtable
+spec:
+  rules:
+  # API Gateway can call all services
+  - from:
+    - source:
+        principals: ["cluster.local/ns/pyairtable/sa/api-gateway"]
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "DELETE"]
+  
+  # Auth service authorization
+  - from:
+    - source:
+        principals: 
+        - "cluster.local/ns/pyairtable/sa/api-gateway"
+        - "cluster.local/ns/pyairtable/sa/user-service"
+        - "cluster.local/ns/pyairtable/sa/permission-service"
+    to:
+    - operation:
+        methods: ["GET", "POST"]
+        paths: ["/api/v1/auth/*"]
+    when:
+    - key: request.headers[authorization]
+      values: ["Bearer *"]
+
+  # User service authorization  
+  - from:
+    - source:
+        principals:
+        - "cluster.local/ns/pyairtable/sa/auth-service"
+        - "cluster.local/ns/pyairtable/sa/api-gateway"
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT"]
+        paths: ["/api/v1/users/*"]
+    when:
+    - key: custom.tenant_id
+      values: ["*"]  # Will be populated by custom filter
+
+  # Airtable services authorization
+  - from:
+    - source:
+        principals:
+        - "cluster.local/ns/pyairtable/sa/api-gateway"
+        - "cluster.local/ns/pyairtable/sa/data-sync-service"
+        - "cluster.local/ns/pyairtable/sa/webhook-service"
+    to:
+    - operation:
+        methods: ["GET", "POST"]
+        paths: ["/api/v1/airtable/*"]
+
+  # AI services authorization
+  - from:
+    - source:
+        principals:
+        - "cluster.local/ns/pyairtable/sa/api-gateway"
+        - "cluster.local/ns/pyairtable/sa/conversation-service"
+    to:
+    - operation:
+        methods: ["POST"]
+        paths: ["/api/v1/llm/*", "/api/v1/chat/*"]
+
+  # File services authorization
+  - from:
+    - source:
+        principals:
+        - "cluster.local/ns/pyairtable/sa/api-gateway"
+        - "cluster.local/ns/pyairtable/sa/content-processor"
+        - "cluster.local/ns/pyairtable/sa/workflow-engine"
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT"]
+        paths: ["/api/v1/files/*"]
+
+  # Workflow services authorization
+  - from:
+    - source:
+        principals:
+        - "cluster.local/ns/pyairtable/sa/api-gateway"
+        - "cluster.local/ns/pyairtable/sa/scheduler-service"
+        - "cluster.local/ns/pyairtable/sa/event-processor"
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT"]
+        paths: ["/api/v1/workflows/*"]
+
+  # Analytics services (internal only)
+  - from:
+    - source:
+        principals:
+        - "cluster.local/ns/pyairtable/sa/audit-service"
+        - "cluster.local/ns/pyairtable/sa/notification-service"
+    to:
+    - operation:
+        methods: ["POST"]
+        paths: ["/api/v1/analytics/*"]
+
+---
+# Deny all other traffic by default
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-all-default
+  namespace: pyairtable
+spec:
+  # Empty rules means deny all
+
+---
+# =============================================================================
+# TRAFFIC MANAGEMENT
+# =============================================================================
+
+# Gateway for external traffic
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: pyairtable-gateway
+  namespace: pyairtable
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "pyairtable.local"
+    - "api.pyairtable.local"
+    tls:
+      httpsRedirect: true
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    hosts:
+    - "pyairtable.local"
+    - "api.pyairtable.local"
+    tls:
+      mode: SIMPLE
+      credentialName: pyairtable-tls-secret
+
+---
+# Virtual Service for traffic routing
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: pyairtable-routes
+  namespace: pyairtable
+spec:
+  hosts:
+  - "pyairtable.local"
+  - "api.pyairtable.local"
+  gateways:
+  - pyairtable-gateway
+  http:
+  # API routes
+  - match:
+    - uri:
+        prefix: "/api/v1/auth"
+    route:
+    - destination:
+        host: auth-service
+        port:
+          number: 8010
+    headers:
+      request:
+        add:
+          x-forwarded-proto: https
+          x-service-name: auth-service
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+
+  - match:
+    - uri:
+        prefix: "/api/v1/users"
+    route:
+    - destination:
+        host: user-service
+        port:
+          number: 8011
+    headers:
+      request:
+        add:
+          x-service-name: user-service
+    timeout: 30s
+
+  - match:
+    - uri:
+        prefix: "/api/v1/airtable"
+    route:
+    - destination:
+        host: airtable-connector
+        port:
+          number: 8020
+      weight: 90
+    - destination:
+        host: airtable-connector
+        port:
+          number: 8020
+        subset: canary
+      weight: 10
+    headers:
+      request:
+        add:
+          x-service-name: airtable-connector
+    timeout: 60s
+    retries:
+      attempts: 3
+      perTryTimeout: 20s
+      retryOn: gateway-error,connect-failure,refused-stream
+
+  - match:
+    - uri:
+        prefix: "/api/v1/chat"
+    - uri:
+        prefix: "/api/v1/llm"
+    route:
+    - destination:
+        host: llm-orchestrator
+        port:
+          number: 8030
+    headers:
+      request:
+        add:
+          x-service-name: llm-orchestrator
+    timeout: 120s  # LLM calls can take longer
+
+  - match:
+    - uri:
+        prefix: "/api/v1/files"
+    route:
+    - destination:
+        host: file-storage-service
+        port:
+          number: 8040
+    headers:
+      request:
+        add:
+          x-service-name: file-storage-service
+    timeout: 300s  # File uploads can take longer
+
+  - match:
+    - uri:
+        prefix: "/api/v1/workflows"
+    route:
+    - destination:
+        host: workflow-engine
+        port:
+          number: 8050
+    headers:
+      request:
+        add:
+          x-service-name: workflow-engine
+    timeout: 60s
+
+  # Health check routes
+  - match:
+    - uri:
+        exact: "/health"
+    route:
+    - destination:
+        host: api-gateway
+        port:
+          number: 8000
+    timeout: 5s
+
+  # Default route to frontend
+  - route:
+    - destination:
+        host: api-gateway
+        port:
+          number: 8000
+    timeout: 30s
+
+---
+# =============================================================================
+# DESTINATION RULES (Circuit Breaker & Load Balancing)
+# =============================================================================
+
+# Airtable Connector with circuit breaker
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: airtable-connector
+  namespace: pyairtable
+spec:
+  host: airtable-connector
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 50
+      http:
+        http1MaxPendingRequests: 20
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 10
+        maxRetries: 3
+        consecutiveGatewayErrors: 5
+        h2UpgradePolicy: UPGRADE
+    loadBalancer:
+      simple: LEAST_CONN
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 30
+  subsets:
+  - name: stable
+    labels:
+      version: stable
+    trafficPolicy:
+      connectionPool:
+        tcp:
+          maxConnections: 40
+  - name: canary
+    labels:
+      version: canary
+    trafficPolicy:
+      connectionPool:
+        tcp:
+          maxConnections: 10
+
+---
+# LLM Orchestrator with custom load balancing
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: llm-orchestrator
+  namespace: pyairtable
+spec:
+  host: llm-orchestrator
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 20
+      http:
+        http1MaxPendingRequests: 10
+        maxRequestsPerConnection: 5
+        consecutiveGatewayErrors: 3
+    loadBalancer:
+      simple: ROUND_ROBIN
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      consecutive5xxErrors: 3
+      interval: 60s
+      baseEjectionTime: 60s
+      maxEjectionPercent: 25
+
+---
+# File Storage with higher connection limits
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: file-storage-service
+  namespace: pyairtable
+spec:
+  host: file-storage-service
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 50
+        maxRequestsPerConnection: 20
+        consecutiveGatewayErrors: 5
+    loadBalancer:
+      simple: LEAST_CONN
+
+---
+# Auth Service with high availability
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: auth-service
+  namespace: pyairtable
+spec:
+  host: auth-service
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 30
+        maxRequestsPerConnection: 20
+    loadBalancer:
+      simple: ROUND_ROBIN
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+
+---
+# =============================================================================
+# OBSERVABILITY CONFIGURATION
+# =============================================================================
+
+# Enable telemetry for all services
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: default
+  namespace: pyairtable
+spec:
+  metrics:
+  - providers:
+    - name: prometheus
+  - overrides:
+    - match:
+        metric: ALL_METRICS
+      tagOverrides:
+        tenant_id:
+          value: "%{REQUEST_HEADERS.x-tenant-id}"
+        user_id:
+          value: "%{REQUEST_HEADERS.x-user-id}"
+        service_name:
+          value: "%{REQUEST_HEADERS.x-service-name}"
+  accessLogging:
+  - providers:
+    - name: otel
+  tracing:
+  - providers:
+    - name: jaeger
+
+---
+# Custom metrics for business logic
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: business-metrics
+  namespace: pyairtable
+spec:
+  metrics:
+  - providers:
+    - name: prometheus
+  - overrides:
+    - match:
+        metric: requests_total
+      tagOverrides:
+        tenant_id:
+          value: "%{REQUEST_HEADERS.x-tenant-id}"
+        airtable_base_id:
+          value: "%{REQUEST_HEADERS.x-airtable-base-id}"
+        operation_type:
+          value: "%{REQUEST_HEADERS.x-operation-type}"
+
+---
+# =============================================================================
+# SERVICE ENTRIES FOR EXTERNAL DEPENDENCIES
+# =============================================================================
+
+# Airtable API
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: airtable-api
+  namespace: pyairtable
+spec:
+  hosts:
+  - api.airtable.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  resolution: DNS
+  location: MESH_EXTERNAL
+
+---
+# LLM APIs
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: openai-api
+  namespace: pyairtable
+spec:
+  hosts:
+  - api.openai.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  resolution: DNS
+  location: MESH_EXTERNAL
+
+---
+apiVersion: networking.istio.io/v1beta1  
+kind: ServiceEntry
+metadata:
+  name: gemini-api
+  namespace: pyairtable
+spec:
+  hosts:
+  - generativelanguage.googleapis.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  resolution: DNS
+  location: MESH_EXTERNAL
+
+---
+# =============================================================================
+# FAULT INJECTION FOR CHAOS ENGINEERING
+# =============================================================================
+
+# Fault injection for testing (disabled by default)
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: chaos-testing
+  namespace: pyairtable
+spec:
+  hosts:
+  - airtable-connector
+  http:
+  - match:
+    - headers:
+        x-chaos-test:
+          exact: "true"
+    fault:
+      delay:
+        percentage:
+          value: 10
+        fixedDelay: 2s
+      abort:
+        percentage:
+          value: 5
+        httpStatus: 503
+    route:
+    - destination:
+        host: airtable-connector
+        port:
+          number: 8020
+  - route:
+    - destination:
+        host: airtable-connector
+        port:
+          number: 8020
+
+---
+# =============================================================================
+# WASMPLUGIN FOR CUSTOM LOGIC
+# =============================================================================
+
+# Custom plugin for tenant isolation
+apiVersion: extensions.istio.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: tenant-isolation
+  namespace: pyairtable
+spec:
+  selector:
+    matchLabels:
+      app: auth-service
+  url: oci://ghcr.io/pyairtable/tenant-isolation-wasm:latest
+  configuration:
+    tenant_header: "x-tenant-id"
+    jwt_claim: "tenant_id"
+    enforcement_mode: "strict"
+
+---
+# Rate limiting plugin
+apiVersion: extensions.istio.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: rate-limiting
+  namespace: pyairtable
+spec:
+  selector:
+    matchLabels:
+      app: api-gateway
+  url: oci://ghcr.io/pyairtable/rate-limiter-wasm:latest
+  configuration:
+    rules:
+    - match:
+        request_headers:
+          x-api-key:
+            exact: "free-tier"
+      rate_limit:
+        requests_per_minute: 100
+    - match:
+        request_headers:
+          x-api-key:
+            exact: "pro-tier"
+      rate_limit:
+        requests_per_minute: 1000
+    - match:
+        request_headers:
+          x-api-key:
+            exact: "enterprise-tier"
+      rate_limit:
+        requests_per_minute: 10000
+
+---
+# =============================================================================
+# ENVOY FILTERS FOR ADVANCED CUSTOMIZATION
+# =============================================================================
+
+# Custom headers for debugging
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: debug-headers
+  namespace: pyairtable
+spec:
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.wasm
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm
+          config:
+            name: debug_headers
+            root_id: debug_headers
+            vm_config:
+              vm_id: debug_headers
+              runtime: envoy.wasm.runtime.v8
+              code:
+                local:
+                  inline_string: |
+                    class DebugHeaders extends RootContext {
+                      onRequestHeaders() {
+                        const traceId = this.getRequestHeader("x-trace-id") || 
+                          Math.random().toString(36).substring(7);
+                        this.setRequestHeader("x-trace-id", traceId);
+                        this.setRequestHeader("x-timestamp", Date.now().toString());
+                        return FilterHeadersStatus.Continue;
+                      }
+                    }
+
+---
+# Custom access logging format
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: custom-access-log
+  namespace: pyairtable
+spec:
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+    patch:
+      operation: MERGE
+      value:
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          access_log:
+          - name: envoy.access_loggers.file
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+              path: "/dev/stdout"
+              format: |
+                {
+                  "timestamp": "%START_TIME%",
+                  "method": "%REQ(:METHOD)%",
+                  "url": "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%",
+                  "protocol": "%PROTOCOL%",
+                  "status": "%RESPONSE_CODE%",
+                  "response_flags": "%RESPONSE_FLAGS%",
+                  "bytes_received": "%BYTES_RECEIVED%",
+                  "bytes_sent": "%BYTES_SENT%",
+                  "duration": "%DURATION%",
+                  "upstream_service_time": "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%",
+                  "x_forwarded_for": "%REQ(X-FORWARDED-FOR)%",
+                  "user_agent": "%REQ(USER-AGENT)%",
+                  "request_id": "%REQ(X-REQUEST-ID)%",
+                  "authority": "%REQ(:AUTHORITY)%",
+                  "upstream_host": "%UPSTREAM_HOST%",
+                  "tenant_id": "%REQ(X-TENANT-ID)%",
+                  "user_id": "%REQ(X-USER-ID)%",
+                  "trace_id": "%REQ(X-TRACE-ID)%"
+                }
+
+---
+# =============================================================================
+# NETWORK POLICIES (Additional Security Layer)
+# =============================================================================
+
+# Default deny all ingress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: pyairtable
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+
+---
+# Allow ingress gateway traffic
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-gateway
+  namespace: pyairtable
+spec:
+  podSelector:
+    matchLabels:
+      app: api-gateway
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+    ports:
+    - protocol: TCP
+      port: 8000
+
+---
+# Allow inter-service communication within namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: pyairtable
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: pyairtable
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+
+---
+# Allow database connections
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-database-connections
+  namespace: pyairtable
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: database
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: pyairtable
+    ports:
+    - protocol: TCP
+      port: 5432
+
+---
+# Allow Redis connections
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-redis-connections
+  namespace: pyairtable
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: pyairtable
+    ports:
+    - protocol: TCP
+      port: 6379
+
+---
+# Allow Kafka connections
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kafka-connections
+  namespace: pyairtable
+spec:
+  podSelector:
+    matchLabels:
+      app: kafka
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: pyairtable
+    ports:
+    - protocol: TCP
+      port: 9092

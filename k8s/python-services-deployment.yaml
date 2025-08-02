@@ -1,0 +1,550 @@
+# Analytics Service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  namespace: pyairtable
+spec:
+  selector:
+    app: analytics-service
+  ports:
+    - port: 8094
+      targetPort: 8094
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: pyairtable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      containers:
+      - name: analytics-service
+        image: pyairtable/analytics-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8094
+        env:
+        - name: PORT
+          value: "8094"
+        envFrom:
+        - configMapRef:
+            name: pyairtable-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8094
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+# Workflow Engine
+apiVersion: v1
+kind: Service
+metadata:
+  name: workflow-engine
+  namespace: pyairtable
+spec:
+  selector:
+    app: workflow-engine
+  ports:
+    - port: 8095
+      targetPort: 8095
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workflow-engine
+  namespace: pyairtable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: workflow-engine
+  template:
+    metadata:
+      labels:
+        app: workflow-engine
+    spec:
+      containers:
+      - name: workflow-engine
+        image: pyairtable/workflow-engine:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8095
+        env:
+        - name: PORT
+          value: "8095"
+        envFrom:
+        - configMapRef:
+            name: pyairtable-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8095
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+# File Processor
+apiVersion: v1
+kind: Service
+metadata:
+  name: file-processor
+  namespace: pyairtable
+spec:
+  selector:
+    app: file-processor
+  ports:
+    - port: 8096
+      targetPort: 8096
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: file-processor
+  namespace: pyairtable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: file-processor
+  template:
+    metadata:
+      labels:
+        app: file-processor
+    spec:
+      containers:
+      - name: file-processor
+        image: pyairtable/file-processor:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8096
+        env:
+        - name: PORT
+          value: "8096"
+        envFrom:
+        - configMapRef:
+            name: pyairtable-config
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "300m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8096
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+# Data Pipeline
+apiVersion: v1
+kind: Service
+metadata:
+  name: data-pipeline
+  namespace: pyairtable
+spec:
+  selector:
+    app: data-pipeline
+  ports:
+    - port: 8097
+      targetPort: 8097
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-pipeline
+  namespace: pyairtable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: data-pipeline
+  template:
+    metadata:
+      labels:
+        app: data-pipeline
+    spec:
+      containers:
+      - name: data-pipeline
+        image: pyairtable/data-pipeline:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8097
+        env:
+        - name: PORT
+          value: "8097"
+        envFrom:
+        - configMapRef:
+            name: pyairtable-config
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "300m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8097
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+# Report Generator
+apiVersion: v1
+kind: Service
+metadata:
+  name: report-generator
+  namespace: pyairtable
+spec:
+  selector:
+    app: report-generator
+  ports:
+    - port: 8098
+      targetPort: 8098
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: report-generator
+  namespace: pyairtable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: report-generator
+  template:
+    metadata:
+      labels:
+        app: report-generator
+    spec:
+      containers:
+      - name: report-generator
+        image: pyairtable/report-generator:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8098
+        env:
+        - name: PORT
+          value: "8098"
+        envFrom:
+        - configMapRef:
+            name: pyairtable-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8098
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+# Webhook Handler
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook-handler
+  namespace: pyairtable
+spec:
+  selector:
+    app: webhook-handler
+  ports:
+    - port: 8099
+      targetPort: 8099
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-handler
+  namespace: pyairtable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webhook-handler
+  template:
+    metadata:
+      labels:
+        app: webhook-handler
+    spec:
+      containers:
+      - name: webhook-handler
+        image: pyairtable/webhook-handler:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8099
+        env:
+        - name: PORT
+          value: "8099"
+        envFrom:
+        - configMapRef:
+            name: pyairtable-config
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8099
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+# Storage Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: storage-service
+  namespace: pyairtable
+spec:
+  selector:
+    app: storage-service
+  ports:
+    - port: 8100
+      targetPort: 8100
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storage-service
+  namespace: pyairtable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: storage-service
+  template:
+    metadata:
+      labels:
+        app: storage-service
+    spec:
+      containers:
+      - name: storage-service
+        image: pyairtable/storage-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8100
+        env:
+        - name: PORT
+          value: "8100"
+        envFrom:
+        - configMapRef:
+            name: pyairtable-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8100
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+# Webhook Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook-service
+  namespace: pyairtable
+spec:
+  selector:
+    app: webhook-service
+  ports:
+    - port: 8088
+      targetPort: 8088
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-service
+  namespace: pyairtable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webhook-service
+  template:
+    metadata:
+      labels:
+        app: webhook-service
+    spec:
+      containers:
+      - name: webhook-service
+        image: pyairtable/webhook-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8088
+        env:
+        - name: PORT
+          value: "8088"
+        envFrom:
+        - configMapRef:
+            name: pyairtable-config
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8088
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+# Cache Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: cache-service
+  namespace: pyairtable
+spec:
+  selector:
+    app: cache-service
+  ports:
+    - port: 8089
+      targetPort: 8089
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cache-service
+  namespace: pyairtable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cache-service
+  template:
+    metadata:
+      labels:
+        app: cache-service
+    spec:
+      containers:
+      - name: cache-service
+        image: pyairtable/cache-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8089
+        env:
+        - name: PORT
+          value: "8089"
+        envFrom:
+        - configMapRef:
+            name: pyairtable-config
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8089
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+# Search Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: search-service
+  namespace: pyairtable
+spec:
+  selector:
+    app: search-service
+  ports:
+    - port: 8090
+      targetPort: 8090
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-service
+  namespace: pyairtable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: search-service
+  template:
+    metadata:
+      labels:
+        app: search-service
+    spec:
+      containers:
+      - name: search-service
+        image: pyairtable/search-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8090
+        env:
+        - name: PORT
+          value: "8090"
+        envFrom:
+        - configMapRef:
+            name: pyairtable-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8090
+          initialDelaySeconds: 30
+          periodSeconds: 10

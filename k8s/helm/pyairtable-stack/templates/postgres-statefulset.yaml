@@ -1,0 +1,220 @@
+{{- if .Values.databases.postgres.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "pyairtable-stack.fullname" . }}-postgres
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "pyairtable-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  serviceName: {{ .Values.databases.postgres.name }}-headless
+  replicas: {{ .Values.databases.postgres.replicas }}
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0
+  selector:
+    matchLabels:
+      {{- include "pyairtable-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        {{- include "pyairtable-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/postgres-config.yaml") . | sha256sum }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+    spec:
+      {{- if .Values.databases.postgres.securityContext.enabled }}
+      securityContext:
+        fsGroup: {{ .Values.databases.postgres.securityContext.fsGroup }}
+        runAsUser: {{ .Values.databases.postgres.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.databases.postgres.securityContext.runAsGroup }}
+      {{- end }}
+      {{- if .Values.databases.postgres.serviceAccount.create }}
+      serviceAccountName: {{ include "pyairtable-stack.fullname" . }}-postgres
+      {{- end }}
+      initContainers:
+      - name: postgres-init-perms
+        image: "{{ .Values.databases.postgres.image }}:{{ .Values.databases.postgres.tag }}"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "Setting up PostgreSQL data directory permissions..."
+          mkdir -p /var/lib/postgresql/data
+          chown -R postgres:postgres /var/lib/postgresql/data
+          chmod 700 /var/lib/postgresql/data
+          echo "Permissions setup complete"
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+      containers:
+      - name: postgres
+        image: "{{ .Values.databases.postgres.image }}:{{ .Values.databases.postgres.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - name: postgres
+          containerPort: {{ .Values.databases.postgres.port }}
+          protocol: TCP
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_DB
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_PASSWORD
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        - name: POSTGRES_INITDB_ARGS
+          value: "--data-checksums --encoding=UTF8 --locale=en_US.utf8"
+        {{- if .Values.databases.postgres.extraEnvVars }}
+        {{- toYaml .Values.databases.postgres.extraEnvVars | nindent 8 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.databases.postgres.resources | nindent 10 }}
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        - name: postgres-config
+          mountPath: /etc/postgresql/postgresql.conf
+          subPath: postgresql.conf
+        - name: postgres-config
+          mountPath: /etc/postgresql/pg_hba.conf
+          subPath: pg_hba.conf
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+          readOnly: true
+        {{- if .Values.databases.postgres.backup.enabled }}
+        - name: backup-scripts
+          mountPath: /usr/local/bin/backup
+          readOnly: true
+        {{- end }}
+        livenessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - |
+              pg_isready -U $POSTGRES_USER -d $POSTGRES_DB -h localhost -p {{ .Values.databases.postgres.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+        readinessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - |
+              pg_isready -U $POSTGRES_USER -d $POSTGRES_DB -h localhost -p {{ .Values.databases.postgres.port }}
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - |
+              pg_isready -U $POSTGRES_USER -d $POSTGRES_DB -h localhost -p {{ .Values.databases.postgres.port }}
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+      {{- if .Values.databases.postgres.metrics.enabled }}
+      - name: postgres-exporter
+        image: "{{ .Values.databases.postgres.metrics.image }}:{{ .Values.databases.postgres.metrics.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - name: metrics
+          containerPort: 9187
+          protocol: TCP
+        env:
+        - name: DATA_SOURCE_NAME
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:{{ .Values.databases.postgres.port }}/$(POSTGRES_DB)?sslmode=disable"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pyairtable-stack.fullname" . }}-secrets
+              key: POSTGRES_DB
+        resources:
+          {{- toYaml .Values.databases.postgres.metrics.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /
+            port: metrics
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: metrics
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      {{- end }}
+      volumes:
+      - name: postgres-config
+        configMap:
+          name: {{ include "pyairtable-stack.fullname" . }}-postgres-config
+      - name: init-scripts
+        configMap:
+          name: {{ include "pyairtable-stack.fullname" . }}-postgres-init
+      {{- if .Values.databases.postgres.backup.enabled }}
+      - name: backup-scripts
+        configMap:
+          name: {{ include "pyairtable-stack.fullname" . }}-postgres-backup
+          defaultMode: 0755
+      {{- end }}
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-storage
+      labels:
+        {{- include "pyairtable-stack.labels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres
+      {{- if .Values.databases.postgres.persistence.annotations }}
+      annotations:
+        {{- toYaml .Values.databases.postgres.persistence.annotations | nindent 8 }}
+      {{- end }}
+    spec:
+      accessModes:
+      {{- range .Values.databases.postgres.persistence.accessModes }}
+        - {{ . | quote }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.databases.postgres.persistence.size | quote }}
+      {{- if .Values.databases.postgres.persistence.storageClass }}
+      {{- if (eq "-" .Values.databases.postgres.persistence.storageClass) }}
+      storageClassName: ""
+      {{- else }}
+      storageClassName: {{ .Values.databases.postgres.persistence.storageClass | quote }}
+      {{- end }}
+      {{- end }}
+{{- end }}

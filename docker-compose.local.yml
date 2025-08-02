@@ -1,0 +1,180 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=pyairtablemcp
+      - POSTGRES_USER=pyairtable_admin
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-+Z5cf90hean4PTNPtBblP/SfDLbiwljc}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - pyairtable-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:-TmQbTcrsWmV1SgNF1e2VgFyDWd8UEqLx}
+    volumes:
+      - redis-data:/data
+    networks:
+      - pyairtable-network
+
+  # API Gateway - Main entry point
+  api-gateway:
+    image: pyairtable-api-gateway:local
+    build:
+      context: ./go-services/api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
+      - MCP_SERVER_URL=http://mcp-server:8001
+      - LLM_ORCHESTRATOR_URL=http://llm-orchestrator:8003
+      - PLATFORM_SERVICES_URL=http://platform-services:8007
+      - AUTOMATION_SERVICES_URL=http://automation-services:8006
+      - API_KEY=${API_KEY:-52780ea4f0d17448aae6ea12}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+
+  # MCP Server - Model Context Protocol
+  mcp-server:
+    image: mcp-server-py:local
+    build:
+      context: ../../mcp-server-py
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
+      - API_KEY=${API_KEY:-52780ea4f0d17448aae6ea12}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - file-uploads:/app/uploads
+    networks:
+      - pyairtable-network
+
+  # Airtable Gateway - Direct Airtable API integration
+  airtable-gateway:
+    image: airtable-gateway-py:local
+    build:
+      context: ../../airtable-gateway-py
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
+      - AIRTABLE_BASE=${AIRTABLE_BASE:-appVLUAubH5cFWhMV}
+      - API_KEY=${API_KEY:-52780ea4f0d17448aae6ea12}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-TmQbTcrsWmV1SgNF1e2VgFyDWd8UEqLx}
+    depends_on:
+      - redis
+    networks:
+      - pyairtable-network
+
+  # LLM Orchestrator - Gemini 2.5 Flash integration
+  llm-orchestrator:
+    image: llm-orchestrator-py:local
+    build:
+      context: ../../llm-orchestrator-py
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MCP_SERVER_HTTP_URL=http://mcp-server:8001
+      - USE_HTTP_MCP=true
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-TmQbTcrsWmV1SgNF1e2VgFyDWd8UEqLx}
+      - USE_REDIS_SESSIONS=true
+      - THINKING_BUDGET=${THINKING_BUDGET:-1000}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      - mcp-server
+      - redis
+    networks:
+      - pyairtable-network
+
+  # Platform Services - Unified Auth & Analytics
+  platform-services:
+    image: pyairtable-platform-services:local
+    build:
+      context: ../../pyairtable-platform-services
+      dockerfile: Dockerfile
+    ports:
+      - "8007:8007"
+    environment:
+      - DATABASE_URL=postgresql://pyairtable_admin:${POSTGRES_PASSWORD:-+Z5cf90hean4PTNPtBblP/SfDLbiwljc}@postgres:5432/pyairtablemcp
+      - JWT_SECRET=${JWT_SECRET:-qsfNRmpgEvYMfcgcZOA2uGm5g3rd9+Pymnn46nnMqHoM28YDF/TEPLShvBA8dHxZEiTDTCMpqy+zrO7r6ib/XA==}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - API_KEY=${API_KEY:-52780ea4f0d17448aae6ea12}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      - postgres
+    networks:
+      - pyairtable-network
+
+  # Automation Services - File processing and workflow automation
+  automation-services:
+    image: pyairtable-automation-services:local
+    build:
+      context: ../../pyairtable-automation-services
+      dockerfile: Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      - DATABASE_URL=postgresql://pyairtable_admin:${POSTGRES_PASSWORD:-+Z5cf90hean4PTNPtBblP/SfDLbiwljc}@postgres:5432/pyairtablemcp
+      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
+      - AIRTABLE_BASE=${AIRTABLE_BASE:-appVLUAubH5cFWhMV}
+      - API_KEY=${API_KEY:-52780ea4f0d17448aae6ea12}
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-10MB}
+      - ALLOWED_EXTENSIONS=${ALLOWED_EXTENSIONS:-pdf,doc,docx,txt,csv,xlsx}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - file-uploads:/app/uploads
+    depends_on:
+      - postgres
+      - airtable-gateway
+    networks:
+      - pyairtable-network
+
+  # Frontend - Next.js web interface
+  frontend:
+    image: pyairtable-frontend:local
+    build:
+      context: ../../pyairtable-frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-3YoVx2e515m3M7XGFbfcxaJ8V9QwQLnlWDIdeMXWeIDis6SOz0Us2DmEA6mSP7NZfw159V7LHKAJYMHg5arFPw==}
+    depends_on:
+      - api-gateway
+    networks:
+      - pyairtable-network
+
+volumes:
+  postgres-data:
+  redis-data:
+  file-uploads:
+
+networks:
+  pyairtable-network:
+    driver: bridge

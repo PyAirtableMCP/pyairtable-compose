@@ -122,20 +122,24 @@ persistence:
     size: 1Gi
     storageClass: standard
 
-# Development secrets - CHANGE THESE IN PRODUCTION!
+# Development secrets configuration
+# SECURITY: These are development-only placeholders
+# For local dev: Use ./scripts/setup-local-credentials.sh to generate secure values
+# For CI/CD dev environment: Use GitHub Secrets or external secret management
 secrets:
-  apiKey: "dev-api-key-123456"
-  geminiApiKey: "your-gemini-api-key-here"  # Replace with actual key
-  airtableToken: "your-airtable-token-here"  # Replace with actual token
-  airtableBase: "your-airtable-base-here"    # Replace with actual base
-  jwtSecret: "dev-jwt-secret-change-in-production"
-  nextauthSecret: "dev-nextauth-secret-change-in-production"
-  redisPassword: "dev-redis-password"
+  # CRITICAL: Replace with secure generated values
+  apiKey: ""  # Use ./scripts/setup-local-credentials.sh to generate
+  geminiApiKey: ""  # Get from Google Cloud Console - never commit real values
+  airtableToken: ""  # Get from Airtable Developer Hub - never commit real values
+  airtableBase: ""  # Get from Airtable API docs - format: appXXXXXXXXXXXXXX
+  jwtSecret: ""  # Generate 64+ character secure secret
+  nextauthSecret: ""  # Generate 64+ character secure secret
+  redisPassword: ""  # Generate secure password
   
   # Database credentials
   postgresDb: pyairtable
   postgresUser: postgres
-  postgresPassword: "dev-postgres-password"
+  postgresPassword: ""  # Generate secure password
   
   # Optional configuration
   thinkingBudget: "1000"

@@ -1,0 +1,446 @@
+version: '3.8'
+
+services:
+  # Infrastructure Services
+  postgres:
+    image: postgres:15-alpine
+    container_name: pyairtable-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-pyairtable}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: pyairtable-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-changeme}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Go Services (Ports 8080-8090)
+  api-gateway:
+    build:
+      context: ./go-services/api-gateway
+      dockerfile: Dockerfile
+    container_name: pyairtable-api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}?sslmode=disable"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      API_KEY: ${API_KEY:-your-api-key}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  auth-service:
+    build:
+      context: ./go-services/auth-service
+      dockerfile: Dockerfile
+    container_name: pyairtable-auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      PORT: "8081"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}?sslmode=disable"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      JWT_SECRET: ${JWT_SECRET:-your-jwt-secret}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  user-service:
+    build:
+      context: ./go-services/user-service
+      dockerfile: Dockerfile
+    container_name: pyairtable-user-service
+    ports:
+      - "8082:8082"
+    environment:
+      PORT: "8082"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}?sslmode=disable"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  tenant-service:
+    build:
+      context: ./go-services/tenant-service
+      dockerfile: Dockerfile
+    container_name: pyairtable-tenant-service
+    ports:
+      - "8083:8083"
+    environment:
+      PORT: "8083"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}?sslmode=disable"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  workspace-service:
+    build:
+      context: ./go-services/workspace-service
+      dockerfile: Dockerfile
+    container_name: pyairtable-workspace-service
+    ports:
+      - "8084:8084"
+    environment:
+      PORT: "8084"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}?sslmode=disable"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  permission-service:
+    build:
+      context: ./go-services/permission-service
+      dockerfile: Dockerfile
+    container_name: pyairtable-permission-service
+    ports:
+      - "8085:8085"
+    environment:
+      PORT: "8085"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}?sslmode=disable"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  webhook-service:
+    build:
+      context: ./go-services/webhook-service
+      dockerfile: Dockerfile
+    container_name: pyairtable-webhook-service
+    ports:
+      - "8086:8086"
+    environment:
+      PORT: "8086"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}?sslmode=disable"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  notification-service:
+    build:
+      context: ./go-services/notification-service
+      dockerfile: Dockerfile
+    container_name: pyairtable-notification-service
+    ports:
+      - "8087:8087"
+    environment:
+      PORT: "8087"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}?sslmode=disable"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  file-service:
+    build:
+      context: ./go-services/file-service
+      dockerfile: Dockerfile
+    container_name: pyairtable-file-service
+    ports:
+      - "8088:8088"
+    environment:
+      PORT: "8088"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}?sslmode=disable"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      STORAGE_PATH: "/app/uploads"
+    volumes:
+      - file_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web-bff:
+    build:
+      context: ./go-services/web-bff
+      dockerfile: Dockerfile
+    container_name: pyairtable-web-bff
+    ports:
+      - "8089:8089"
+    environment:
+      PORT: "8089"
+      API_GATEWAY_URL: "http://api-gateway:8080"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      - api-gateway
+      - redis
+
+  mobile-bff:
+    build:
+      context: ./go-services/mobile-bff
+      dockerfile: Dockerfile
+    container_name: pyairtable-mobile-bff
+    ports:
+      - "8090:8090"
+    environment:
+      PORT: "8090"
+      API_GATEWAY_URL: "http://api-gateway:8080"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      - api-gateway
+      - redis
+
+  # Python Services (Ports 8091-8101)
+  llm-orchestrator:
+    build:
+      context: ./python-services/llm-orchestrator
+      dockerfile: Dockerfile
+    container_name: pyairtable-llm-orchestrator
+    ports:
+      - "8091:8091"
+    environment:
+      PORT: "8091"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  mcp-server:
+    build:
+      context: ./python-services/mcp-server
+      dockerfile: Dockerfile
+    container_name: pyairtable-mcp-server
+    ports:
+      - "8092:8092"
+    environment:
+      PORT: "8092"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      AIRTABLE_TOKEN: ${AIRTABLE_TOKEN}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  airtable-gateway:
+    build:
+      context: ./python-services/airtable-gateway
+      dockerfile: Dockerfile
+    container_name: pyairtable-airtable-gateway
+    ports:
+      - "8093:8093"
+    environment:
+      PORT: "8093"
+      AIRTABLE_TOKEN: ${AIRTABLE_TOKEN}
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  schema-service:
+    build:
+      context: ./python-services/schema-service
+      dockerfile: Dockerfile
+    container_name: pyairtable-schema-service
+    ports:
+      - "8094:8094"
+    environment:
+      PORT: "8094"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  formula-engine:
+    build:
+      context: ./python-services/formula-engine
+      dockerfile: Dockerfile
+    container_name: pyairtable-formula-engine
+    ports:
+      - "8095:8095"
+    environment:
+      PORT: "8095"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  embedding-service:
+    build:
+      context: ./python-services/embedding-service
+      dockerfile: Dockerfile
+    container_name: pyairtable-embedding-service
+    ports:
+      - "8096:8096"
+    environment:
+      PORT: "8096"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  semantic-search:
+    build:
+      context: ./python-services/semantic-search
+      dockerfile: Dockerfile
+    container_name: pyairtable-semantic-search
+    ports:
+      - "8097:8097"
+    environment:
+      PORT: "8097"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      EMBEDDING_SERVICE_URL: "http://embedding-service:8096"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      - postgres
+      - redis
+      - embedding-service
+
+  chat-service:
+    build:
+      context: ./python-services/chat-service
+      dockerfile: Dockerfile
+    container_name: pyairtable-chat-service
+    ports:
+      - "8098:8098"
+    environment:
+      PORT: "8098"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      LLM_ORCHESTRATOR_URL: "http://llm-orchestrator:8091"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      - postgres
+      - redis
+      - llm-orchestrator
+
+  workflow-engine:
+    build:
+      context: ./python-services/workflow-engine
+      dockerfile: Dockerfile
+    container_name: pyairtable-workflow-engine
+    ports:
+      - "8099:8099"
+    environment:
+      PORT: "8099"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  analytics-service:
+    build:
+      context: ./python-services/analytics-service
+      dockerfile: Dockerfile
+    container_name: pyairtable-analytics-service
+    ports:
+      - "8100:8100"
+    environment:
+      PORT: "8100"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  audit-service:
+    build:
+      context: ./python-services/audit-service
+      dockerfile: Dockerfile
+    container_name: pyairtable-audit-service
+    ports:
+      - "8101:8101"
+    environment:
+      PORT: "8101"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pyairtable}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  file_uploads:
+
+networks:
+  default:
+    name: pyairtable-network

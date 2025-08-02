@@ -8,9 +8,10 @@ echo
 if [ -z "$AIRTABLE_BASE" ]; then
     echo "⚠️  AIRTABLE_BASE environment variable not set"
     echo "Please set it in your .env file or export it:"
-    echo "export AIRTABLE_BASE=appXXXXXXXXXXXXXX"
+    echo "export AIRTABLE_BASE=your_actual_airtable_base_id"
+    echo "Format: appXXXXXXXXXXXXXX (get from Airtable API docs)"
     echo
-    AIRTABLE_BASE="appXXXXXXXXXXXXXX"
+    AIRTABLE_BASE="REPLACE_WITH_ACTUAL_AIRTABLE_BASE_ID"
 fi
 
 echo "🤖 Testing chat with base ID: $AIRTABLE_BASE"
@@ -19,7 +20,7 @@ echo
 # Test chat endpoint
 curl -X POST http://localhost:8000/api/chat \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: ${API_KEY:-test-api-key}" \
+  -H "X-API-Key: ${PYAIRTABLE_API_KEY:-${API_KEY:-REPLACE_WITH_SECURE_API_KEY}}" \
   -d "{
     \"message\": \"List all tables in my Airtable base\",
     \"session_id\": \"test-user-$(date +%s)\",
