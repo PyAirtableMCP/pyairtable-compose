@@ -289,3 +289,24 @@ cp .env .env.backup.$(date +%Y%m%d)
 4. **Network**: Use host networking for performance
 
 Remember: This repository is the **operational control center** - it must be secure, well-documented, and easy to operate!
+
+## 📚 Documentation Guidelines
+
+**IMPORTANT**: All architectural documents, design documents, user guides, and technical documentation should be placed in the **pyairtable-docs** repository (https://github.com/Reg-Kris/pyairtable-docs).
+
+### What stays in this repo:
+- README.md (repository-specific information)
+- CLAUDE.md (AI context file)
+- Configuration files (.env.example, docker-compose.yml, etc.)
+- Scripts and code
+
+### What goes in pyairtable-docs:
+- Architectural Decision Records (ADRs)
+- Design documents
+- User guides and tutorials
+- API documentation
+- Security reviews and audits
+- Migration guides
+- Best practices documentation
+
+This keeps our documentation centralized and prevents scattered .md files across repositories.

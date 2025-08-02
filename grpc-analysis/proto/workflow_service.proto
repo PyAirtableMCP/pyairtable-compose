@@ -1,0 +1,956 @@
+syntax = "proto3";
+
+package pyairtable.workflow.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/pyairtable/workflow/v1;workflowv1";
+
+// Workflow Service - Handles automation and file processing with streaming capabilities
+service WorkflowService {
+  // Workflow management
+  rpc CreateWorkflow(CreateWorkflowRequest) returns (CreateWorkflowResponse);
+  rpc GetWorkflow(GetWorkflowRequest) returns (GetWorkflowResponse);
+  rpc UpdateWorkflow(UpdateWorkflowRequest) returns (UpdateWorkflowResponse);
+  rpc DeleteWorkflow(DeleteWorkflowRequest) returns (DeleteWorkflowResponse);
+  rpc ListWorkflows(ListWorkflowsRequest) returns (ListWorkflowsResponse);
+  
+  // Workflow execution
+  rpc ExecuteWorkflow(ExecuteWorkflowRequest) returns (ExecuteWorkflowResponse);
+  rpc GetExecution(GetExecutionRequest) returns (GetExecutionResponse);
+  rpc ListExecutions(ListExecutionsRequest) returns (ListExecutionsResponse);
+  rpc CancelExecution(CancelExecutionRequest) returns (CancelExecutionResponse);
+  
+  // Real-time execution monitoring with streaming
+  rpc StreamExecution(StreamExecutionRequest) returns (stream StreamExecutionResponse);
+  rpc StreamWorkflowLogs(StreamWorkflowLogsRequest) returns (stream StreamWorkflowLogsResponse);
+  
+  // File processing operations
+  rpc UploadFile(stream UploadFileRequest) returns (UploadFileResponse);
+  rpc ProcessFile(ProcessFileRequest) returns (ProcessFileResponse);
+  rpc GetFileContent(GetFileContentRequest) returns (GetFileContentResponse);
+  rpc DeleteFile(DeleteFileRequest) returns (DeleteFileResponse);
+  rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
+  
+  // Streaming file operations for large files
+  rpc StreamFileContent(StreamFileContentRequest) returns (stream StreamFileContentResponse);
+  rpc StreamFileProcessing(StreamFileProcessingRequest) returns (stream StreamFileProcessingResponse);
+  
+  // Batch operations for performance
+  rpc BatchExecuteWorkflows(BatchExecuteWorkflowsRequest) returns (BatchExecuteWorkflowsResponse);
+  rpc BatchProcessFiles(BatchProcessFilesRequest) returns (BatchProcessFilesResponse);
+  
+  // Scheduling and triggers
+  rpc CreateTrigger(CreateTriggerRequest) returns (CreateTriggerResponse);
+  rpc UpdateTrigger(UpdateTriggerRequest) returns (UpdateTriggerResponse);
+  rpc DeleteTrigger(DeleteTriggerRequest) returns (DeleteTriggerResponse);
+  rpc ListTriggers(ListTriggersRequest) returns (ListTriggersResponse);
+  
+  // Health and metrics
+  rpc GetWorkflowStats(GetWorkflowStatsRequest) returns (GetWorkflowStatsResponse);
+}
+
+// Workflow management
+message CreateWorkflowRequest {
+  string tenant_id = 1;
+  string name = 2;
+  string description = 3;
+  WorkflowDefinition definition = 4;
+  repeated Trigger triggers = 5;
+  WorkflowConfig config = 6;
+  map<string, string> metadata = 7;
+}
+
+message CreateWorkflowResponse {
+  Workflow workflow = 1;
+  repeated string warnings = 2;
+}
+
+message GetWorkflowRequest {
+  string tenant_id = 1;
+  string workflow_id = 2;
+  bool include_executions = 3;
+  bool include_triggers = 4;
+}
+
+message GetWorkflowResponse {
+  Workflow workflow = 1;
+  repeated Execution recent_executions = 2; // if include_executions = true
+  repeated Trigger triggers = 3; // if include_triggers = true
+}
+
+message UpdateWorkflowRequest {
+  string tenant_id = 1;
+  string workflow_id = 2;
+  WorkflowUpdate updates = 3;
+  repeated string update_mask = 4;
+}
+
+message UpdateWorkflowResponse {
+  Workflow workflow = 1;
+  repeated string warnings = 2;
+}
+
+message DeleteWorkflowRequest {
+  string tenant_id = 1;
+  string workflow_id = 2;
+  bool force = 3; // delete even if active executions exist
+}
+
+message DeleteWorkflowResponse {
+  bool success = 1;
+  string message = 2;
+  int32 executions_cancelled = 3;
+}
+
+message ListWorkflowsRequest {
+  string tenant_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  WorkflowFilter filter = 4;
+  repeated WorkflowSort sort = 5;
+}
+
+message ListWorkflowsResponse {
+  repeated Workflow workflows = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
+
+// Workflow execution
+message ExecuteWorkflowRequest {
+  string tenant_id = 1;
+  string workflow_id = 2;
+  google.protobuf.Struct input_data = 3;
+  ExecutionOptions options = 4;
+  string triggered_by = 5; // user_id or system
+  string trigger_id = 6; // if triggered by schedule/webhook
+}
+
+message ExecuteWorkflowResponse {
+  Execution execution = 1;
+  repeated string warnings = 2;
+}
+
+message GetExecutionRequest {
+  string tenant_id = 1;
+  string execution_id = 2;
+  bool include_logs = 3;
+  bool include_artifacts = 4;
+}
+
+message GetExecutionResponse {
+  Execution execution = 1;
+  repeated ExecutionLog logs = 2; // if include_logs = true
+  repeated ExecutionArtifact artifacts = 3; // if include_artifacts = true
+}
+
+message ListExecutionsRequest {
+  string tenant_id = 1;
+  string workflow_id = 2; // optional, filter by workflow
+  int32 page_size = 3;
+  string page_token = 4;
+  ExecutionFilter filter = 5;
+  repeated ExecutionSort sort = 6;
+}
+
+message ListExecutionsResponse {
+  repeated Execution executions = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
+
+message CancelExecutionRequest {
+  string tenant_id = 1;
+  string execution_id = 2;
+  string reason = 3;
+}
+
+message CancelExecutionResponse {
+  bool success = 1;
+  string message = 2;
+  ExecutionStatus final_status = 3;
+}
+
+// Streaming operations
+message StreamExecutionRequest {
+  string tenant_id = 1;
+  string execution_id = 2;
+  bool include_logs = 3;
+  bool include_step_details = 4;
+}
+
+message StreamExecutionResponse {
+  oneof event {
+    ExecutionUpdate execution_update = 1;
+    ExecutionLog log_entry = 2;
+    StepUpdate step_update = 3;
+    ExecutionCompleted completion = 4;
+  }
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+message StreamWorkflowLogsRequest {
+  string tenant_id = 1;
+  string workflow_id = 2;
+  LogLevel min_level = 3;
+  google.protobuf.Timestamp start_time = 4;
+  bool follow = 5; // continue streaming new logs
+}
+
+message StreamWorkflowLogsResponse {
+  ExecutionLog log = 1;
+  string execution_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+// File operations
+message UploadFileRequest {
+  oneof chunk {
+    FileMetadata metadata = 1;
+    bytes data = 2;
+  }
+}
+
+message UploadFileResponse {
+  File file = 1;
+  UploadStats stats = 2;
+}
+
+message ProcessFileRequest {
+  string tenant_id = 1;
+  string file_id = 2;
+  ProcessingType processing_type = 3;
+  google.protobuf.Struct options = 4;
+  bool async_processing = 5;
+}
+
+message ProcessFileResponse {
+  string processing_id = 1;
+  ProcessingStatus status = 2;
+  FileContent content = 3; // if synchronous processing
+  repeated string warnings = 4;
+}
+
+message GetFileContentRequest {
+  string tenant_id = 1;
+  string file_id = 2;
+  ContentFormat format = 3;
+  bool include_metadata = 4;
+}
+
+message GetFileContentResponse {
+  FileContent content = 1;
+  FileMetadata metadata = 2; // if include_metadata = true
+}
+
+message DeleteFileRequest {
+  string tenant_id = 1;
+  string file_id = 2;
+  bool delete_content = 3; // also delete extracted content
+}
+
+message DeleteFileResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ListFilesRequest {
+  string tenant_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  FileFilter filter = 4;
+  repeated FileSort sort = 5;
+}
+
+message ListFilesResponse {
+  repeated File files = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
+
+// Streaming file operations
+message StreamFileContentRequest {
+  string tenant_id = 1;
+  string file_id = 2;
+  int32 chunk_size = 3; // bytes per chunk
+  ContentFormat format = 4;
+}
+
+message StreamFileContentResponse {
+  oneof chunk {
+    FileMetadata metadata = 1;
+    bytes data = 2;
+    ContentMetadata content_metadata = 3;
+  }
+  int32 chunk_number = 4;
+  bool is_last_chunk = 5;
+}
+
+message StreamFileProcessingRequest {
+  string tenant_id = 1;
+  string file_id = 2;
+  ProcessingType processing_type = 3;
+  google.protobuf.Struct options = 4;
+}
+
+message StreamFileProcessingResponse {
+  oneof update {
+    ProcessingStatus status_update = 1;
+    ProcessingLog log_entry = 2;
+    ProcessingResult result = 3;
+    ProcessingError error = 4;
+  }
+  double progress_percent = 5;
+  google.protobuf.Timestamp timestamp = 6;
+}
+
+// Batch operations
+message BatchExecuteWorkflowsRequest {
+  string tenant_id = 1;
+  repeated WorkflowExecutionRequest executions = 2;
+  BatchOptions options = 3;
+}
+
+message BatchExecuteWorkflowsResponse {
+  repeated ExecutionResult results = 1;
+  BatchStats stats = 2;
+}
+
+message BatchProcessFilesRequest {
+  string tenant_id = 1;
+  repeated FileProcessingRequest files = 2;
+  ProcessingType processing_type = 3;
+  BatchOptions options = 4;
+}
+
+message BatchProcessFilesResponse {
+  repeated ProcessingResult results = 1;
+  BatchStats stats = 2;
+}
+
+// Triggers
+message CreateTriggerRequest {
+  string tenant_id = 1;
+  string workflow_id = 2;
+  TriggerDefinition definition = 3;
+  bool enabled = 4;
+}
+
+message CreateTriggerResponse {
+  Trigger trigger = 1;
+}
+
+message UpdateTriggerRequest {
+  string tenant_id = 1;
+  string trigger_id = 2;
+  TriggerUpdate updates = 3;
+  repeated string update_mask = 4;
+}
+
+message UpdateTriggerResponse {
+  Trigger trigger = 1;
+}
+
+message DeleteTriggerRequest {
+  string tenant_id = 1;
+  string trigger_id = 2;
+}
+
+message DeleteTriggerResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ListTriggersRequest {
+  string tenant_id = 1;
+  string workflow_id = 2; // optional filter
+  int32 page_size = 3;
+  string page_token = 4;
+  TriggerFilter filter = 5;
+}
+
+message ListTriggersResponse {
+  repeated Trigger triggers = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
+
+// Stats and metrics
+message GetWorkflowStatsRequest {
+  string tenant_id = 1;
+  string workflow_id = 2; // optional, for specific workflow
+  google.protobuf.Duration time_range = 3;
+  StatsGranularity granularity = 4;
+}
+
+message GetWorkflowStatsResponse {
+  WorkflowStats stats = 1;
+  repeated TimeSeriesData time_series = 2;
+}
+
+// Data models
+message Workflow {
+  string id = 1;
+  string tenant_id = 2;
+  string name = 3;
+  string description = 4;
+  WorkflowStatus status = 5;
+  WorkflowDefinition definition = 6;
+  WorkflowConfig config = 7;
+  map<string, string> metadata = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+  string created_by = 11;
+  string updated_by = 12;
+  int32 execution_count = 13;
+  google.protobuf.Timestamp last_executed = 14;
+}
+
+message WorkflowDefinition {
+  repeated WorkflowStep steps = 1;
+  repeated Connection connections = 2;
+  google.protobuf.Struct variables = 3;
+  ErrorHandling error_handling = 4;
+}
+
+message WorkflowStep {
+  string id = 1;
+  string name = 2;
+  StepType type = 3;
+  google.protobuf.Struct config = 4;
+  repeated string inputs = 5;
+  repeated string outputs = 6;
+  google.protobuf.Duration timeout = 7;
+  int32 retry_count = 8;
+  google.protobuf.Struct conditions = 9;
+}
+
+message Connection {
+  string from_step = 1;
+  string to_step = 2;
+  string condition = 3; // optional conditional flow
+}
+
+message WorkflowConfig {
+  google.protobuf.Duration max_execution_time = 1;
+  int32 max_concurrent_executions = 2;
+  int32 retry_attempts = 3;
+  google.protobuf.Duration retry_delay = 4;
+  bool enable_logging = 5;
+  LogLevel log_level = 6;
+  repeated string notification_channels = 7;
+}
+
+message Execution {
+  string id = 1;
+  string workflow_id = 2;
+  string tenant_id = 3;
+  ExecutionStatus status = 4;
+  google.protobuf.Struct input_data = 5;
+  google.protobuf.Struct output_data = 6;
+  google.protobuf.Timestamp started_at = 7;
+  google.protobuf.Timestamp completed_at = 8;
+  google.protobuf.Duration duration = 9;
+  string triggered_by = 10;
+  string trigger_id = 11;
+  repeated StepExecution steps = 12;
+  string error_message = 13;
+  ExecutionMetrics metrics = 14;
+}
+
+message StepExecution {
+  string step_id = 1;
+  string step_name = 2;
+  ExecutionStatus status = 3;
+  google.protobuf.Timestamp started_at = 4;
+  google.protobuf.Timestamp completed_at = 5;
+  google.protobuf.Duration duration = 6;
+  google.protobuf.Struct input_data = 7;
+  google.protobuf.Struct output_data = 8;
+  string error_message = 9;
+  int32 retry_count = 10;
+}
+
+message File {
+  string id = 1;
+  string tenant_id = 2;
+  string filename = 3;
+  string original_filename = 4;
+  string mime_type = 5;
+  int64 size_bytes = 6;
+  string hash = 7;
+  FileStatus status = 8;
+  string storage_path = 9;
+  google.protobuf.Timestamp uploaded_at = 10;
+  string uploaded_by = 11;
+  ProcessingMetadata processing = 12;
+  map<string, string> metadata = 13;
+}
+
+message FileContent {
+  string file_id = 1;
+  ContentType content_type = 2;
+  oneof content {
+    string text_content = 3;
+    bytes binary_content = 4;
+    google.protobuf.Struct structured_content = 5;
+  }
+  repeated ContentChunk chunks = 6; // for large content
+  ContentMetadata metadata = 7;
+}
+
+message Trigger {
+  string id = 1;
+  string workflow_id = 2;
+  string tenant_id = 3;
+  TriggerType type = 4;
+  TriggerDefinition definition = 5;
+  bool enabled = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp last_triggered = 8;
+  int32 trigger_count = 9;
+}
+
+message TriggerDefinition {
+  oneof trigger_config {
+    ScheduleTrigger schedule = 1;
+    WebhookTrigger webhook = 2;
+    FileTrigger file = 3;
+    DatabaseTrigger database = 4;
+  }
+}
+
+message ScheduleTrigger {
+  string cron_expression = 1;
+  google.protobuf.Timestamp start_time = 2;
+  google.protobuf.Timestamp end_time = 3; // optional
+  string timezone = 4;
+  bool enabled = 5;
+}
+
+message WebhookTrigger {
+  string url = 1;
+  string secret = 2;
+  repeated string allowed_ips = 3;
+  map<string, string> headers = 4;
+}
+
+message FileTrigger {
+  string file_pattern = 1;
+  string directory = 2;
+  FileEvent event_type = 3;
+}
+
+message DatabaseTrigger {
+  string table_name = 1;
+  DatabaseEvent event_type = 2;
+  string condition = 3; // SQL-like condition
+}
+
+// Supporting types
+message WorkflowUpdate {
+  string name = 1;
+  string description = 2;
+  WorkflowStatus status = 3;
+  WorkflowDefinition definition = 4;
+  WorkflowConfig config = 5;
+  map<string, string> metadata = 6;
+}
+
+message ExecutionOptions {
+  bool async_execution = 1;
+  google.protobuf.Duration timeout = 2;
+  bool enable_debugging = 3;
+  google.protobuf.Struct parameters = 4;
+}
+
+message FileMetadata {
+  string tenant_id = 1;
+  string filename = 2;
+  string mime_type = 3;
+  int64 size_bytes = 4;
+  map<string, string> metadata = 5;
+}
+
+message ProcessingMetadata {
+  ProcessingStatus status = 1;
+  ProcessingType type = 2;
+  google.protobuf.Timestamp started_at = 3;
+  google.protobuf.Timestamp completed_at = 4;
+  string processor_version = 5;
+  google.protobuf.Struct results = 6;
+}
+
+message ExecutionLog {
+  string id = 1;
+  string execution_id = 2;
+  string step_id = 3; // optional
+  LogLevel level = 4;
+  string message = 5;
+  google.protobuf.Struct context = 6;
+  google.protobuf.Timestamp timestamp = 7;
+}
+
+message ExecutionArtifact {
+  string id = 1;
+  string execution_id = 2;
+  string step_id = 3; // optional
+  string name = 4;
+  ArtifactType type = 5;
+  string storage_path = 6;
+  int64 size_bytes = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+// Filters and sorting
+message WorkflowFilter {
+  WorkflowStatus status = 1;
+  string created_by = 2;
+  google.protobuf.Timestamp created_after = 3;
+  google.protobuf.Timestamp created_before = 4;
+  string search_query = 5;
+  repeated string tags = 6;
+}
+
+message WorkflowSort {
+  WorkflowSortField field = 1;
+  SortDirection direction = 2;
+}
+
+message ExecutionFilter {
+  ExecutionStatus status = 1;
+  string triggered_by = 2;
+  google.protobuf.Timestamp started_after = 3;
+  google.protobuf.Timestamp started_before = 4;
+  google.protobuf.Duration min_duration = 5;
+  google.protobuf.Duration max_duration = 6;
+}
+
+message ExecutionSort {
+  ExecutionSortField field = 1;
+  SortDirection direction = 2;
+}
+
+message FileFilter {
+  FileStatus status = 1;
+  string mime_type = 2;
+  int64 min_size = 3;
+  int64 max_size = 4;
+  google.protobuf.Timestamp uploaded_after = 5;
+  google.protobuf.Timestamp uploaded_before = 6;
+  string search_query = 7;
+}
+
+message FileSort {
+  FileSortField field = 1;
+  SortDirection direction = 2;
+}
+
+// Statistics and metrics
+message WorkflowStats {
+  int64 total_workflows = 1;
+  int64 active_workflows = 2;
+  int64 total_executions = 3;
+  int64 successful_executions = 4;
+  int64 failed_executions = 5;
+  double average_execution_time_ms = 6;
+  int64 files_processed = 7;
+  int64 total_file_size_bytes = 8;
+  google.protobuf.Timestamp collected_at = 9;
+}
+
+message TimeSeriesData {
+  google.protobuf.Timestamp timestamp = 1;
+  map<string, double> metrics = 2;
+}
+
+message ExecutionMetrics {
+  int32 steps_completed = 1;
+  int32 steps_failed = 2;
+  int32 steps_skipped = 3;
+  int64 memory_used_bytes = 4;
+  double cpu_time_ms = 5;
+  int64 network_bytes_sent = 6;
+  int64 network_bytes_received = 7;
+}
+
+// Enums
+enum WorkflowStatus {
+  WORKFLOW_STATUS_UNSPECIFIED = 0;
+  WORKFLOW_STATUS_DRAFT = 1;
+  WORKFLOW_STATUS_ACTIVE = 2;
+  WORKFLOW_STATUS_PAUSED = 3;
+  WORKFLOW_STATUS_DISABLED = 4;
+  WORKFLOW_STATUS_ARCHIVED = 5;
+}
+
+enum ExecutionStatus {
+  EXECUTION_STATUS_UNSPECIFIED = 0;
+  EXECUTION_STATUS_PENDING = 1;
+  EXECUTION_STATUS_RUNNING = 2;
+  EXECUTION_STATUS_COMPLETED = 3;
+  EXECUTION_STATUS_FAILED = 4;
+  EXECUTION_STATUS_CANCELLED = 5;
+  EXECUTION_STATUS_TIMEOUT = 6;
+}
+
+enum StepType {
+  STEP_TYPE_UNSPECIFIED = 0;
+  STEP_TYPE_HTTP_REQUEST = 1;
+  STEP_TYPE_DATABASE_QUERY = 2;
+  STEP_TYPE_FILE_PROCESSING = 3;
+  STEP_TYPE_TRANSFORMATION = 4;
+  STEP_TYPE_CONDITIONAL = 5;
+  STEP_TYPE_LOOP = 6;
+  STEP_TYPE_SCRIPT = 7;
+  STEP_TYPE_EMAIL = 8;
+  STEP_TYPE_WEBHOOK = 9;
+  STEP_TYPE_DELAY = 10;
+}
+
+enum FileStatus {
+  FILE_STATUS_UNSPECIFIED = 0;
+  FILE_STATUS_UPLOADING = 1;
+  FILE_STATUS_UPLOADED = 2;
+  FILE_STATUS_PROCESSING = 3;
+  FILE_STATUS_PROCESSED = 4;
+  FILE_STATUS_FAILED = 5;
+  FILE_STATUS_DELETED = 6;
+}
+
+enum ProcessingType {
+  PROCESSING_TYPE_UNSPECIFIED = 0;
+  PROCESSING_TYPE_TEXT_EXTRACTION = 1;
+  PROCESSING_TYPE_OCR = 2;
+  PROCESSING_TYPE_METADATA_EXTRACTION = 3;
+  PROCESSING_TYPE_THUMBNAIL_GENERATION = 4;
+  PROCESSING_TYPE_VIRUS_SCAN = 5;
+  PROCESSING_TYPE_CONTENT_ANALYSIS = 6;
+}
+
+enum ProcessingStatus {
+  PROCESSING_STATUS_UNSPECIFIED = 0;
+  PROCESSING_STATUS_QUEUED = 1;
+  PROCESSING_STATUS_RUNNING = 2;
+  PROCESSING_STATUS_COMPLETED = 3;
+  PROCESSING_STATUS_FAILED = 4;
+  PROCESSING_STATUS_CANCELLED = 5;
+}
+
+enum ContentType {
+  CONTENT_TYPE_UNSPECIFIED = 0;
+  CONTENT_TYPE_TEXT = 1;
+  CONTENT_TYPE_BINARY = 2;
+  CONTENT_TYPE_JSON = 3;
+  CONTENT_TYPE_XML = 4;
+  CONTENT_TYPE_CSV = 5;
+}
+
+enum ContentFormat {
+  CONTENT_FORMAT_UNSPECIFIED = 0;
+  CONTENT_FORMAT_RAW = 1;
+  CONTENT_FORMAT_JSON = 2;
+  CONTENT_FORMAT_TEXT = 3;
+  CONTENT_FORMAT_MARKDOWN = 4;
+}
+
+enum TriggerType {
+  TRIGGER_TYPE_UNSPECIFIED = 0;
+  TRIGGER_TYPE_SCHEDULE = 1;
+  TRIGGER_TYPE_WEBHOOK = 2;
+  TRIGGER_TYPE_FILE = 3;
+  TRIGGER_TYPE_DATABASE = 4;
+  TRIGGER_TYPE_MANUAL = 5;
+}
+
+enum FileEvent {
+  FILE_EVENT_UNSPECIFIED = 0;
+  FILE_EVENT_CREATED = 1;
+  FILE_EVENT_MODIFIED = 2;
+  FILE_EVENT_DELETED = 3;
+}
+
+enum DatabaseEvent {
+  DATABASE_EVENT_UNSPECIFIED = 0;
+  DATABASE_EVENT_INSERT = 1;
+  DATABASE_EVENT_UPDATE = 2;
+  DATABASE_EVENT_DELETE = 3;
+}
+
+enum LogLevel {
+  LOG_LEVEL_UNSPECIFIED = 0;
+  LOG_LEVEL_DEBUG = 1;
+  LOG_LEVEL_INFO = 2;
+  LOG_LEVEL_WARN = 3;
+  LOG_LEVEL_ERROR = 4;
+}
+
+enum ArtifactType {
+  ARTIFACT_TYPE_UNSPECIFIED = 0;
+  ARTIFACT_TYPE_FILE = 1;
+  ARTIFACT_TYPE_DATA = 2;
+  ARTIFACT_TYPE_LOG = 3;
+  ARTIFACT_TYPE_REPORT = 4;
+}
+
+enum WorkflowSortField {
+  WORKFLOW_SORT_FIELD_UNSPECIFIED = 0;
+  WORKFLOW_SORT_FIELD_NAME = 1;
+  WORKFLOW_SORT_FIELD_CREATED_AT = 2;
+  WORKFLOW_SORT_FIELD_UPDATED_AT = 3;
+  WORKFLOW_SORT_FIELD_EXECUTION_COUNT = 4;
+}
+
+enum ExecutionSortField {
+  EXECUTION_SORT_FIELD_UNSPECIFIED = 0;
+  EXECUTION_SORT_FIELD_STARTED_AT = 1;
+  EXECUTION_SORT_FIELD_DURATION = 2;
+  EXECUTION_SORT_FIELD_STATUS = 3;
+}
+
+enum FileSortField {
+  FILE_SORT_FIELD_UNSPECIFIED = 0;
+  FILE_SORT_FIELD_FILENAME = 1;
+  FILE_SORT_FIELD_SIZE = 2;
+  FILE_SORT_FIELD_UPLOADED_AT = 3;
+}
+
+enum SortDirection {
+  SORT_DIRECTION_UNSPECIFIED = 0;
+  SORT_DIRECTION_ASC = 1;
+  SORT_DIRECTION_DESC = 2;
+}
+
+enum StatsGranularity {
+  STATS_GRANULARITY_UNSPECIFIED = 0;
+  STATS_GRANULARITY_HOUR = 1;
+  STATS_GRANULARITY_DAY = 2;
+  STATS_GRANULARITY_WEEK = 3;
+  STATS_GRANULARITY_MONTH = 4;
+}
+
+// Additional supporting messages
+message WorkflowExecutionRequest {
+  string workflow_id = 1;
+  google.protobuf.Struct input_data = 2;
+  ExecutionOptions options = 3;
+}
+
+message ExecutionResult {
+  string workflow_id = 1;
+  string execution_id = 2;
+  ExecutionStatus status = 3;
+  string error_message = 4;
+  google.protobuf.Duration duration = 5;
+}
+
+message FileProcessingRequest {
+  string file_id = 1;
+  google.protobuf.Struct options = 2;
+}
+
+message ProcessingResult {
+  string file_id = 1;
+  string processing_id = 2;
+  ProcessingStatus status = 3;
+  FileContent content = 4;
+  string error_message = 5;
+}
+
+message BatchOptions {
+  int32 max_concurrent = 1;
+  google.protobuf.Duration timeout = 2;
+  bool fail_fast = 3; // stop on first failure
+  bool continue_on_error = 4;
+}
+
+message BatchStats {
+  int32 total_requests = 1;
+  int32 successful = 2;
+  int32 failed = 3;
+  double duration_ms = 4;
+  double avg_request_time_ms = 5;
+}
+
+message UploadStats {
+  int64 bytes_uploaded = 1;
+  double upload_speed_mbps = 2;
+  google.protobuf.Duration upload_time = 3;
+  int32 chunk_count = 4;
+}
+
+message ErrorHandling {
+  bool continue_on_error = 1;
+  int32 max_retries = 2;
+  google.protobuf.Duration retry_delay = 3;
+  repeated string ignore_errors = 4; // error codes to ignore
+}
+
+message TriggerUpdate {
+  TriggerDefinition definition = 1;
+  bool enabled = 2;
+}
+
+message TriggerFilter {
+  TriggerType type = 1;
+  bool enabled = 2;
+  google.protobuf.Timestamp created_after = 3;
+  google.protobuf.Timestamp created_before = 4;
+}
+
+message ContentChunk {
+  int32 chunk_number = 1;
+  int64 offset = 2;
+  int32 size = 3;
+  bytes data = 4;
+}
+
+message ContentMetadata {
+  string encoding = 1;
+  string language = 2;
+  int32 page_count = 3; // for documents
+  int32 word_count = 4;
+  int32 character_count = 5;
+  map<string, string> custom_metadata = 6;
+}
+
+message ExecutionUpdate {
+  string execution_id = 1;
+  ExecutionStatus status = 2;
+  double progress_percent = 3;
+  string current_step = 4;
+  google.protobuf.Struct context = 5;
+}
+
+message StepUpdate {
+  string step_id = 1;
+  string step_name = 2;
+  ExecutionStatus status = 3;
+  double progress_percent = 4;
+  google.protobuf.Struct output_data = 5;
+}
+
+message ExecutionCompleted {
+  string execution_id = 1;
+  ExecutionStatus final_status = 2;
+  google.protobuf.Struct output_data = 3;
+  ExecutionMetrics metrics = 4;
+  string message = 5;
+}
+
+message ProcessingLog {
+  LogLevel level = 1;
+  string message = 2;
+  google.protobuf.Struct context = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+message ProcessingError {
+  string error_code = 1;
+  string error_message = 2;
+  google.protobuf.Struct context = 3;
+  bool retryable = 4;
+}

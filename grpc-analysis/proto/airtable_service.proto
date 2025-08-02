@@ -1,0 +1,471 @@
+syntax = "proto3";
+
+package pyairtable.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/pyairtable/api/v1;pyairtablev1";
+
+// Airtable Service - Handles Airtable API integration with optimized communication
+service AirtableService {
+  // Base operations
+  rpc ListBases(ListBasesRequest) returns (ListBasesResponse);
+  rpc GetBase(GetBaseRequest) returns (GetBaseResponse);
+  
+  // Table operations
+  rpc ListTables(ListTablesRequest) returns (ListTablesResponse);
+  rpc GetTable(GetTableRequest) returns (GetTableResponse);
+  rpc GetTableSchema(GetTableSchemaRequest) returns (GetTableSchemaResponse);
+  
+  // Record operations (optimized for bulk operations)
+  rpc ListRecords(ListRecordsRequest) returns (ListRecordsResponse);
+  rpc GetRecord(GetRecordRequest) returns (GetRecordResponse);
+  rpc CreateRecord(CreateRecordRequest) returns (CreateRecordResponse);
+  rpc UpdateRecord(UpdateRecordRequest) returns (UpdateRecordResponse);
+  rpc DeleteRecord(DeleteRecordRequest) returns (DeleteRecordResponse);
+  
+  // Bulk operations for better performance
+  rpc BatchCreateRecords(BatchCreateRecordsRequest) returns (BatchCreateRecordsResponse);
+  rpc BatchUpdateRecords(BatchUpdateRecordsRequest) returns (BatchUpdateRecordsResponse);
+  rpc BatchDeleteRecords(BatchDeleteRecordsRequest) returns (BatchDeleteRecordsResponse);
+  
+  // Streaming operations for large datasets
+  rpc StreamRecords(StreamRecordsRequest) returns (stream StreamRecordsResponse);
+  rpc StreamTableData(StreamTableDataRequest) returns (stream StreamTableDataResponse);
+  
+  // Cache management
+  rpc InvalidateCache(InvalidateCacheRequest) returns (InvalidateCacheResponse);
+  rpc GetCacheStats(GetCacheStatsRequest) returns (GetCacheStatsResponse);
+}
+
+// Request/Response messages
+
+// Base operations
+message ListBasesRequest {
+  string tenant_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListBasesResponse {
+  repeated Base bases = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
+
+message GetBaseRequest {
+  string tenant_id = 1;
+  string base_id = 2;
+  bool include_schema = 3;
+}
+
+message GetBaseResponse {
+  Base base = 1;
+  repeated Table tables = 2; // Only if include_schema = true
+}
+
+// Table operations
+message ListTablesRequest {
+  string tenant_id = 1;
+  string base_id = 2;
+  bool include_schema = 3;
+}
+
+message ListTablesResponse {
+  repeated Table tables = 1;
+  int32 total_count = 2;
+}
+
+message GetTableRequest {
+  string tenant_id = 1;
+  string base_id = 2;
+  string table_id = 3;
+  bool include_schema = 4;
+}
+
+message GetTableResponse {
+  Table table = 1;
+  repeated Field fields = 2; // Only if include_schema = true
+}
+
+message GetTableSchemaRequest {
+  string tenant_id = 1;
+  string base_id = 2;
+  string table_id = 3;
+}
+
+message GetTableSchemaResponse {
+  repeated Field fields = 1;
+  repeated View views = 2;
+  TableMetadata metadata = 3;
+}
+
+// Record operations
+message ListRecordsRequest {
+  string tenant_id = 1;
+  string base_id = 2;
+  string table_id = 3;
+  string view_id = 4; // optional
+  repeated string fields = 5; // optional, specific fields to return
+  string filter_by_formula = 6; // optional
+  int32 max_records = 7;
+  int32 page_size = 8;
+  string offset = 9;
+  repeated Sort sort = 10;
+  CellFormat cell_format = 11;
+  string time_zone = 12;
+  string user_locale = 13;
+}
+
+message ListRecordsResponse {
+  repeated Record records = 1;
+  string offset = 2; // for pagination
+  bool has_more = 3;
+  int32 total_count = 4;
+}
+
+message GetRecordRequest {
+  string tenant_id = 1;
+  string base_id = 2;
+  string table_id = 3;
+  string record_id = 4;
+}
+
+message GetRecordResponse {
+  Record record = 1;
+}
+
+message CreateRecordRequest {
+  string tenant_id = 1;
+  string base_id = 2;
+  string table_id = 3;
+  google.protobuf.Struct fields = 4;
+  bool typecast = 5;
+}
+
+message CreateRecordResponse {
+  Record record = 1;
+  repeated string warnings = 2;
+}
+
+message UpdateRecordRequest {
+  string tenant_id = 1;
+  string base_id = 2;
+  string table_id = 3;
+  string record_id = 4;
+  google.protobuf.Struct fields = 5;
+  bool typecast = 6;
+  DestructiveUpdate destructive = 7;
+}
+
+message UpdateRecordResponse {
+  Record record = 1;
+  repeated string warnings = 2;
+}
+
+message DeleteRecordRequest {
+  string tenant_id = 1;
+  string base_id = 2;
+  string table_id = 3;
+  string record_id = 4;
+}
+
+message DeleteRecordResponse {
+  string record_id = 1;
+  bool deleted = 2;
+}
+
+// Batch operations
+message BatchCreateRecordsRequest {
+  string tenant_id = 1;
+  string base_id = 2;
+  string table_id = 3;
+  repeated RecordInput records = 4; // up to 10 records per batch
+  bool typecast = 5;
+}
+
+message BatchCreateRecordsResponse {
+  repeated Record records = 1;
+  repeated string warnings = 2;
+  BatchStats stats = 3;
+}
+
+message BatchUpdateRecordsRequest {
+  string tenant_id = 1;
+  string base_id = 2;
+  string table_id = 3;
+  repeated RecordUpdate records = 4; // up to 10 records per batch
+  bool typecast = 5;
+  DestructiveUpdate destructive = 6;
+}
+
+message BatchUpdateRecordsResponse {
+  repeated Record records = 1;
+  repeated string warnings = 2;
+  BatchStats stats = 3;
+}
+
+message BatchDeleteRecordsRequest {
+  string tenant_id = 1;
+  string base_id = 2;
+  string table_id = 3;
+  repeated string record_ids = 4; // up to 10 records per batch
+}
+
+message BatchDeleteRecordsResponse {
+  repeated DeletedRecord deleted_records = 1;
+  BatchStats stats = 2;
+}
+
+// Streaming operations
+message StreamRecordsRequest {
+  string tenant_id = 1;
+  string base_id = 2;
+  string table_id = 3;
+  string view_id = 4; // optional
+  repeated string fields = 5; // optional
+  string filter_by_formula = 6; // optional
+  int32 batch_size = 7; // records per stream message
+  repeated Sort sort = 8;
+  CellFormat cell_format = 9;
+}
+
+message StreamRecordsResponse {
+  repeated Record records = 1;
+  int32 batch_number = 2;
+  bool is_last_batch = 3;
+  int32 total_records_sent = 4;
+}
+
+message StreamTableDataRequest {
+  string tenant_id = 1;
+  string base_id = 2;
+  string table_id = 3;
+  bool include_schema = 4;
+  bool include_attachments = 5;
+  int32 batch_size = 6;
+}
+
+message StreamTableDataResponse {
+  oneof data {
+    TableMetadata metadata = 1;
+    RecordBatch record_batch = 2;
+    AttachmentBatch attachment_batch = 3;
+  }
+  int32 batch_number = 4;
+  bool is_last_batch = 5;
+}
+
+// Cache operations
+message InvalidateCacheRequest {
+  string tenant_id = 1;
+  string base_id = 2; // optional, specific base
+  string table_id = 3; // optional, specific table
+  CacheScope scope = 4;
+}
+
+message InvalidateCacheResponse {
+  bool success = 1;
+  int32 keys_invalidated = 2;
+  string message = 3;
+}
+
+message GetCacheStatsRequest {
+  string tenant_id = 1;
+  string base_id = 2; // optional
+}
+
+message GetCacheStatsResponse {
+  CacheStats stats = 1;
+}
+
+// Data models
+message Base {
+  string id = 1;
+  string name = 2;
+  string permission_level = 3;
+  google.protobuf.Timestamp created_time = 4;
+  google.protobuf.Timestamp modified_time = 5;
+  repeated string table_ids = 6;
+}
+
+message Table {
+  string id = 1;
+  string name = 2;
+  string primary_field_id = 3;
+  repeated string field_ids = 4;
+  repeated string view_ids = 5;
+  string description = 6;
+  google.protobuf.Timestamp created_time = 7;
+  google.protobuf.Timestamp modified_time = 8;
+}
+
+message Field {
+  string id = 1;
+  string name = 2;
+  FieldType type = 3;
+  google.protobuf.Struct options = 4; // field-specific options
+  string description = 5;
+}
+
+message View {
+  string id = 1;
+  string name = 2;
+  ViewType type = 3;
+  google.protobuf.Struct configuration = 4;
+}
+
+message Record {
+  string id = 1;
+  google.protobuf.Struct fields = 2;
+  google.protobuf.Timestamp created_time = 3;
+  google.protobuf.Timestamp modified_time = 4;
+  string created_by = 5;
+  string modified_by = 6;
+}
+
+message RecordInput {
+  google.protobuf.Struct fields = 1;
+}
+
+message RecordUpdate {
+  string id = 1;
+  google.protobuf.Struct fields = 2;
+}
+
+message DeletedRecord {
+  string id = 1;
+  bool deleted = 2;
+}
+
+message Sort {
+  string field = 1;
+  SortDirection direction = 2;
+}
+
+message TableMetadata {
+  string id = 1;
+  string name = 2;
+  repeated Field fields = 3;
+  repeated View views = 4;
+  int32 record_count = 5;
+  google.protobuf.Timestamp last_modified = 6;
+}
+
+message RecordBatch {
+  repeated Record records = 1;
+  int32 batch_size = 2;
+}
+
+message AttachmentBatch {
+  repeated Attachment attachments = 1;
+  int32 batch_size = 2;
+}
+
+message Attachment {
+  string id = 1;
+  string url = 2;
+  string filename = 3;
+  int64 size = 4;
+  string type = 5;
+  repeated Thumbnail thumbnails = 6;
+}
+
+message Thumbnail {
+  string url = 1;
+  int32 width = 2;
+  int32 height = 3;
+}
+
+message BatchStats {
+  int32 total_records = 1;
+  int32 successful = 2;
+  int32 failed = 3;
+  double duration_ms = 4;
+}
+
+message CacheStats {
+  int64 hit_count = 1;
+  int64 miss_count = 2;
+  double hit_rate = 3;
+  int64 size_bytes = 4;
+  int32 key_count = 5;
+  google.protobuf.Timestamp last_updated = 6;
+}
+
+// Enums
+enum FieldType {
+  FIELD_TYPE_UNSPECIFIED = 0;
+  FIELD_TYPE_SINGLE_LINE_TEXT = 1;
+  FIELD_TYPE_EMAIL = 2;
+  FIELD_TYPE_URL = 3;
+  FIELD_TYPE_MULTILINE_TEXT = 4;
+  FIELD_TYPE_NUMBER = 5;
+  FIELD_TYPE_PERCENT = 6;
+  FIELD_TYPE_CURRENCY = 7;
+  FIELD_TYPE_SINGLE_SELECT = 8;
+  FIELD_TYPE_MULTIPLE_SELECTS = 9;
+  FIELD_TYPE_SINGLE_COLLABORATOR = 10;
+  FIELD_TYPE_MULTIPLE_COLLABORATORS = 11;
+  FIELD_TYPE_MULTIPLE_RECORD_LINKS = 12;
+  FIELD_TYPE_DATE = 13;
+  FIELD_TYPE_DATE_TIME = 14;
+  FIELD_TYPE_PHONE_NUMBER = 15;
+  FIELD_TYPE_MULTIPLE_ATTACHMENTS = 16;
+  FIELD_TYPE_CHECKBOX = 17;
+  FIELD_TYPE_FORMULA = 18;
+  FIELD_TYPE_CREATED_TIME = 19;
+  FIELD_TYPE_ROLLUP = 20;
+  FIELD_TYPE_COUNT = 21;
+  FIELD_TYPE_LOOKUP = 22;
+  FIELD_TYPE_CREATED_BY = 23;
+  FIELD_TYPE_MODIFIED_TIME = 24;
+  FIELD_TYPE_MODIFIED_BY = 25;
+  FIELD_TYPE_AUTO_NUMBER = 26;
+  FIELD_TYPE_BARCODE = 27;
+  FIELD_TYPE_RATING = 28;
+  FIELD_TYPE_RICH_TEXT = 29;
+  FIELD_TYPE_DURATION = 30;
+  FIELD_TYPE_LAST_MODIFIED_TIME = 31;
+  FIELD_TYPE_LAST_MODIFIED_BY = 32;
+  FIELD_TYPE_BUTTON = 33;
+}
+
+enum ViewType {
+  VIEW_TYPE_UNSPECIFIED = 0;
+  VIEW_TYPE_GRID = 1;
+  VIEW_TYPE_FORM = 2;
+  VIEW_TYPE_CALENDAR = 3;
+  VIEW_TYPE_GALLERY = 4;
+  VIEW_TYPE_KANBAN = 5;
+  VIEW_TYPE_TIMELINE = 6;
+  VIEW_TYPE_BLOCK = 7;
+}
+
+enum SortDirection {
+  SORT_DIRECTION_UNSPECIFIED = 0;
+  SORT_DIRECTION_ASC = 1;
+  SORT_DIRECTION_DESC = 2;
+}
+
+enum CellFormat {
+  CELL_FORMAT_UNSPECIFIED = 0;
+  CELL_FORMAT_JSON = 1;
+  CELL_FORMAT_STRING = 2;
+}
+
+enum DestructiveUpdate {
+  DESTRUCTIVE_UPDATE_UNSPECIFIED = 0;
+  DESTRUCTIVE_UPDATE_NONE = 1;
+  DESTRUCTIVE_UPDATE_REPLACE = 2;
+  DESTRUCTIVE_UPDATE_MERGE = 3;
+}
+
+enum CacheScope {
+  CACHE_SCOPE_UNSPECIFIED = 0;
+  CACHE_SCOPE_ALL = 1;
+  CACHE_SCOPE_TENANT = 2;
+  CACHE_SCOPE_BASE = 3;
+  CACHE_SCOPE_TABLE = 4;
+}
