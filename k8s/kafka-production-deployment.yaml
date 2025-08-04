@@ -1,0 +1,897 @@
+# Production Kafka Cluster Deployment for Kubernetes
+# This manifest deploys a secure, scalable Kafka cluster with ZooKeeper ensemble
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kafka
+  labels:
+    name: kafka
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: messaging
+
+---
+# ZooKeeper ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zookeeper-config
+  namespace: kafka
+data:
+  zoo.cfg: |
+    tickTime=2000
+    initLimit=5
+    syncLimit=2
+    dataDir=/var/lib/zookeeper/data
+    dataLogDir=/var/lib/zookeeper/log
+    clientPort=2181
+    server.1=zookeeper-0.zookeeper-headless:2888:3888
+    server.2=zookeeper-1.zookeeper-headless:2888:3888
+    server.3=zookeeper-2.zookeeper-headless:2888:3888
+    autopurge.snapRetainCount=3
+    autopurge.purgeInterval=24
+    4lw.commands.whitelist=mntr,conf,ruok,stat
+
+---
+# Kafka ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-config
+  namespace: kafka
+data:
+  server.properties: |
+    # Broker Configuration
+    num.network.threads=8
+    num.io.threads=16
+    socket.send.buffer.bytes=102400
+    socket.receive.buffer.bytes=102400
+    socket.request.max.bytes=104857600
+    
+    # Log Configuration
+    num.partitions=12
+    default.replication.factor=3
+    min.insync.replicas=2
+    log.retention.hours=168
+    log.retention.bytes=1073741824
+    log.segment.bytes=1073741824
+    log.cleanup.policy=delete
+    
+    # Performance Optimizations
+    compression.type=snappy
+    message.max.bytes=10485760
+    replica.fetch.max.bytes=10485760
+    log.flush.interval.ms=1000
+    log.flush.interval.messages=10000
+    
+    # Replication Configuration
+    replica.lag.time.max.ms=30000
+    replica.socket.timeout.ms=30000
+    replica.socket.receive.buffer.bytes=65536
+    replica.fetch.max.bytes=1048576
+    
+    # Auto Topic Creation (disabled for production control)
+    auto.create.topics.enable=false
+    delete.topic.enable=true
+    
+    # Producer/Consumer Optimizations
+    batch.size=16384
+    linger.ms=5
+    buffer.memory=33554432
+    max.request.size=1048576
+    
+    # Security Configuration
+    security.inter.broker.protocol=SSL
+    ssl.client.auth=required
+    ssl.keystore.location=/etc/kafka/secrets/kafka.server.keystore.jks
+    ssl.keystore.password=pyairtable-keystore-password
+    ssl.key.password=pyairtable-ssl-key-password
+    ssl.truststore.location=/etc/kafka/secrets/kafka.server.truststore.jks
+    ssl.truststore.password=pyairtable-truststore-password
+    ssl.endpoint.identification.algorithm=
+
+---
+# ZooKeeper Service (Headless)
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper-headless
+  namespace: kafka
+  labels:
+    app: zookeeper
+    service: headless
+spec:
+  clusterIP: None
+  ports:
+  - port: 2888
+    name: server
+  - port: 3888
+    name: leader-election
+  - port: 2181
+    name: client
+  selector:
+    app: zookeeper
+
+---
+# ZooKeeper Service (Client)
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper-service
+  namespace: kafka
+  labels:
+    app: zookeeper
+    service: client
+spec:
+  ports:
+  - port: 2181
+    name: client
+  selector:
+    app: zookeeper
+
+---
+# ZooKeeper StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zookeeper
+  namespace: kafka
+  labels:
+    app: zookeeper
+spec:
+  serviceName: zookeeper-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: zookeeper
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - zookeeper
+            topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: zookeeper
+        image: confluentinc/cp-zookeeper:7.5.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 2181
+          name: client
+        - containerPort: 2888
+          name: server
+        - containerPort: 3888
+          name: leader-election
+        - containerPort: 9999
+          name: jmx
+        env:
+        - name: ZOOKEEPER_SERVER_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['kafka.io/zookeeper-server-id']
+        - name: ZOOKEEPER_CLIENT_PORT
+          value: "2181"
+        - name: ZOOKEEPER_TICK_TIME
+          value: "2000"
+        - name: ZOOKEEPER_INIT_LIMIT
+          value: "5"
+        - name: ZOOKEEPER_SYNC_LIMIT
+          value: "2"
+        - name: ZOOKEEPER_SERVERS
+          value: "zookeeper-0.zookeeper-headless:2888:3888;zookeeper-1.zookeeper-headless:2888:3888;zookeeper-2.zookeeper-headless:2888:3888"
+        - name: ZOOKEEPER_AUTOPURGE_SNAP_RETAIN_COUNT
+          value: "3"
+        - name: ZOOKEEPER_AUTOPURGE_PURGE_INTERVAL
+          value: "24"
+        - name: ZOOKEEPER_4LW_COMMANDS_WHITELIST
+          value: "mntr,conf,ruok,stat"
+        - name: ZOOKEEPER_JMX_HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: ZOOKEEPER_JMX_PORT
+          value: "9999"
+        - name: ZOOKEEPER_LOG4J_ROOT_LOGLEVEL
+          value: "INFO"
+        volumeMounts:
+        - name: zookeeper-data
+          mountPath: /var/lib/zookeeper/data
+        - name: zookeeper-log
+          mountPath: /var/lib/zookeeper/log
+        - name: zookeeper-config
+          mountPath: /etc/kafka
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - bash
+            - -c
+            - "echo 'ruok' | nc localhost 2181 | grep imok"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
+        readinessProbe:
+          exec:
+            command:
+            - bash
+            - -c
+            - "echo 'ruok' | nc localhost 2181 | grep imok"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: zookeeper-config
+        configMap:
+          name: zookeeper-config
+      initContainers:
+      - name: zookeeper-id-setup
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          ZOOKEEPER_SERVER_ID=$((${HOSTNAME##*-} + 1))
+          echo "Setting ZooKeeper Server ID: $ZOOKEEPER_SERVER_ID"
+          echo $ZOOKEEPER_SERVER_ID > /var/lib/zookeeper/data/myid
+          kubectl annotate pod $HOSTNAME kafka.io/zookeeper-server-id=$ZOOKEEPER_SERVER_ID --overwrite
+        volumeMounts:
+        - name: zookeeper-data
+          mountPath: /var/lib/zookeeper/data
+        env:
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+  volumeClaimTemplates:
+  - metadata:
+      name: zookeeper-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "fast-ssd"
+      resources:
+        requests:
+          storage: 10Gi
+  - metadata:
+      name: zookeeper-log
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "fast-ssd"
+      resources:
+        requests:
+          storage: 5Gi
+
+---
+# Kafka Service (Headless)
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-headless
+  namespace: kafka
+  labels:
+    app: kafka
+    service: headless
+spec:
+  clusterIP: None
+  ports:
+  - port: 9092
+    name: internal
+  - port: 9093
+    name: ssl
+  - port: 9094
+    name: sasl-ssl
+  selector:
+    app: kafka
+
+---
+# Kafka Service (External)
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-service
+  namespace: kafka
+  labels:
+    app: kafka
+    service: external
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9092
+    name: internal
+    targetPort: 9092
+  - port: 9093
+    name: ssl
+    targetPort: 9093
+  - port: 9094
+    name: sasl-ssl
+    targetPort: 9094
+  selector:
+    app: kafka
+
+---
+# Kafka StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  namespace: kafka
+  labels:
+    app: kafka
+spec:
+  serviceName: kafka-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9308"
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - kafka
+            topologyKey: "kubernetes.io/hostname"
+      securityContext:
+        fsGroup: 1001
+      containers:
+      - name: kafka
+        image: confluentinc/cp-kafka:7.5.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9092
+          name: internal
+        - containerPort: 9093
+          name: ssl
+        - containerPort: 9094
+          name: sasl-ssl
+        - containerPort: 9101
+          name: jmx
+        env:
+        - name: KAFKA_BROKER_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['kafka.io/broker-id']
+        - name: KAFKA_ZOOKEEPER_CONNECT
+          value: "zookeeper-0.zookeeper-headless:2181,zookeeper-1.zookeeper-headless:2181,zookeeper-2.zookeeper-headless:2181"
+        - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+          value: "INTERNAL:PLAINTEXT,SSL:SSL,SASL_SSL:SASL_SSL"
+        - name: KAFKA_ADVERTISED_LISTENERS
+          value: "INTERNAL://$(HOSTNAME).kafka-headless:9092,SSL://$(HOSTNAME).kafka-headless:9093,SASL_SSL://$(HOSTNAME).kafka-headless:9094"
+        - name: KAFKA_LISTENERS
+          value: "INTERNAL://0.0.0.0:9092,SSL://0.0.0.0:9093,SASL_SSL://0.0.0.0:9094"
+        - name: KAFKA_INTER_BROKER_LISTENER_NAME
+          value: "SSL"
+        # Cluster Configuration
+        - name: KAFKA_DEFAULT_REPLICATION_FACTOR
+          value: "3"
+        - name: KAFKA_MIN_INSYNC_REPLICAS
+          value: "2"
+        - name: KAFKA_NUM_PARTITIONS
+          value: "12"
+        - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+          value: "3"
+        - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+          value: "3"
+        - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+          value: "2"
+        # Performance Optimizations
+        - name: KAFKA_NUM_NETWORK_THREADS
+          value: "8"
+        - name: KAFKA_NUM_IO_THREADS
+          value: "8"
+        - name: KAFKA_SOCKET_SEND_BUFFER_BYTES
+          value: "102400"
+        - name: KAFKA_SOCKET_RECEIVE_BUFFER_BYTES
+          value: "102400"
+        - name: KAFKA_SOCKET_REQUEST_MAX_BYTES
+          value: "104857600"
+        - name: KAFKA_MESSAGE_MAX_BYTES
+          value: "10485760"
+        - name: KAFKA_REPLICA_FETCH_MAX_BYTES
+          value: "10485760"
+        # Log Configuration
+        - name: KAFKA_LOG_RETENTION_HOURS
+          value: "168"
+        - name: KAFKA_LOG_RETENTION_BYTES
+          value: "1073741824"
+        - name: KAFKA_LOG_SEGMENT_BYTES
+          value: "1073741824"
+        - name: KAFKA_LOG_CLEANUP_POLICY
+          value: "delete"
+        - name: KAFKA_LOG_FLUSH_INTERVAL_MS
+          value: "1000"
+        - name: KAFKA_LOG_FLUSH_INTERVAL_MESSAGES
+          value: "10000"
+        # Compression
+        - name: KAFKA_COMPRESSION_TYPE
+          value: "snappy"
+        # Auto Topic Creation (disabled for production control)
+        - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+          value: "false"
+        - name: KAFKA_DELETE_TOPIC_ENABLE
+          value: "true"
+        # SSL Configuration
+        - name: KAFKA_SSL_KEYSTORE_FILENAME
+          value: "kafka.server.keystore.jks"
+        - name: KAFKA_SSL_KEYSTORE_CREDENTIALS
+          value: "kafka_keystore_creds"
+        - name: KAFKA_SSL_KEY_CREDENTIALS
+          value: "kafka_ssl_key_creds"
+        - name: KAFKA_SSL_TRUSTSTORE_FILENAME
+          value: "kafka.server.truststore.jks"
+        - name: KAFKA_SSL_TRUSTSTORE_CREDENTIALS
+          value: "kafka_truststore_creds"
+        - name: KAFKA_SSL_CLIENT_AUTH
+          value: "none"
+        - name: KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM
+          value: ""
+        # JMX Configuration
+        - name: KAFKA_JMX_HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: KAFKA_JMX_PORT
+          value: "9101"
+        - name: JMX_PORT
+          value: "9101"
+        # Heap Configuration
+        - name: KAFKA_HEAP_OPTS
+          value: "-Xmx2G -Xms2G"
+        # Log Level
+        - name: KAFKA_LOG4J_ROOT_LOGLEVEL
+          value: "INFO"
+        - name: KAFKA_LOG4J_LOGGERS
+          value: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+        volumeMounts:
+        - name: kafka-data
+          mountPath: /var/lib/kafka/data
+        - name: kafka-config
+          mountPath: /etc/kafka/kafka-config
+        - name: kafka-secrets
+          mountPath: /etc/kafka/secrets
+          readOnly: true
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2"
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "kafka-broker-api-versions --bootstrap-server localhost:9092"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "kafka-broker-api-versions --bootstrap-server localhost:9092"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: kafka-config
+        configMap:
+          name: kafka-config
+      - name: kafka-secrets
+        secret:
+          secretName: kafka-ssl-secret
+      initContainers:
+      - name: kafka-id-setup
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          KAFKA_BROKER_ID=$((${HOSTNAME##*-} + 1))
+          echo "Setting Kafka Broker ID: $KAFKA_BROKER_ID"
+          kubectl annotate pod $HOSTNAME kafka.io/broker-id=$KAFKA_BROKER_ID --overwrite
+        env:
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+      - name: wait-for-zookeeper
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for ZooKeeper to be ready..."
+          until nc -z zookeeper-service 2181; do
+            echo "Waiting for ZooKeeper..."
+            sleep 2
+          done
+          echo "ZooKeeper is ready!"
+  volumeClaimTemplates:
+  - metadata:
+      name: kafka-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "fast-ssd"
+      resources:
+        requests:
+          storage: 100Gi
+
+---
+# SSL Secret for Kafka (to be created separately)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kafka-ssl-secret
+  namespace: kafka
+type: Opaque
+data:
+  # These should be base64 encoded files
+  # Create using: kubectl create secret generic kafka-ssl-secret --from-file=path/to/certs
+  kafka.server.keystore.jks: ""
+  kafka.server.truststore.jks: ""
+  kafka_keystore_creds: cHlhaXJ0YWJsZS1rZXlzdG9yZS1wYXNzd29yZA==  # pyairtable-keystore-password
+  kafka_ssl_key_creds: cHlhaXJ0YWJsZS1zc2wta2V5LXBhc3N3b3Jk  # pyairtable-ssl-key-password
+  kafka_truststore_creds: cHlhaXJ0YWJsZS10cnVzdHN0b3JlLXBhc3N3b3Jk  # pyairtable-truststore-password
+
+---
+# Schema Registry Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: schema-registry
+  namespace: kafka
+  labels:
+    app: schema-registry
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: schema-registry
+  template:
+    metadata:
+      labels:
+        app: schema-registry
+    spec:
+      containers:
+      - name: schema-registry
+        image: confluentinc/cp-schema-registry:7.5.0
+        ports:
+        - containerPort: 8081
+          name: http
+        - containerPort: 9582
+          name: jmx
+        env:
+        - name: SCHEMA_REGISTRY_HOST_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS
+          value: "kafka-service:9092"
+        - name: SCHEMA_REGISTRY_LISTENERS
+          value: "http://0.0.0.0:8081"
+        - name: SCHEMA_REGISTRY_KAFKASTORE_TOPIC
+          value: "_schemas"
+        - name: SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR
+          value: "3"
+        - name: SCHEMA_REGISTRY_LEADER_ELIGIBILITY
+          value: "true"
+        - name: SCHEMA_REGISTRY_MODE_MUTABILITY
+          value: "true"
+        - name: SCHEMA_REGISTRY_COMPATIBILITY_LEVEL
+          value: "BACKWARD"
+        - name: SCHEMA_REGISTRY_ACCESS_CONTROL_ALLOW_ORIGIN
+          value: "*"
+        - name: SCHEMA_REGISTRY_ACCESS_CONTROL_ALLOW_METHODS
+          value: "GET,POST,PUT,DELETE,OPTIONS"
+        - name: SCHEMA_REGISTRY_JMX_HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: SCHEMA_REGISTRY_JMX_PORT
+          value: "9582"
+        - name: SCHEMA_REGISTRY_HEAP_OPTS
+          value: "-Xmx512M -Xms512M"
+        - name: SCHEMA_REGISTRY_LOG4J_ROOT_LOGLEVEL
+          value: "INFO"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "768Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /subjects
+            port: 8081
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /subjects
+            port: 8081
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+
+---
+# Schema Registry Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: schema-registry-service
+  namespace: kafka
+  labels:
+    app: schema-registry
+spec:
+  ports:
+  - port: 8081
+    name: http
+    targetPort: 8081
+  - port: 9582
+    name: jmx
+    targetPort: 9582
+  selector:
+    app: schema-registry
+
+---
+# Kafka Connect Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-connect
+  namespace: kafka
+  labels:
+    app: kafka-connect
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kafka-connect
+  template:
+    metadata:
+      labels:
+        app: kafka-connect
+    spec:
+      containers:
+      - name: kafka-connect
+        image: confluentinc/cp-kafka-connect:7.5.0
+        ports:
+        - containerPort: 8083
+          name: http
+        - containerPort: 9584
+          name: jmx
+        env:
+        - name: CONNECT_BOOTSTRAP_SERVERS
+          value: "kafka-service:9092"
+        - name: CONNECT_REST_ADVERTISED_HOST_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: CONNECT_REST_PORT
+          value: "8083"
+        - name: CONNECT_GROUP_ID
+          value: "pyairtable-connect-cluster"
+        - name: CONNECT_CONFIG_STORAGE_TOPIC
+          value: "pyairtable.connect.configs"
+        - name: CONNECT_OFFSET_STORAGE_TOPIC
+          value: "pyairtable.connect.offsets"
+        - name: CONNECT_STATUS_STORAGE_TOPIC
+          value: "pyairtable.connect.status"
+        - name: CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR
+          value: "3"
+        - name: CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR
+          value: "3"
+        - name: CONNECT_STATUS_STORAGE_REPLICATION_FACTOR
+          value: "3"
+        - name: CONNECT_KEY_CONVERTER
+          value: "io.confluent.connect.avro.AvroConverter"
+        - name: CONNECT_VALUE_CONVERTER
+          value: "io.confluent.connect.avro.AvroConverter"
+        - name: CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL
+          value: "http://schema-registry-service:8081"
+        - name: CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL
+          value: "http://schema-registry-service:8081"
+        - name: CONNECT_INTERNAL_KEY_CONVERTER
+          value: "org.apache.kafka.connect.json.JsonConverter"
+        - name: CONNECT_INTERNAL_VALUE_CONVERTER
+          value: "org.apache.kafka.connect.json.JsonConverter"
+        - name: CONNECT_PLUGIN_PATH
+          value: "/usr/share/java,/usr/share/confluent-hub-components"
+        - name: CONNECT_JMX_HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: CONNECT_JMX_PORT
+          value: "9584"
+        - name: KAFKA_HEAP_OPTS
+          value: "-Xmx1G -Xms1G"
+        - name: CONNECT_LOG4J_ROOT_LOGLEVEL
+          value: "INFO"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "1.5Gi"
+            cpu: "1"
+        livenessProbe:
+          httpGet:
+            path: /connectors
+            port: 8083
+          initialDelaySeconds: 90
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /connectors
+            port: 8083
+          initialDelaySeconds: 90
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+
+---
+# Kafka Connect Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-connect-service
+  namespace: kafka
+  labels:
+    app: kafka-connect
+spec:
+  ports:
+  - port: 8083
+    name: http
+    targetPort: 8083
+  - port: 9584
+    name: jmx
+    targetPort: 9584
+  selector:
+    app: kafka-connect
+
+---
+# Kafka Exporter for Monitoring
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-exporter
+  namespace: kafka
+  labels:
+    app: kafka-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka-exporter
+  template:
+    metadata:
+      labels:
+        app: kafka-exporter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9308"
+    spec:
+      containers:
+      - name: kafka-exporter
+        image: danielqsj/kafka-exporter:latest
+        args:
+        - --kafka.server=kafka-service:9092
+        - --web.listen-address=0.0.0.0:9308
+        - --log.level=info
+        - --topic.filter=pyairtable.*
+        ports:
+        - containerPort: 9308
+          name: metrics
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 9308
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: 9308
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+---
+# Kafka Exporter Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-exporter-service
+  namespace: kafka
+  labels:
+    app: kafka-exporter
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9308"
+spec:
+  ports:
+  - port: 9308
+    name: metrics
+    targetPort: 9308
+  selector:
+    app: kafka-exporter
+
+---
+# NetworkPolicy for Kafka namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-network-policy
+  namespace: kafka
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: pyairtable
+    - podSelector: {}
+  egress:
+  - to:
+    - podSelector: {}
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: pyairtable
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80

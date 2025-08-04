@@ -1,0 +1,746 @@
+# PyAirtable Istio Traffic Management Configuration
+# Advanced traffic routing, load balancing, circuit breakers, and canary deployments
+
+---
+# Main Ingress Gateway for external traffic
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: pyairtable-gateway
+  namespace: pyairtable
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  # HTTP Server (with redirect to HTTPS)
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "pyairtable.local"
+    - "api.pyairtable.local"
+    - "*.pyairtable.local"
+    tls:
+      httpsRedirect: true
+  # HTTPS Server
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    hosts:
+    - "pyairtable.local"
+    - "api.pyairtable.local"
+    - "*.pyairtable.local"
+    tls:
+      mode: SIMPLE
+      credentialName: pyairtable-tls-secret
+  # gRPC Server (for service mesh communication)
+  - port:
+      number: 15010
+      name: grpc-tls
+      protocol: GRPC
+    hosts:
+    - "grpc.pyairtable.local"
+    tls:
+      mode: SIMPLE
+      credentialName: pyairtable-grpc-tls-secret
+
+---
+# Main Virtual Service for external routing
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: pyairtable-external-routes
+  namespace: pyairtable
+spec:
+  hosts:
+  - "pyairtable.local"
+  - "api.pyairtable.local"
+  - "*.pyairtable.local"
+  gateways:
+  - pyairtable-gateway
+  http:
+  # Health check endpoints (high priority)
+  - match:
+    - uri:
+        exact: "/health"
+    - uri:
+        exact: "/ready"
+    - uri:
+        prefix: "/health/"
+    route:
+    - destination:
+        host: api-gateway.pyairtable.svc.cluster.local
+        port:
+          number: 8080
+    timeout: 5s
+    retries:
+      attempts: 2
+      perTryTimeout: 2s
+      retryOn: gateway-error,connect-failure,refused-stream
+
+  # Authentication endpoints
+  - match:
+    - uri:
+        prefix: "/api/v1/auth"
+    route:
+    - destination:
+        host: api-gateway.pyairtable.svc.cluster.local
+        port:
+          number: 8080
+    headers:
+      request:
+        add:
+          x-forwarded-proto: https
+          x-service-route: auth
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+      retryOn: gateway-error,connect-failure,refused-stream
+
+  # User management endpoints
+  - match:
+    - uri:
+        prefix: "/api/v1/users"
+    route:
+    - destination:
+        host: api-gateway.pyairtable.svc.cluster.local
+        port:
+          number: 8080
+    headers:
+      request:
+        add:
+          x-service-route: users
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+
+  # Airtable API endpoints with canary deployment
+  - match:
+    - uri:
+        prefix: "/api/v1/airtable"
+    route:
+    - destination:
+        host: api-gateway.pyairtable.svc.cluster.local
+        port:
+          number: 8080
+        subset: stable
+      weight: 90
+    - destination:
+        host: api-gateway.pyairtable.svc.cluster.local
+        port:
+          number: 8080
+        subset: canary
+      weight: 10
+    headers:
+      request:
+        add:
+          x-service-route: airtable
+    timeout: 60s
+    retries:
+      attempts: 3
+      perTryTimeout: 20s
+      retryOn: gateway-error,connect-failure,refused-stream
+
+  # LLM and Chat endpoints (longer timeouts)
+  - match:
+    - uri:
+        prefix: "/api/v1/llm"
+    - uri:
+        prefix: "/api/v1/chat"
+    route:
+    - destination:
+        host: api-gateway.pyairtable.svc.cluster.local
+        port:
+          number: 8080
+    headers:
+      request:
+        add:
+          x-service-route: llm
+    timeout: 120s
+    retries:
+      attempts: 2
+      perTryTimeout: 60s
+      retryOn: gateway-error,connect-failure
+
+  # File upload endpoints (very long timeouts)
+  - match:
+    - uri:
+        prefix: "/api/v1/files"
+    route:
+    - destination:
+        host: api-gateway.pyairtable.svc.cluster.local
+        port:
+          number: 8080
+    headers:
+      request:
+        add:
+          x-service-route: files
+    timeout: 300s
+    retries:
+      attempts: 2
+      perTryTimeout: 150s
+
+  # Workflow endpoints
+  - match:
+    - uri:
+        prefix: "/api/v1/workflows"
+    - uri:
+        prefix: "/api/v1/automation"
+    route:
+    - destination:
+        host: api-gateway.pyairtable.svc.cluster.local
+        port:
+          number: 8080
+    headers:
+      request:
+        add:
+          x-service-route: workflows
+    timeout: 60s
+    retries:
+      attempts: 3
+      perTryTimeout: 20s
+
+  # Analytics and metrics (internal APIs)
+  - match:
+    - uri:
+        prefix: "/api/v1/analytics"
+    - uri:
+        prefix: "/metrics"
+    route:
+    - destination:
+        host: api-gateway.pyairtable.svc.cluster.local
+        port:
+          number: 8080
+    headers:
+      request:
+        add:
+          x-service-route: analytics
+    timeout: 30s
+
+  # Default route to frontend application
+  - route:
+    - destination:
+        host: frontend.pyairtable.svc.cluster.local
+        port:
+          number: 3000
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+
+---
+# Internal Virtual Service for API Gateway routing
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: api-gateway-internal-routing
+  namespace: pyairtable
+spec:
+  hosts:
+  - api-gateway.pyairtable.svc.cluster.local
+  http:
+  # Auth service routing
+  - match:
+    - headers:
+        x-service-route:
+          exact: auth
+    route:
+    - destination:
+        host: auth-service.pyairtable.svc.cluster.local
+        port:
+          number: 8001
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+
+  # User service routing
+  - match:
+    - headers:
+        x-service-route:
+          exact: users
+    route:
+    - destination:
+        host: user-service.pyairtable.svc.cluster.local
+        port:
+          number: 8002
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+
+  # Airtable gateway routing
+  - match:
+    - headers:
+        x-service-route:
+          exact: airtable
+    route:
+    - destination:
+        host: airtable-gateway.pyairtable.svc.cluster.local
+        port:
+          number: 8002
+    timeout: 60s
+    retries:
+      attempts: 3
+      perTryTimeout: 20s
+
+  # LLM orchestrator routing
+  - match:
+    - headers:
+        x-service-route:
+          exact: llm
+    route:
+    - destination:
+        host: llm-orchestrator.pyairtable.svc.cluster.local
+        port:
+          number: 8003
+    timeout: 120s
+    retries:
+      attempts: 2
+      perTryTimeout: 60s
+
+  # Platform services routing
+  - match:
+    - headers:
+        x-service-route:
+          exact: analytics
+    route:
+    - destination:
+        host: platform-services.pyairtable.svc.cluster.local
+        port:
+          number: 8007
+    timeout: 30s
+
+  # Automation services routing
+  - match:
+    - headers:
+        x-service-route:
+          exact: files
+    - headers:
+        x-service-route:
+          exact: workflows
+    route:
+    - destination:
+        host: automation-services.pyairtable.svc.cluster.local
+        port:
+          number: 8006
+    timeout: 300s
+
+---
+# DestinationRule for API Gateway with circuit breaker
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: api-gateway-destination
+  namespace: pyairtable
+spec:
+  host: api-gateway.pyairtable.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 30s
+        tcpKeepalive:
+          time: 7200s
+          interval: 75s
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 10
+        maxRetries: 3
+        consecutiveGatewayErrors: 5
+        h2UpgradePolicy: UPGRADE
+        useClientProtocol: true
+    loadBalancer:
+      simple: LEAST_CONN
+      localityLbSetting:
+        enabled: true
+        distribute:
+        - from: region1/zone1/*
+          to:
+            "region1/zone1/*": 80
+            "region1/zone2/*": 20
+        failover:
+        - from: region1
+          to: region2
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 30
+      splitExternalLocalOriginErrors: true
+  subsets:
+  - name: stable
+    labels:
+      version: stable
+    trafficPolicy:
+      connectionPool:
+        tcp:
+          maxConnections: 80
+  - name: canary
+    labels:
+      version: canary
+    trafficPolicy:
+      connectionPool:
+        tcp:
+          maxConnections: 20
+
+---
+# DestinationRule for Auth Service
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: auth-service-destination
+  namespace: pyairtable
+spec:
+  host: auth-service.pyairtable.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 50
+        connectTimeout: 10s
+      http:
+        http1MaxPendingRequests: 25
+        http2MaxRequests: 50
+        maxRequestsPerConnection: 5
+        maxRetries: 3
+        consecutiveGatewayErrors: 3
+    loadBalancer:
+      simple: ROUND_ROBIN
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+
+---
+# DestinationRule for User Service
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: user-service-destination
+  namespace: pyairtable
+spec:
+  host: user-service.pyairtable.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 50
+        connectTimeout: 10s
+      http:
+        http1MaxPendingRequests: 25
+        http2MaxRequests: 50
+        maxRequestsPerConnection: 5
+        maxRetries: 3
+    loadBalancer:
+      simple: ROUND_ROBIN
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+
+---
+# DestinationRule for Airtable Gateway with enhanced circuit breaker
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: airtable-gateway-destination
+  namespace: pyairtable
+spec:
+  host: airtable-gateway.pyairtable.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 30
+        connectTimeout: 15s
+      http:
+        http1MaxPendingRequests: 15
+        http2MaxRequests: 30
+        maxRequestsPerConnection: 3
+        maxRetries: 3
+        consecutiveGatewayErrors: 5
+        h2UpgradePolicy: UPGRADE
+    loadBalancer:
+      simple: LEAST_CONN
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 60s
+      maxEjectionPercent: 30
+      minHealthPercent: 50
+
+---
+# DestinationRule for LLM Orchestrator with custom settings
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: llm-orchestrator-destination
+  namespace: pyairtable
+spec:
+  host: llm-orchestrator.pyairtable.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 20
+        connectTimeout: 30s
+      http:
+        http1MaxPendingRequests: 10
+        http2MaxRequests: 20
+        maxRequestsPerConnection: 2
+        maxRetries: 2
+        consecutiveGatewayErrors: 3
+    loadBalancer:
+      simple: ROUND_ROBIN
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      consecutive5xxErrors: 3
+      interval: 60s
+      baseEjectionTime: 120s
+      maxEjectionPercent: 25
+
+---
+# DestinationRule for Platform Services
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: platform-services-destination
+  namespace: pyairtable
+spec:
+  host: platform-services.pyairtable.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 40
+        connectTimeout: 10s
+      http:
+        http1MaxPendingRequests: 20
+        http2MaxRequests: 40
+        maxRequestsPerConnection: 5
+        maxRetries: 3
+    loadBalancer:
+      simple: ROUND_ROBIN
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+
+---
+# DestinationRule for Automation Services
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: automation-services-destination
+  namespace: pyairtable
+spec:
+  host: automation-services.pyairtable.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 25
+        connectTimeout: 30s
+      http:
+        http1MaxPendingRequests: 10
+        http2MaxRequests: 25
+        maxRequestsPerConnection: 2
+        maxRetries: 2
+    loadBalancer:
+      simple: LEAST_CONN
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      consecutive5xxErrors: 3
+      interval: 60s
+      baseEjectionTime: 60s
+
+---
+# Service Entry for Airtable API
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: airtable-api
+  namespace: pyairtable
+spec:
+  hosts:
+  - api.airtable.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+# Service Entry for Google AI API
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: google-ai-api
+  namespace: pyairtable
+spec:
+  hosts:
+  - generativelanguage.googleapis.com
+  - aiplatform.googleapis.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+# Service Entry for OpenAI API
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: openai-api
+  namespace: pyairtable
+spec:
+  hosts:
+  - api.openai.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+# DestinationRule for external Airtable API
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: airtable-api-destination
+  namespace: pyairtable
+spec:
+  host: api.airtable.com
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 10
+        connectTimeout: 30s
+      http:
+        http1MaxPendingRequests: 5
+        maxRequestsPerConnection: 2
+        maxRetries: 3
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      consecutive5xxErrors: 5
+      interval: 60s
+      baseEjectionTime: 120s
+
+---
+# DestinationRule for Google AI API
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: google-ai-api-destination
+  namespace: pyairtable
+spec:
+  host: generativelanguage.googleapis.com
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 10
+        connectTimeout: 30s
+      http:
+        http1MaxPendingRequests: 5
+        maxRequestsPerConnection: 2
+        maxRetries: 2
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      consecutive5xxErrors: 3
+      interval: 60s
+      baseEjectionTime: 180s
+
+---
+# Fault injection Virtual Service for chaos engineering (disabled by default)
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: chaos-engineering-faults
+  namespace: pyairtable
+spec:
+  hosts:
+  - airtable-gateway.pyairtable.svc.cluster.local
+  http:
+  # Only apply faults when chaos testing header is present
+  - match:
+    - headers:
+        x-chaos-test:
+          exact: "enabled"
+    fault:
+      delay:
+        percentage:
+          value: 10.0
+        fixedDelay: 2s
+      abort:
+        percentage:
+          value: 5.0
+        httpStatus: 503
+    route:
+    - destination:
+        host: airtable-gateway.pyairtable.svc.cluster.local
+        port:
+          number: 8002
+  # Normal traffic without faults
+  - route:
+    - destination:
+        host: airtable-gateway.pyairtable.svc.cluster.local
+        port:
+          number: 8002
+
+---
+# Advanced traffic splitting for canary deployments
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: canary-deployment-control
+  namespace: pyairtable
+spec:
+  hosts:
+  - api-gateway.pyairtable.svc.cluster.local
+  http:
+  # Route traffic based on user headers for canary testing
+  - match:
+    - headers:
+        x-canary-user:
+          exact: "true"
+    route:
+    - destination:
+        host: api-gateway.pyairtable.svc.cluster.local
+        port:
+          number: 8080
+        subset: canary
+  # Route specific percentage to canary for gradual rollout
+  - match:
+    - uri:
+        prefix: "/api/v1/"
+    route:
+    - destination:
+        host: api-gateway.pyairtable.svc.cluster.local
+        port:
+          number: 8080
+        subset: stable
+      weight: 95
+    - destination:
+        host: api-gateway.pyairtable.svc.cluster.local
+        port:
+          number: 8080
+        subset: canary
+      weight: 5
+  # Default route to stable
+  - route:
+    - destination:
+        host: api-gateway.pyairtable.svc.cluster.local
+        port:
+          number: 8080
+        subset: stable

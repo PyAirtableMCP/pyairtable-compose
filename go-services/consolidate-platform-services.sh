@@ -21,7 +21,6 @@ NC='\033[0m' # No Color
 SERVICES_TO_CONSOLIDATE=(
     "user-service"
     "workspace-service" 
-    "tenant-service"
     "notification-service"
 )
 
@@ -1489,7 +1488,7 @@ func main() {
 	}()
 
 	// Start server
-	logger.Info("Starting server", "port", cfg.Port)
+	logger.Info("Starting PyAirtable Platform Service", "port", cfg.Port)
 	if err := app.Listen(":" + cfg.Port); err != nil {
 		logger.Error("Server failed to start", "error", err)
 	}
@@ -1585,7 +1584,7 @@ type Config struct {
 
 func Load() (*Config, error) {
 	return &Config{
-		Port:        getEnv("PORT", "8080"),
+		Port:        getEnv("PORT", "8007"),
 		DatabaseURL: getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/pyairtable?sslmode=disable"),
 		JWTSecret:   getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
 		RedisURL:    getEnv("REDIS_URL", "redis://localhost:6379"),
@@ -1760,7 +1759,7 @@ WORKDIR /root/
 COPY --from=builder /app/main .
 
 # Expose port
-EXPOSE 8080
+EXPOSE 8007
 
 # Command to run
 CMD ["./main"]
@@ -1774,9 +1773,9 @@ services:
   platform:
     build: .
     ports:
-      - "8080:8080"
+      - "8007:8007"
     environment:
-      - PORT=8080
+      - PORT=8007
       - DATABASE_URL=postgres://postgres:postgres@postgres:5432/pyairtable?sslmode=disable
       - JWT_SECRET=your-secret-key-change-in-production
       - REDIS_URL=redis://redis:6379

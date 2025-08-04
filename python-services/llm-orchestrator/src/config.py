@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     max_tokens: int = 8192
     
     # Database config
-    database_url: str = "postgresql://admin:changeme@localhost:5432/pyairtable"
+    database_url: str = "postgresql://admin:changeme@localhost:5432/pyairtable?sslmode=require"
     
     # Redis config
     redis_url: str = "redis://localhost:6379/0"

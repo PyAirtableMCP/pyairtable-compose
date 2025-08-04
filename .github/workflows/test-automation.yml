@@ -1,0 +1,770 @@
+# PyAirtable Test Automation CI/CD Pipeline
+# Comprehensive testing workflow with parallel execution and comprehensive reporting
+
+name: PyAirtable Test Automation
+
+on:
+  push:
+    branches: [ main, develop, 'feature/*', 'release/*' ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run comprehensive tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Test suite to run (all, unit, integration, e2e, performance, security, chaos)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - unit
+        - integration
+        - e2e
+        - performance
+        - security
+        - chaos
+        - deployment
+      environment:
+        description: 'Test environment'
+        required: false
+        default: 'ci'
+        type: choice
+        options:
+        - ci
+        - staging
+        - production
+      parallel_workers:
+        description: 'Number of parallel workers'
+        required: false
+        default: '4'
+        type: string
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+  GO_VERSION: '1.21'
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  # Job 1: Setup and validation
+  setup:
+    name: Setup and Validation
+    runs-on: ubuntu-latest
+    outputs:
+      test-suite: ${{ steps.determine-tests.outputs.test-suite }}
+      should-run-integration: ${{ steps.determine-tests.outputs.should-run-integration }}
+      should-run-e2e: ${{ steps.determine-tests.outputs.should-run-e2e }}
+      should-run-performance: ${{ steps.determine-tests.outputs.should-run-performance }}
+      should-run-security: ${{ steps.determine-tests.outputs.should-run-security }}
+      should-run-chaos: ${{ steps.determine-tests.outputs.should-run-chaos }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Determine tests to run
+      id: determine-tests
+      run: |
+        TEST_SUITE="${{ github.event.inputs.test_suite || 'all' }}"
+        
+        if [[ "$TEST_SUITE" == "all" ]]; then
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            # Full test suite for scheduled runs
+            echo "test-suite=all" >> $GITHUB_OUTPUT
+            echo "should-run-integration=true" >> $GITHUB_OUTPUT
+            echo "should-run-e2e=true" >> $GITHUB_OUTPUT
+            echo "should-run-performance=true" >> $GITHUB_OUTPUT
+            echo "should-run-security=true" >> $GITHUB_OUTPUT
+            echo "should-run-chaos=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            # Comprehensive tests for main branch
+            echo "test-suite=comprehensive" >> $GITHUB_OUTPUT
+            echo "should-run-integration=true" >> $GITHUB_OUTPUT
+            echo "should-run-e2e=true" >> $GITHUB_OUTPUT
+            echo "should-run-performance=false" >> $GITHUB_OUTPUT
+            echo "should-run-security=true" >> $GITHUB_OUTPUT
+            echo "should-run-chaos=false" >> $GITHUB_OUTPUT
+          else
+            # Essential tests for PRs and feature branches
+            echo "test-suite=essential" >> $GITHUB_OUTPUT
+            echo "should-run-integration=true" >> $GITHUB_OUTPUT
+            echo "should-run-e2e=false" >> $GITHUB_OUTPUT
+            echo "should-run-performance=false" >> $GITHUB_OUTPUT
+            echo "should-run-security=true" >> $GITHUB_OUTPUT
+            echo "should-run-chaos=false" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "test-suite=$TEST_SUITE" >> $GITHUB_OUTPUT
+          echo "should-run-integration=$([[ '$TEST_SUITE' =~ ^(all|integration)$ ]] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+          echo "should-run-e2e=$([[ '$TEST_SUITE' =~ ^(all|e2e)$ ]] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+          echo "should-run-performance=$([[ '$TEST_SUITE' =~ ^(all|performance)$ ]] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+          echo "should-run-security=$([[ '$TEST_SUITE' =~ ^(all|security)$ ]] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+          echo "should-run-chaos=$([[ '$TEST_SUITE' =~ ^(all|chaos)$ ]] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/pip
+          ~/.npm
+          ~/.go/pkg/mod
+          node_modules
+          **/node_modules
+        key: ${{ runner.os }}-deps-${{ hashFiles('**/requirements*.txt', '**/package*.json', '**/go.mod') }}
+        restore-keys: |
+          ${{ runner.os }}-deps-
+
+  # Job 2: Unit Tests (Fast feedback)
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: setup
+    
+    strategy:
+      matrix:
+        python-version: ['3.11']
+        test-group: ['python-services', 'go-services', 'frontend']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Set up Node.js
+      if: matrix.test-group == 'frontend'
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Set up Go
+      if: matrix.test-group == 'go-services'
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Install Python dependencies
+      if: matrix.test-group == 'python-services'
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements.test.txt
+        pip install pytest-cov pytest-xdist pytest-html
+
+    - name: Install Node.js dependencies
+      if: matrix.test-group == 'frontend'
+      run: |
+        cd pyairtable-frontend
+        npm ci
+        npm run build
+
+    - name: Install Go dependencies
+      if: matrix.test-group == 'go-services'
+      run: |
+        cd go-services
+        go mod download
+        go install github.com/onsi/ginkgo/v2/ginkgo@latest
+
+    - name: Run Python unit tests
+      if: matrix.test-group == 'python-services'
+      run: |
+        python -m pytest tests/unit \
+          --cov=python-services \
+          --cov-report=xml \
+          --cov-report=html \
+          --junit-xml=test-results/unit-python.xml \
+          --html=test-results/unit-python.html \
+          -v
+
+    - name: Run Go unit tests
+      if: matrix.test-group == 'go-services'
+      run: |
+        cd go-services
+        go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        go tool cover -html=coverage.out -o ../test-results/unit-go.html
+
+    - name: Run Frontend unit tests
+      if: matrix.test-group == 'frontend'
+      run: |
+        cd pyairtable-frontend
+        npm test -- --coverage --watchAll=false --reporters=default --reporters=jest-junit
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: unit-test-results-${{ matrix.test-group }}
+        path: |
+          test-results/
+          coverage.xml
+          htmlcov/
+        retention-days: 30
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unit-${{ matrix.test-group }}
+        name: codecov-${{ matrix.test-group }}
+
+  # Job 3: Integration Tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [setup, unit-tests]
+    if: needs.setup.outputs.should-run-integration == 'true'
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements.test.txt
+
+    - name: Set up test environment
+      run: |
+        cp tests/fixtures/.env.test .env
+        echo "DATABASE_URL=postgresql://test_user:test_password@localhost:5432/test_db" >> .env
+        echo "REDIS_URL=redis://localhost:6379" >> .env
+
+    - name: Run database migrations
+      run: |
+        python -m alembic upgrade head
+
+    - name: Build and start services
+      run: |
+        docker-compose -f docker-compose.test.yml up -d --build
+        sleep 30  # Wait for services to be ready
+
+    - name: Wait for services to be healthy
+      run: |
+        timeout 120 bash -c 'until curl -f http://localhost:8000/health; do sleep 2; done'
+        timeout 120 bash -c 'until curl -f http://localhost:8004/health; do sleep 2; done'
+
+    - name: Run integration tests
+      run: |
+        python -m pytest tests/integration \
+          --maxfail=5 \
+          --tb=short \
+          --junit-xml=test-results/integration.xml \
+          --html=test-results/integration.html \
+          -v
+
+    - name: Run contract tests
+      run: |
+        python -m pytest tests/contract \
+          --maxfail=3 \
+          --tb=short \
+          --junit-xml=test-results/contract.xml \
+          --html=test-results/contract.html \
+          -v
+
+    - name: Collect service logs
+      if: failure()
+      run: |
+        mkdir -p test-results/logs
+        docker-compose -f docker-compose.test.yml logs > test-results/logs/services.log
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: integration-test-results
+        path: |
+          test-results/
+        retention-days: 30
+
+    - name: Stop services
+      if: always()
+      run: |
+        docker-compose -f docker-compose.test.yml down -v
+
+  # Job 4: Security Tests
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    needs: [setup, integration-tests]
+    if: needs.setup.outputs.should-run-security == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install security testing tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements.test.txt
+        pip install bandit safety semgrep
+
+    - name: Run static security analysis
+      run: |
+        # Python security scanning
+        bandit -r python-services/ -f json -o test-results/bandit-report.json
+        safety check --json --output test-results/safety-report.json
+        
+        # SAST with Semgrep
+        semgrep --config=auto python-services/ --json --output=test-results/semgrep-report.json
+
+    - name: Start services for security testing
+      run: |
+        docker-compose -f docker-compose.test.yml up -d --build
+        sleep 30
+
+    - name: Run security tests
+      run: |
+        python -m pytest tests/security \
+          --maxfail=10 \
+          --tb=short \
+          --junit-xml=test-results/security.xml \
+          --html=test-results/security.html \
+          -v
+
+    - name: Run OWASP ZAP baseline scan
+      uses: zaproxy/action-baseline@v0.7.0
+      with:
+        target: 'http://localhost:8000'
+        rules_file_name: '.zap/rules.tsv'
+        cmd_options: '-a'
+
+    - name: Upload security test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-test-results
+        path: |
+          test-results/
+          report_html.html
+          report_json.json
+        retention-days: 30
+
+    - name: Stop services
+      if: always()
+      run: |
+        docker-compose -f docker-compose.test.yml down -v
+
+  # Job 5: End-to-End Tests
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    needs: [setup, integration-tests]
+    if: needs.setup.outputs.should-run-e2e == 'true'
+    
+    strategy:
+      matrix:
+        browser: [chromium, firefox]
+        shard: [1, 2]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements.test.txt
+        pip install playwright
+        playwright install ${{ matrix.browser }}
+
+    - name: Build and start full stack
+      run: |
+        docker-compose -f docker-compose.test.yml -f docker-compose.e2e.yml up -d --build
+        sleep 60  # Wait for full stack to be ready
+
+    - name: Wait for application to be ready
+      run: |
+        timeout 300 bash -c 'until curl -f http://localhost:3000/health; do sleep 5; done'
+        timeout 300 bash -c 'until curl -f http://localhost:8000/health; do sleep 5; done'
+
+    - name: Run E2E tests
+      run: |
+        python -m pytest tests/e2e \
+          --browser=${{ matrix.browser }} \
+          --headed=false \
+          --video=retain-on-failure \
+          --screenshot=only-on-failure \
+          --maxfail=3 \
+          --shard=${{ matrix.shard }}/2 \
+          --junit-xml=test-results/e2e-${{ matrix.browser }}-${{ matrix.shard }}.xml \
+          -v
+      env:
+        BROWSER: ${{ matrix.browser }}
+
+    - name: Upload E2E test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: e2e-test-results-${{ matrix.browser }}-${{ matrix.shard }}
+        path: |
+          test-results/
+          test-results/videos/
+          test-results/screenshots/
+        retention-days: 30
+
+    - name: Stop services
+      if: always()
+      run: |
+        docker-compose -f docker-compose.test.yml -f docker-compose.e2e.yml down -v
+
+  # Job 6: Performance Tests
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [setup, integration-tests]
+    if: needs.setup.outputs.should-run-performance == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements.test.txt
+        pip install locust
+
+    - name: Start services for performance testing
+      run: |
+        docker-compose -f docker-compose.test.yml up -d --build --scale api-gateway=2
+        sleep 45
+
+    - name: Run performance tests
+      run: |
+        python -m pytest tests/performance \
+          --maxfail=5 \
+          --tb=short \
+          --junit-xml=test-results/performance.xml \
+          --html=test-results/performance.html \
+          -v
+      env:
+        LOAD_TEST_USERS: 50
+        STRESS_TEST_USERS: 200
+        TEST_DURATION: 300
+
+    - name: Generate performance report
+      run: |
+        python tests/performance/generate_report.py --output test-results/performance-report.html
+
+    - name: Upload performance test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-test-results
+        path: |
+          test-results/
+        retention-days: 30
+
+    - name: Stop services
+      if: always()
+      run: |
+        docker-compose -f docker-compose.test.yml down -v
+
+  # Job 7: Chaos Engineering Tests
+  chaos-tests:
+    name: Chaos Tests
+    runs-on: ubuntu-latest
+    needs: [setup, performance-tests]
+    if: needs.setup.outputs.should-run-chaos == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements.test.txt
+
+    - name: Start services for chaos testing
+      run: |
+        docker-compose -f docker-compose.test.yml up -d --build
+        sleep 45
+
+    - name: Run chaos tests
+      run: |
+        python -m pytest tests/chaos \
+          --maxfail=2 \
+          --tb=short \
+          --junit-xml=test-results/chaos.xml \
+          --html=test-results/chaos.html \
+          -v -s
+      env:
+        CHAOS_DURATION: 120
+        CHAOS_INTENSITY: medium
+
+    - name: Upload chaos test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: chaos-test-results
+        path: |
+          test-results/
+        retention-days: 30
+
+    - name: Stop services
+      if: always()
+      run: |
+        docker-compose -f docker-compose.test.yml down -v
+
+  # Job 8: Deployment Smoke Tests
+  deployment-tests:
+    name: Deployment Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [setup]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements.test.txt
+
+    - name: Deploy to test environment
+      run: |
+        docker-compose -f docker-compose.yml up -d --build
+        sleep 30
+
+    - name: Wait for deployment to be ready
+      run: |
+        timeout 180 bash -c 'until curl -f http://localhost:8000/health; do sleep 5; done'
+
+    - name: Run smoke tests
+      run: |
+        python -m pytest tests/deployment \
+          --maxfail=3 \
+          --tb=short \
+          --junit-xml=test-results/deployment.xml \
+          --html=test-results/deployment.html \
+          -v
+
+    - name: Upload deployment test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: deployment-test-results
+        path: |
+          test-results/
+        retention-days: 30
+
+    - name: Stop services
+      if: always()
+      run: |
+        docker-compose -f docker-compose.yml down -v
+
+  # Job 9: Test Report Aggregation
+  test-report:
+    name: Generate Test Report
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, security-tests, e2e-tests, performance-tests, chaos-tests, deployment-tests]
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install jinja2 pyyaml
+
+    - name: Download all test artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: all-test-results
+
+    - name: Generate comprehensive test report
+      run: |
+        python tests/automation/generate_comprehensive_report.py \
+          --input-dir all-test-results \
+          --output-dir final-report \
+          --environment ${{ github.event.inputs.environment || 'ci' }}
+
+    - name: Upload comprehensive test report
+      uses: actions/upload-artifact@v4
+      with:
+        name: comprehensive-test-report
+        path: |
+          final-report/
+        retention-days: 30
+
+    - name: Publish test results
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: PyAirtable Test Results
+        path: 'all-test-results/**/*.xml'
+        reporter: java-junit
+
+    - name: Comment PR with test results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const path = 'final-report/summary.json';
+          
+          if (fs.existsSync(path)) {
+            const summary = JSON.parse(fs.readFileSync(path, 'utf8'));
+            
+            const comment = `## 🧪 Test Results Summary
+            
+            | Test Suite | Status | Tests | Success Rate |
+            |------------|--------|-------|--------------|
+            | Unit Tests | ${summary.unit.status} | ${summary.unit.total} | ${summary.unit.success_rate} |
+            | Integration Tests | ${summary.integration.status} | ${summary.integration.total} | ${summary.integration.success_rate} |
+            | Security Tests | ${summary.security.status} | ${summary.security.total} | ${summary.security.success_rate} |
+            | E2E Tests | ${summary.e2e.status} | ${summary.e2e.total} | ${summary.e2e.success_rate} |
+            
+            **Overall Success Rate: ${summary.overall.success_rate}**
+            
+            ${summary.critical_failures > 0 ? '⚠️ **Critical failures detected!**' : '✅ **All critical tests passed**'}
+            
+            [View Full Report](${summary.report_url})`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+          }
+
+  # Job 10: Quality Gate
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs: [test-report]
+    if: always()
+    
+    steps:
+    - name: Download test report
+      uses: actions/download-artifact@v4
+      with:
+        name: comprehensive-test-report
+        path: test-report
+
+    - name: Evaluate quality gate
+      run: |
+        python -c "
+        import json
+        import sys
+        
+        try:
+            with open('test-report/summary.json', 'r') as f:
+                summary = json.load(f)
+            
+            # Quality gate criteria
+            min_success_rate = 95.0
+            max_critical_failures = 0
+            
+            success_rate = float(summary['overall']['success_rate'].rstrip('%'))
+            critical_failures = summary.get('critical_failures', 0)
+            
+            print(f'Success Rate: {success_rate}% (minimum: {min_success_rate}%)')
+            print(f'Critical Failures: {critical_failures} (maximum: {max_critical_failures})')
+            
+            if success_rate < min_success_rate:
+                print(f'❌ Quality gate failed: Success rate {success_rate}% below minimum {min_success_rate}%')
+                sys.exit(1)
+            
+            if critical_failures > max_critical_failures:
+                print(f'❌ Quality gate failed: {critical_failures} critical failures detected')
+                sys.exit(1)
+            
+            print('✅ Quality gate passed: All criteria met')
+            
+        except FileNotFoundError:
+            print('❌ Quality gate failed: Test report not found')
+            sys.exit(1)
+        except Exception as e:
+            print(f'❌ Quality gate failed: {str(e)}')
+            sys.exit(1)
+        "
+
+    - name: Update deployment status
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "✅ Quality gate passed - ready for deployment"
+        # Here you would typically trigger deployment to staging/production

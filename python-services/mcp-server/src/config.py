@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     llm_orchestrator_url: str = "http://llm-orchestrator:8091"
     
     # Database config
-    database_url: str = "postgresql://admin:changeme@localhost:5432/pyairtable"
+    database_url: str = "postgresql://admin:changeme@localhost:5432/pyairtable?sslmode=require"
     
     # Redis config
     redis_url: str = "redis://localhost:6379/0"

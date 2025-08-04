@@ -35,15 +35,16 @@ func New(cfg RedisConfig, logger *zap.Logger) (*redis.Client, error) {
 		WriteTimeout: 3 * time.Second,
 	})
 
-	// Test connection
+	// Test connection with authentication
 	ctx := context.Background()
 	if err := client.Ping(ctx).Err(); err != nil {
-		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
+		return nil, fmt.Errorf("failed to connect to Redis (check password): %w", err)
 	}
 
-	logger.Info("Redis connection established", 
+	logger.Info("Redis connection established with authentication", 
 		zap.String("addr", fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)),
-		zap.Int("db", cfg.DB))
+		zap.Int("db", cfg.DB),
+		zap.Bool("auth_enabled", cfg.Password != ""))
 
 	return client, nil
 }

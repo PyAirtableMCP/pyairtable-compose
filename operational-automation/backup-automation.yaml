@@ -1,0 +1,562 @@
+# Automated Backup System for PyAirtable
+# Provides comprehensive backup automation with retention policies and monitoring
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-config
+  namespace: pyairtable-prod
+data:
+  config.yaml: |
+    backup_schedules:
+      database:
+        postgres:
+          schedule: "0 2 * * *"  # Daily at 2 AM
+          retention_days: 30
+          retention_weeks: 12
+          retention_months: 12
+          compression: true
+          encryption: true
+          
+      application_data:
+        schedule: "0 3 * * *"  # Daily at 3 AM
+        retention_days: 7
+        retention_weeks: 4
+        compression: true
+        
+      configuration:
+        schedule: "0 1 * * 0"  # Weekly on Sunday at 1 AM
+        retention_weeks: 8
+        retention_months: 6
+        
+    storage:
+      primary:
+        type: s3
+        bucket: pyairtable-prod-backups
+        region: us-west-2
+        encryption: true
+        
+      cross_region:
+        type: s3
+        bucket: pyairtable-prod-backups-dr
+        region: us-east-1
+        encryption: true
+        
+    notification:
+      slack_webhook: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+      email_recipients:
+        - "ops@pyairtable.com"
+        - "engineering@pyairtable.com"
+        
+    monitoring:
+      prometheus_metrics: true
+      healthcheck_endpoint: "/health"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: database-backup
+  namespace: pyairtable-prod
+  labels:
+    app: backup-system
+    component: database-backup
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM UTC
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: backup-system
+            component: database-backup
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: backup-service-account
+          containers:
+          - name: postgres-backup
+            image: postgres:15
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              
+              # Configuration
+              BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+              BACKUP_FILE="postgres_backup_${BACKUP_DATE}.sql"
+              COMPRESSED_FILE="${BACKUP_FILE}.gz"
+              S3_PATH="s3://${S3_BUCKET}/database/postgres/${BACKUP_DATE}/"
+              
+              echo "Starting PostgreSQL backup at $(date)"
+              echo "Backup file: ${BACKUP_FILE}"
+              
+              # Create backup
+              pg_dump "${DATABASE_URL}" \
+                --verbose \
+                --no-owner \
+                --no-privileges \
+                --clean \
+                --if-exists \
+                --format=plain \
+                --file="${BACKUP_FILE}"
+              
+              if [ $? -eq 0 ]; then
+                echo "Database backup created successfully"
+                
+                # Compress backup
+                gzip "${BACKUP_FILE}"
+                echo "Backup compressed: ${COMPRESSED_FILE}"
+                
+                # Upload to S3
+                aws s3 cp "${COMPRESSED_FILE}" "${S3_PATH}${COMPRESSED_FILE}" \
+                  --server-side-encryption=AES256 \
+                  --storage-class=STANDARD_IA
+                
+                if [ $? -eq 0 ]; then
+                  echo "Backup uploaded to S3 successfully"
+                  
+                  # Cross-region replication
+                  aws s3 cp "${S3_PATH}${COMPRESSED_FILE}" \
+                    "s3://${S3_BUCKET_DR}/database/postgres/${BACKUP_DATE}/${COMPRESSED_FILE}" \
+                    --source-region=${AWS_REGION} \
+                    --region=${AWS_REGION_DR}
+                  
+                  # Update metrics
+                  curl -X POST http://backup-metrics:8080/metrics/backup \
+                    -H "Content-Type: application/json" \
+                    -d '{
+                      "type": "database",
+                      "status": "success",
+                      "size": "'$(stat -c%s "${COMPRESSED_FILE}")'",
+                      "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+                    }'
+                  
+                  # Send success notification
+                  curl -X POST "${SLACK_WEBHOOK}" \
+                    -H "Content-Type: application/json" \
+                    -d '{
+                      "text": "✅ Database backup completed successfully",
+                      "attachments": [{
+                        "color": "good",
+                        "fields": [
+                          {"title": "Environment", "value": "Production", "short": true},
+                          {"title": "Backup Size", "value": "'$(stat -c%s "${COMPRESSED_FILE}" | numfmt --to=iec)'", "short": true},
+                          {"title": "Timestamp", "value": "'$(date)'", "short": false}
+                        ]
+                      }]
+                    }'
+                else
+                  echo "Failed to upload backup to S3"
+                  exit 1
+                fi
+              else
+                echo "Database backup failed"
+                exit 1
+              fi
+              
+              # Cleanup local files
+              rm -f "${COMPRESSED_FILE}"
+              
+              echo "Database backup completed successfully"
+            env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: database-credentials
+                  key: url
+            - name: S3_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: backup-config
+                  key: s3_bucket
+            - name: S3_BUCKET_DR
+              valueFrom:
+                configMapKeyRef:
+                  name: backup-config
+                  key: s3_bucket_dr
+            - name: AWS_REGION
+              value: "us-west-2"
+            - name: AWS_REGION_DR
+              value: "us-east-1"
+            - name: SLACK_WEBHOOK
+              valueFrom:
+                secretKeyRef:
+                  name: notification-secrets
+                  key: slack_webhook
+            resources:
+              requests:
+                cpu: 200m
+                memory: 512Mi
+              limits:
+                cpu: 500m
+                memory: 1Gi
+            securityContext:
+              allowPrivilegeEscalation: false
+              runAsNonRoot: true
+              runAsUser: 999
+              capabilities:
+                drop:
+                - ALL
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: application-data-backup
+  namespace: pyairtable-prod
+  labels:
+    app: backup-system
+    component: app-data-backup
+spec:
+  schedule: "0 3 * * *"  # Daily at 3 AM UTC
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: backup-system
+            component: app-data-backup
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: backup-service-account
+          containers:
+          - name: app-data-backup
+            image: alpine:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              apk add --no-cache aws-cli tar gzip curl
+              
+              BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+              BACKUP_DIR="/tmp/app_backup_${BACKUP_DATE}"
+              BACKUP_FILE="app_data_backup_${BACKUP_DATE}.tar.gz"
+              
+              echo "Starting application data backup at $(date)"
+              
+              mkdir -p "${BACKUP_DIR}"
+              
+              # Backup ConfigMaps
+              kubectl get configmaps -o yaml > "${BACKUP_DIR}/configmaps.yaml"
+              
+              # Backup Secrets (metadata only, not the actual secret data)
+              kubectl get secrets -o yaml | \
+                sed 's/data:/data: {}/' | \
+                sed 's/stringData:/stringData: {}/' > "${BACKUP_DIR}/secrets-metadata.yaml"
+              
+              # Backup PVCs
+              kubectl get pvc -o yaml > "${BACKUP_DIR}/pvc.yaml"
+              
+              # Backup Services
+              kubectl get services -o yaml > "${BACKUP_DIR}/services.yaml"
+              
+              # Backup Ingresses
+              kubectl get ingresses -o yaml > "${BACKUP_DIR}/ingresses.yaml"
+              
+              # Create compressed archive
+              tar -czf "${BACKUP_FILE}" -C /tmp "app_backup_${BACKUP_DATE}"
+              
+              # Upload to S3
+              aws s3 cp "${BACKUP_FILE}" "s3://${S3_BUCKET}/application-data/${BACKUP_DATE}/${BACKUP_FILE}" \
+                --server-side-encryption=AES256
+              
+              # Cleanup
+              rm -rf "${BACKUP_DIR}" "${BACKUP_FILE}"
+              
+              echo "Application data backup completed successfully"
+            env:
+            - name: S3_BUCKET
+              value: "pyairtable-prod-backups"
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 200m
+                memory: 512Mi
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backup-cleanup
+  namespace: pyairtable-prod
+  labels:
+    app: backup-system
+    component: cleanup
+spec:
+  schedule: "0 4 * * 0"  # Weekly on Sunday at 4 AM UTC
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: backup-system
+            component: cleanup
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: backup-service-account
+          containers:
+          - name: backup-cleanup
+            image: amazon/aws-cli:latest
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              
+              echo "Starting backup cleanup at $(date)"
+              
+              # Cleanup old database backups (keep 30 days)
+              CUTOFF_DATE=$(date -d '30 days ago' +%Y%m%d)
+              echo "Cleaning up database backups older than ${CUTOFF_DATE}"
+              
+            aws s3 ls "s3://${S3_BUCKET}/database/postgres/" --recursive | \
+                while read -r line; do
+                  backup_date=$(echo "$line" | awk '{print $4}' | cut -d'/' -f3 | cut -d'_' -f1)
+                  if [[ "$backup_date" < "$CUTOFF_DATE" ]]; then
+                    backup_path=$(echo "$line" | awk '{print $4}')
+                    echo "Deleting old backup: s3://${S3_BUCKET}/${backup_path}"
+                    aws s3 rm "s3://${S3_BUCKET}/${backup_path}"
+                  fi
+                done
+              
+              # Cleanup old application data backups (keep 7 days)
+              CUTOFF_DATE_APP=$(date -d '7 days ago' +%Y%m%d)
+              echo "Cleaning up application data backups older than ${CUTOFF_DATE_APP}"
+              
+              aws s3 ls "s3://${S3_BUCKET}/application-data/" --recursive | \
+                while read -r line; do
+                  backup_date=$(echo "$line" | awk '{print $4}' | cut -d'/' -f2)
+                  if [[ "$backup_date" < "$CUTOFF_DATE_APP" ]]; then
+                    backup_path=$(echo "$line" | awk '{print $4}')
+                    echo "Deleting old app backup: s3://${S3_BUCKET}/${backup_path}"
+                    aws s3 rm "s3://${S3_BUCKET}/${backup_path}"
+                  fi
+                done
+              
+              echo "Backup cleanup completed successfully"
+            env:
+            - name: S3_BUCKET
+              value: "pyairtable-prod-backups"
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+
+---
+# Backup Monitoring Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backup-metrics
+  namespace: pyairtable-prod
+  labels:
+    app: backup-system
+    component: metrics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backup-system
+      component: metrics
+  template:
+    metadata:
+      labels:
+        app: backup-system
+        component: metrics
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: backup-metrics
+        image: python:3.11-slim
+        ports:
+        - containerPort: 8080
+          name: metrics
+        command:
+        - python
+        - -c
+        - |
+          import os
+          import json
+          import time
+          from datetime import datetime
+          from http.server import HTTPServer, BaseHTTPRequestHandler
+          from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST
+          
+          # Prometheus metrics
+          backup_total = Counter('backup_jobs_total', 'Total backup jobs', ['type', 'status'])
+          backup_size_bytes = Gauge('backup_size_bytes', 'Backup size in bytes', ['type'])
+          backup_duration_seconds = Gauge('backup_duration_seconds', 'Backup duration', ['type'])
+          last_backup_timestamp = Gauge('backup_last_timestamp', 'Last backup timestamp', ['type'])
+          
+          class BackupMetricsHandler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path == '/metrics':
+                      self.send_response(200)
+                      self.send_header('Content-Type', CONTENT_TYPE_LATEST)
+                      self.end_headers()
+                      self.wfile.write(generate_latest())
+                  elif self.path == '/health':
+                      self.send_response(200)
+                      self.send_header('Content-Type', 'application/json')
+                      self.end_headers()
+                      self.wfile.write(json.dumps({'status': 'healthy'}).encode())
+                  else:
+                      self.send_response(404)
+                      self.end_headers()
+              
+              def do_POST(self):
+                  if self.path == '/metrics/backup':
+                      content_length = int(self.headers['Content-Length'])
+                      post_data = self.rfile.read(content_length)
+                      
+                      try:
+                          data = json.loads(post_data.decode('utf-8'))
+                          backup_type = data.get('type', 'unknown')
+                          status = data.get('status', 'unknown')
+                          size = int(data.get('size', 0))
+                          timestamp = data.get('timestamp', datetime.utcnow().isoformat())
+                          
+                          # Update metrics
+                          backup_total.labels(type=backup_type, status=status).inc()
+                          if size > 0:
+                              backup_size_bytes.labels(type=backup_type).set(size)
+                          last_backup_timestamp.labels(type=backup_type).set(time.time())
+                          
+                          self.send_response(200)
+                          self.send_header('Content-Type', 'application/json')
+                          self.end_headers()
+                          self.wfile.write(json.dumps({'status': 'recorded'}).encode())
+                          
+                      except Exception as e:
+                          self.send_response(400)
+                          self.send_header('Content-Type', 'application/json')
+                          self.end_headers()
+                          self.wfile.write(json.dumps({'error': str(e)}).encode())
+                  else:
+                      self.send_response(404)
+                      self.end_headers()
+              
+              def log_message(self, format, *args):
+                  pass  # Suppress access logs
+          
+          if __name__ == '__main__':
+              server = HTTPServer(('0.0.0.0', 8080), BackupMetricsHandler)
+              print("Starting backup metrics server on port 8080")
+              server.serve_forever()
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backup-metrics
+  namespace: pyairtable-prod
+  labels:
+    app: backup-system
+    component: metrics
+spec:
+  selector:
+    app: backup-system
+    component: metrics
+  ports:
+  - name: metrics
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP
+
+---
+# RBAC for Backup Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backup-service-account
+  namespace: pyairtable-prod
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/PyAirtableBackupRole
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: backup-role
+  namespace: pyairtable-prod
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets", "services", "persistentvolumeclaims"]
+  verbs: ["get", "list", "create", "update", "patch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: backup-role-binding
+  namespace: pyairtable-prod
+subjects:
+- kind: ServiceAccount
+  name: backup-service-account
+  namespace: pyairtable-prod
+roleRef:
+  kind: Role
+  name: backup-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ServiceMonitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: backup-metrics
+  namespace: pyairtable-prod
+  labels:
+    app: backup-system
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: backup-system
+      component: metrics
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    honorLabels: true

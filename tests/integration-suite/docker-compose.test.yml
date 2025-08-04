@@ -1,0 +1,507 @@
+version: '3.8'
+
+services:
+  # Test Databases
+  postgres-primary:
+    image: postgres:15-alpine
+    container_name: test-postgres-primary
+    environment:
+      POSTGRES_DB: pyairtable_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./fixtures/sql:/docker-entrypoint-initdb.d:ro
+    command: >
+      postgres 
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c work_mem=4MB
+      -c maintenance_work_mem=64MB
+      -c random_page_cost=1.1
+      -c temp_file_limit=2GB
+      -c log_min_duration_statement=2000
+      -c log_checkpoints=on
+      -c log_connections=on
+      -c log_disconnections=on
+      -c log_lock_waits=on
+      -c deadlock_timeout=1s
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d pyairtable_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+  postgres-events:
+    image: postgres:15-alpine
+    container_name: test-postgres-events
+    environment:
+      POSTGRES_DB: pyairtable_events_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_events_data:/var/lib/postgresql/data
+      - ./fixtures/sql/events:/docker-entrypoint-initdb.d:ro
+    command: >
+      postgres 
+      -c shared_preload_libraries=pg_stat_statements
+      -c max_connections=100
+      -c shared_buffers=128MB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d pyairtable_events_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+  # Test Cache and Message Broker
+  redis-cache:
+    image: redis:7-alpine
+    container_name: test-redis-cache
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server 
+      --appendonly yes 
+      --requirepass testpassword
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_cache_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test-network
+
+  redis-sessions:
+    image: redis:7-alpine
+    container_name: test-redis-sessions
+    ports:
+      - "6380:6379"
+    command: >
+      redis-server 
+      --appendonly yes 
+      --requirepass testpassword
+      --maxmemory 128mb
+      --maxmemory-policy volatile-ttl
+    volumes:
+      - redis_sessions_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test-network
+
+  # Message Broker for Event Testing
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: test-kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_EXTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_EXTERNAL://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_HOURS: 1
+      KAFKA_LOG_SEGMENT_BYTES: 1048576
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - test-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: test-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    networks:
+      - test-network
+
+  # Go Services Under Test
+  api-gateway:
+    build:
+      context: ../../go-services/api-gateway
+      dockerfile: Dockerfile
+    container_name: test-api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - DATABASE_URL=postgres://test_user:test_password@postgres-primary:5432/pyairtable_test?sslmode=disable
+      - REDIS_URL=redis://:testpassword@redis-cache:6379/0
+      - JWT_SECRET=test-jwt-secret-for-testing-only
+      - LOG_LEVEL=debug
+      - SERVICE_NAME=api-gateway
+      - AUTH_SERVICE_URL=http://auth-service:8083
+      - USER_SERVICE_URL=http://user-service:8084
+      - WORKSPACE_SERVICE_URL=http://workspace-service:8086
+      - PERMISSION_SERVICE_URL=http://permission-service:8085
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - test-network
+
+  auth-service:
+    build:
+      context: ../../go-services/auth-service
+      dockerfile: Dockerfile
+    container_name: test-auth-service
+    ports:
+      - "8083:8083"
+    environment:
+      - PORT=8083
+      - DATABASE_URL=postgres://test_user:test_password@postgres-primary:5432/pyairtable_test?sslmode=disable
+      - REDIS_URL=redis://:testpassword@redis-sessions:6379/1
+      - JWT_SECRET=test-jwt-secret-for-testing-only
+      - LOG_LEVEL=debug
+      - SERVICE_NAME=auth-service
+      - TOKEN_EXPIRY=1h
+      - REFRESH_TOKEN_EXPIRY=24h
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      redis-sessions:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - test-network
+
+  user-service:
+    build:
+      context: ../../go-services/user-service
+      dockerfile: Dockerfile
+    container_name: test-user-service
+    ports:
+      - "8084:8084"
+    environment:
+      - PORT=8084
+      - DATABASE_URL=postgres://test_user:test_password@postgres-primary:5432/pyairtable_test?sslmode=disable
+      - EVENTS_DATABASE_URL=postgres://test_user:test_password@postgres-events:5432/pyairtable_events_test?sslmode=disable
+      - REDIS_URL=redis://:testpassword@redis-cache:6379/2
+      - KAFKA_BROKERS=kafka:29092
+      - LOG_LEVEL=debug
+      - SERVICE_NAME=user-service
+      - OUTBOX_ENABLED=true
+      - OUTBOX_BATCH_SIZE=10
+      - OUTBOX_POLL_INTERVAL=1s
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      postgres-events:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+    networks:
+      - test-network
+
+  workspace-service:
+    build:
+      context: ../../go-services/workspace-service
+      dockerfile: Dockerfile
+    container_name: test-workspace-service
+    ports:
+      - "8086:8086"
+    environment:
+      - PORT=8086
+      - DATABASE_URL=postgres://test_user:test_password@postgres-primary:5432/pyairtable_test?sslmode=disable
+      - EVENTS_DATABASE_URL=postgres://test_user:test_password@postgres-events:5432/pyairtable_events_test?sslmode=disable
+      - REDIS_URL=redis://:testpassword@redis-cache:6379/3
+      - KAFKA_BROKERS=kafka:29092
+      - LOG_LEVEL=debug
+      - SERVICE_NAME=workspace-service
+      - OUTBOX_ENABLED=true
+      - CQRS_ENABLED=true
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      postgres-events:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+    networks:
+      - test-network
+
+  permission-service:
+    build:
+      context: ../../go-services/permission-service
+      dockerfile: Dockerfile
+    container_name: test-permission-service
+    ports:
+      - "8085:8085"
+    environment:
+      - PORT=8085
+      - DATABASE_URL=postgres://test_user:test_password@postgres-primary:5432/pyairtable_test?sslmode=disable
+      - REDIS_URL=redis://:testpassword@redis-cache:6379/4
+      - LOG_LEVEL=debug
+      - SERVICE_NAME=permission-service
+      - CACHE_TTL=300s
+      - RBAC_ENABLED=true
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - test-network
+
+  # SAGA Orchestrator Service
+  saga-orchestrator:
+    build:
+      context: ../../saga-orchestrator
+      dockerfile: Dockerfile
+    container_name: test-saga-orchestrator
+    ports:
+      - "8087:8087"
+    environment:
+      - PORT=8087
+      - DATABASE_URL=postgres://test_user:test_password@postgres-events:5432/pyairtable_events_test?sslmode=disable
+      - REDIS_URL=redis://:testpassword@redis-cache:6379/5
+      - KAFKA_BROKERS=kafka:29092
+      - LOG_LEVEL=debug
+      - SERVICE_NAME=saga-orchestrator
+      - USER_SERVICE_URL=http://user-service:8084
+      - WORKSPACE_SERVICE_URL=http://workspace-service:8086
+      - PERMISSION_SERVICE_URL=http://permission-service:8085
+    depends_on:
+      postgres-events:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      workspace-service:
+        condition: service_healthy
+      permission-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - test-network
+
+  # Monitoring and Observability
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: test-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=1h'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    networks:
+      - test-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: test-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=testpassword
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - test-network
+
+  # Test Utilities and Mock Services
+  wiremock:
+    image: wiremock/wiremock:latest
+    container_name: test-wiremock
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./mocks/wiremock:/home/wiremock:ro
+    command: ["--global-response-templating", "--verbose"]
+    networks:
+      - test-network
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: test-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - test-network
+
+  # Test Runner Container
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: test-runner
+    environment:
+      - TEST_CONFIG=/app/config/test-config.yml
+      - TEST_ENVIRONMENT=docker
+      - API_GATEWAY_URL=http://api-gateway:8080
+      - AUTH_SERVICE_URL=http://auth-service:8083
+      - USER_SERVICE_URL=http://user-service:8084
+      - WORKSPACE_SERVICE_URL=http://workspace-service:8086
+      - PERMISSION_SERVICE_URL=http://permission-service:8085
+      - SAGA_ORCHESTRATOR_URL=http://saga-orchestrator:8087
+      - DATABASE_URL=postgres://test_user:test_password@postgres-primary:5432/pyairtable_test?sslmode=disable
+      - EVENTS_DATABASE_URL=postgres://test_user:test_password@postgres-events:5432/pyairtable_events_test?sslmode=disable
+      - REDIS_URL=redis://:testpassword@redis-cache:6379/0
+      - KAFKA_BROKERS=kafka:29092
+      - PROMETHEUS_URL=http://prometheus:9090
+      - GRAFANA_URL=http://grafana:3000
+      - WIREMOCK_URL=http://wiremock:8080
+      - MAILHOG_URL=http://mailhog:8025
+    volumes:
+      - ./:/app:ro
+      - test_results:/app/test-results
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      workspace-service:
+        condition: service_healthy
+      permission-service:
+        condition: service_healthy
+      saga-orchestrator:
+        condition: service_healthy
+    command: ["tail", "-f", "/dev/null"]  # Keep container running for manual test execution
+    networks:
+      - test-network
+
+  # Database Administration
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: test-pgadmin
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@test.com
+      PGADMIN_DEFAULT_PASSWORD: testpassword
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres-primary
+      - postgres-events
+    networks:
+      - test-network
+
+volumes:
+  postgres_test_data:
+    driver: local
+  postgres_events_data:
+    driver: local
+  redis_cache_data:
+    driver: local
+  redis_sessions_data:
+    driver: local
+  zookeeper_data:
+    driver: local
+  zookeeper_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  test_results:
+    driver: local
+
+networks:
+  test-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

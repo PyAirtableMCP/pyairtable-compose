@@ -1,0 +1,1012 @@
+# Advanced Auto-scaling and Performance Optimization for PyAirtable
+# Comprehensive HPA, VPA, KEDA, and performance monitoring configuration
+
+---
+# Namespace for performance monitoring
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: performance-monitoring
+  labels:
+    name: performance-monitoring
+    istio-injection: enabled
+
+---
+# ServiceAccount for performance monitoring
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: performance-monitor
+  namespace: performance-monitoring
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/pyairtable-performance-monitor-role
+
+---
+# ClusterRole for performance monitoring
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: performance-monitor
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "pods", "services", "endpoints", "namespaces"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+  verbs: ["get", "list", "watch", "patch", "update"]
+- apiGroups: ["autoscaling"]
+  resources: ["horizontalpodautoscalers"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["autoscaling.k8s.io"]
+  resources: ["verticalpodautoscalers"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["keda.sh"]
+  resources: ["scaledobjects", "triggerauthentications"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["nodes", "pods"]
+  verbs: ["get", "list"]
+- apiGroups: ["custom.metrics.k8s.io"]
+  resources: ["*"]
+  verbs: ["get", "list"]
+
+---
+# ClusterRoleBinding for performance monitoring
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: performance-monitor
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: performance-monitor
+subjects:
+- kind: ServiceAccount
+  name: performance-monitor
+  namespace: performance-monitoring
+
+---
+# Advanced HPA for API Gateway with Custom Metrics
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway-advanced-hpa
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: autoscaler
+    performance.pyairtable.com/tier: critical
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  minReplicas: 3
+  maxReplicas: 50
+  metrics:
+  # CPU utilization with lower threshold for faster scaling
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60
+  
+  # Memory utilization
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 75
+  
+  # Custom metric: Request rate per second
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "150"
+  
+  # Custom metric: P95 response time
+  - type: Pods
+    pods:
+      metric:
+        name: http_request_duration_p95_seconds
+      target:
+        type: AverageValue
+        averageValue: "0.3"  # 300ms
+  
+  # Custom metric: Error rate
+  - type: Pods
+    pods:
+      metric:
+        name: http_request_error_rate
+      target:
+        type: AverageValue
+        averageValue: "0.01"  # 1% error rate triggers scaling
+  
+  # External metric: Queue depth for async processing
+  - type: External
+    external:
+      metric:
+        name: redis_queue_depth
+        selector:
+          matchLabels:
+            queue: "api_processing"
+      target:
+        type: AverageValue
+        averageValue: "50"
+  
+  # External metric: Active connections
+  - type: External
+    external:
+      metric:
+        name: active_connections
+        selector:
+          matchLabels:
+            service: "api-gateway"
+      target:
+        type: AverageValue
+        averageValue: "500"
+  
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # 5 minutes
+      policies:
+      - type: Percent
+        value: 25  # Scale down by max 25% at a time
+        periodSeconds: 60
+      - type: Pods
+        value: 5   # Scale down by max 5 pods at a time
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 30   # 30 seconds
+      policies:
+      - type: Percent
+        value: 100  # Scale up by 100% when needed
+        periodSeconds: 30
+      - type: Pods
+        value: 10   # Scale up by max 10 pods at a time
+        periodSeconds: 30
+      selectPolicy: Max
+
+---
+# Advanced HPA for Platform Services
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: platform-services-advanced-hpa
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: platform-services
+    app.kubernetes.io/component: autoscaler
+    performance.pyairtable.com/tier: critical
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: platform-services
+  minReplicas: 2
+  maxReplicas: 30
+  metrics:
+  # CPU and Memory
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  
+  # Airtable API rate limiting consideration
+  - type: Pods
+    pods:
+      metric:
+        name: airtable_api_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "20"  # Respect Airtable API limits
+  
+  # Database connection pool utilization
+  - type: External
+    external:
+      metric:
+        name: postgres_connection_pool_utilization
+        selector:
+          matchLabels:
+            service: "platform-services"
+      target:
+        type: AverageValue
+        averageValue: "70"  # 70% connection pool utilization
+  
+  # Tenant-based scaling
+  - type: External
+    external:
+      metric:
+        name: active_tenants_per_pod
+        selector:
+          matchLabels:
+            service: "platform-services"
+      target:
+        type: AverageValue
+        averageValue: "100"  # Max 100 active tenants per pod
+  
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600  # 10 minutes for stateful services
+      policies:
+      - type: Percent
+        value: 20
+        periodSeconds: 120
+      selectPolicy: Max
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      selectPolicy: Max
+
+---
+# VPA for API Gateway - Cost Optimization
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: api-gateway-cost-optimized-vpa
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: vpa
+    performance.pyairtable.com/optimization: cost
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  updatePolicy:
+    updateMode: "Auto"
+    minReplicas: 3
+  resourcePolicy:
+    containerPolicies:
+    - containerName: api-gateway
+      maxAllowed:
+        cpu: 2000m
+        memory: 4Gi
+      minAllowed:
+        cpu: 100m
+        memory: 128Mi
+      mode: Auto
+      controlledResources: ["cpu", "memory"]
+      controlledValues: RequestsAndLimits
+    - containerName: istio-proxy
+      maxAllowed:
+        cpu: 200m
+        memory: 256Mi
+      minAllowed:
+        cpu: 10m
+        memory: 32Mi
+      mode: Auto
+      controlledResources: ["cpu", "memory"]
+
+---
+# VPA for LLM Orchestrator - Performance Optimization
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: llm-orchestrator-performance-vpa
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: llm-orchestrator
+    app.kubernetes.io/component: vpa
+    performance.pyairtable.com/optimization: performance
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: llm-orchestrator
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: llm-orchestrator
+      maxAllowed:
+        cpu: 8000m
+        memory: 16Gi
+      minAllowed:
+        cpu: 500m
+        memory: 1Gi
+      mode: Auto
+      controlledResources: ["cpu", "memory"]
+      controlledValues: RequestsAndLimits
+
+---
+# KEDA ScaledObject for Event-Driven Autoscaling
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: file-processor-event-driven
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: file-processor
+    app.kubernetes.io/component: keda-scaler
+    performance.pyairtable.com/type: event-driven
+spec:
+  scaleTargetRef:
+    name: file-processor
+  pollingInterval: 10  # Check every 10 seconds
+  cooldownPeriod: 180  # 3 minutes cooldown
+  minReplicaCount: 0   # Scale to zero when no work
+  maxReplicaCount: 25
+  triggers:
+  # Scale based on Redis queue length
+  - type: redis
+    metadata:
+      address: redis:6379
+      listName: file_processing_queue
+      listLength: "5"
+      enableTLS: "false"
+      databaseIndex: "0"
+  
+  # Scale based on S3 SQS notifications
+  - type: aws-sqs-queue
+    authenticationRef:
+      name: aws-credentials
+    metadata:
+      queueURL: https://sqs.us-east-1.amazonaws.com/123456789/pyairtable-file-uploads
+      queueLength: "10"
+      awsRegion: "us-east-1"
+      identityOwner: "operator"
+  
+  # Scale based on Kafka consumer lag
+  - type: kafka
+    authenticationRef:
+      name: kafka-auth
+    metadata:
+      bootstrapServers: "kafka:9092"
+      consumerGroup: "file-processor-group"
+      topic: "pyairtable.files.events"
+      lagThreshold: "20"
+      offsetResetPolicy: "latest"
+
+---
+# KEDA ScaledObject for Analytics Processing
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: analytics-processor-scaler
+  namespace: pyairtable
+  labels:
+    app.kubernetes.io/name: analytics-processor
+    app.kubernetes.io/component: keda-scaler
+    performance.pyairtable.com/type: batch-processing
+spec:
+  scaleTargetRef:
+    name: analytics-processor
+  pollingInterval: 30
+  cooldownPeriod: 600  # 10 minutes
+  minReplicaCount: 1
+  maxReplicaCount: 15
+  triggers:
+  # Scale based on time of day (higher activity during business hours)
+  - type: cron
+    metadata:
+      timezone: "America/New_York"
+      start: "0 8 * * 1-5"  # 8 AM weekdays
+      end: "0 18 * * 1-5"   # 6 PM weekdays
+      desiredReplicas: "5"
+  
+  # Scale based on Prometheus metrics
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus:9090
+      metricName: pending_analytics_jobs
+      threshold: "50"
+      query: sum(pending_analytics_jobs{service="analytics-processor"})
+  
+  # Scale based on CPU (for compute-intensive analytics)
+  - type: cpu
+    metadata:
+      type: Utilization
+      value: "75"
+
+---
+# KEDA TriggerAuthentication for AWS
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: aws-credentials
+  namespace: pyairtable
+spec:
+  podIdentity:
+    provider: aws-eks  # Use IAM roles for service accounts
+
+---
+# KEDA TriggerAuthentication for Kafka
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: kafka-auth
+  namespace: pyairtable
+spec:
+  secretTargetRef:
+  - parameter: sasl
+    name: kafka-auth-secret
+    key: sasl
+  - parameter: username
+    name: kafka-auth-secret
+    key: username
+  - parameter: password
+    name: kafka-auth-secret
+    key: password
+
+---
+# Performance Monitoring DaemonSet
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: performance-monitor
+  namespace: performance-monitoring
+  labels:
+    app.kubernetes.io/name: performance-monitor
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: performance-monitor
+  template:
+    metadata:
+      labels:
+        app: performance-monitor
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+    spec:
+      serviceAccountName: performance-monitor
+      hostNetwork: true
+      hostPID: true
+      containers:
+      - name: node-exporter
+        image: prom/node-exporter:v1.6.1
+        args:
+        - --path.procfs=/host/proc
+        - --path.sysfs=/host/sys
+        - --path.rootfs=/host/root
+        - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+        ports:
+        - name: metrics
+          containerPort: 9100
+          hostPort: 9100
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        volumeMounts:
+        - name: proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: sys
+          mountPath: /host/sys
+          readOnly: true
+        - name: root
+          mountPath: /host/root
+          mountPropagation: HostToContainer
+          readOnly: true
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
+      
+      - name: cadvisor
+        image: gcr.io/cadvisor/cadvisor:v0.47.2
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 150m
+            memory: 200Mi
+          limits:
+            cpu: 300m
+            memory: 500Mi
+        volumeMounts:
+        - name: rootfs
+          mountPath: /rootfs
+          readOnly: true
+        - name: var-run
+          mountPath: /var/run
+          readOnly: true
+        - name: sys
+          mountPath: /sys
+          readOnly: true
+        - name: docker
+          mountPath: /var/lib/docker
+          readOnly: true
+        - name: disk
+          mountPath: /dev/disk
+          readOnly: true
+        securityContext:
+          privileged: true
+      
+      volumes:
+      - name: proc
+        hostPath:
+          path: /proc
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: root
+        hostPath:
+          path: /
+      - name: rootfs
+        hostPath:
+          path: /
+      - name: var-run
+        hostPath:
+          path: /var/run
+      - name: docker
+        hostPath:
+          path: /var/lib/docker
+      - name: disk
+        hostPath:
+          path: /dev/disk
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+
+---
+# Custom Resource: Performance Profile
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: performanceprofiles.performance.pyairtable.com
+spec:
+  group: performance.pyairtable.com
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              targetRef:
+                type: object
+                properties:
+                  apiVersion:
+                    type: string
+                  kind:
+                    type: string
+                  name:
+                    type: string
+              optimization:
+                type: string
+                enum: ["cost", "performance", "balanced"]
+              metrics:
+                type: object
+                properties:
+                  cpu:
+                    type: object
+                    properties:
+                      target:
+                        type: integer
+                      max:
+                        type: integer
+                  memory:
+                    type: object
+                    properties:
+                      target:
+                        type: integer
+                      max:
+                        type: integer
+                  responseTime:
+                    type: object
+                    properties:
+                      p95:
+                        type: string
+                      p99:
+                        type: string
+              scaling:
+                type: object
+                properties:
+                  minReplicas:
+                    type: integer
+                  maxReplicas:
+                    type: integer
+                  scaleToZero:
+                    type: boolean
+          status:
+            type: object
+            properties:
+              currentMetrics:
+                type: object
+              recommendations:
+                type: array
+                items:
+                  type: string
+  scope: Namespaced
+  names:
+    plural: performanceprofiles
+    singular: performanceprofile
+    kind: PerformanceProfile
+
+---
+# Performance Profile for API Gateway (Cost Optimized)
+apiVersion: performance.pyairtable.com/v1
+kind: PerformanceProfile
+metadata:
+  name: api-gateway-cost-optimized
+  namespace: pyairtable
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  optimization: cost
+  metrics:
+    cpu:
+      target: 60
+      max: 80
+    memory:
+      target: 70
+      max: 85
+    responseTime:
+      p95: "500ms"
+      p99: "1s"
+  scaling:
+    minReplicas: 2
+    maxReplicas: 20
+    scaleToZero: false
+
+---
+# Performance Profile for LLM Services (Performance Optimized)
+apiVersion: performance.pyairtable.com/v1
+kind: PerformanceProfile
+metadata:
+  name: llm-orchestrator-performance
+  namespace: pyairtable
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: llm-orchestrator
+  optimization: performance
+  metrics:
+    cpu:
+      target: 50
+      max: 70
+    memory:
+      target: 60
+      max: 75
+    responseTime:
+      p95: "2s"
+      p99: "5s"
+  scaling:
+    minReplicas: 1
+    maxReplicas: 10
+    scaleToZero: false
+
+---
+# Performance Profile for Background Jobs (Balanced)
+apiVersion: performance.pyairtable.com/v1
+kind: PerformanceProfile
+metadata:
+  name: automation-services-balanced
+  namespace: pyairtable
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: automation-services
+  optimization: balanced
+  metrics:
+    cpu:
+      target: 65
+      max: 80
+    memory:
+      target: 75
+      max: 85
+    responseTime:
+      p95: "1s"
+      p99: "3s"
+  scaling:
+    minReplicas: 0
+    maxReplicas: 15
+    scaleToZero: true
+
+---
+# ServiceMonitor for Performance Metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: performance-monitoring
+  namespace: performance-monitoring
+  labels:
+    app.kubernetes.io/name: performance-monitor
+spec:
+  selector:
+    matchLabels:
+      app: performance-monitor
+  endpoints:
+  - port: metrics
+    interval: 15s
+    path: /metrics
+  - port: http
+    interval: 30s
+    path: /metrics
+
+---
+# PrometheusRule for Performance Alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: performance-alerts
+  namespace: performance-monitoring
+  labels:
+    app.kubernetes.io/name: performance-alerts
+spec:
+  groups:
+  - name: pyairtable.performance
+    rules:
+    # High CPU utilization
+    - alert: HighCPUUtilization
+      expr: avg(rate(container_cpu_usage_seconds_total{namespace="pyairtable"}[5m])) by (pod) > 0.8
+      for: 5m
+      labels:
+        severity: warning
+        component: performance
+      annotations:
+        summary: "High CPU utilization detected"
+        description: "Pod {{ $labels.pod }} has high CPU utilization: {{ $value }}"
+    
+    # High memory utilization
+    - alert: HighMemoryUtilization
+      expr: avg(container_memory_usage_bytes{namespace="pyairtable"} / container_spec_memory_limit_bytes{namespace="pyairtable"}) by (pod) > 0.85
+      for: 5m
+      labels:
+        severity: warning
+        component: performance
+      annotations:
+        summary: "High memory utilization detected"
+        description: "Pod {{ $labels.pod }} has high memory utilization: {{ $value }}"
+    
+    # High response time
+    - alert: HighResponseTime
+      expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace="pyairtable"}[5m])) by (le, service)) > 1.0
+      for: 2m
+      labels:
+        severity: warning
+        component: performance
+      annotations:
+        summary: "High response time detected"
+        description: "Service {{ $labels.service }} has high P95 response time: {{ $value }}s"
+    
+    # High error rate
+    - alert: HighErrorRate
+      expr: sum(rate(http_requests_total{namespace="pyairtable",status=~"5.."}[5m])) by (service) / sum(rate(http_requests_total{namespace="pyairtable"}[5m])) by (service) > 0.05
+      for: 3m
+      labels:
+        severity: critical
+        component: performance
+      annotations:
+        summary: "High error rate detected"
+        description: "Service {{ $labels.service }} has high error rate: {{ $value }}"
+    
+    # Scaling recommendation
+    - alert: ScalingRecommendation
+      expr: kube_deployment_status_replicas{namespace="pyairtable"} < kube_deployment_spec_replicas{namespace="pyairtable"} * 0.5
+      for: 10m
+      labels:
+        severity: info
+        component: scaling
+      annotations:
+        summary: "Scale-down opportunity detected"
+        description: "Deployment {{ $labels.deployment }} may be over-provisioned"
+
+---
+# ConfigMap for Performance Tuning
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: performance-tuning-config
+  namespace: pyairtable
+data:
+  tuning.yaml: |
+    # Go Services Performance Tuning
+    go_services:
+      api_gateway:
+        GOMAXPROCS: "2"
+        GOGC: "100"
+        GOMEMLIMIT: "1GiB"
+        max_connections: 1000
+        read_timeout: "30s"
+        write_timeout: "30s"
+        idle_timeout: "60s"
+      
+      platform_services:
+        GOMAXPROCS: "4"
+        GOGC: "200"
+        GOMEMLIMIT: "2GiB"
+        connection_pool_size: 20
+        max_idle_connections: 10
+        connection_max_lifetime: "300s"
+      
+      automation_services:
+        GOMAXPROCS: "2"
+        GOGC: "100"
+        GOMEMLIMIT: "1GiB"
+        worker_pool_size: 10
+        batch_size: 100
+        flush_interval: "5s"
+    
+    # Python Services Performance Tuning
+    python_services:
+      llm_orchestrator:
+        PYTHONUNBUFFERED: "1"
+        PYTHONASYNCIODEBUG: "0"
+        workers: 4
+        max_requests: 1000
+        max_requests_jitter: 100
+        timeout: 300
+        keepalive: 2
+      
+      mcp_server:
+        PYTHONUNBUFFERED: "1"
+        workers: 2
+        max_requests: 500
+        timeout: 60
+    
+    # Database Performance Tuning
+    database:
+      postgres:
+        max_connections: 100
+        shared_buffers: "256MB"
+        effective_cache_size: "1GB"
+        work_mem: "4MB"
+        maintenance_work_mem: "64MB"
+        checkpoint_completion_target: 0.9
+        wal_buffers: "16MB"
+        default_statistics_target: 100
+      
+      redis:
+        maxmemory: "512mb"
+        maxmemory_policy: "allkeys-lru"
+        timeout: 300
+        tcp_keepalive: 60
+        databases: 16
+    
+    # Istio Performance Tuning
+    istio:
+      proxy:
+        concurrency: 2
+        stats_config_disable: false
+        pilot_enable_workload_entry_cross_cluster: true
+        pilot_enable_cross_cluster_workload_entry: true
+      
+      pilot:
+        PILOT_ENABLE_STATUS: true
+        PILOT_ENABLE_CROSS_CLUSTER_WORKLOAD_ENTRY: true
+        PILOT_PUSH_THROTTLE: 100
+        PILOT_DEBOUNCE_AFTER: "100ms"
+        PILOT_DEBOUNCE_MAX: "10s"
+
+---
+# Job for Performance Benchmarking
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: performance-benchmark
+  namespace: performance-monitoring
+  labels:
+    app.kubernetes.io/name: performance-benchmark
+    app.kubernetes.io/component: testing
+spec:
+  template:
+    metadata:
+      labels:
+        app: performance-benchmark
+    spec:
+      serviceAccountName: performance-monitor
+      restartPolicy: OnFailure
+      containers:
+      - name: benchmark
+        image: loadimpact/k6:latest
+        command:
+        - k6
+        - run
+        - --vus=50
+        - --duration=5m
+        - --summary-trend-stats=avg,min,med,max,p(95),p(99)
+        - /scripts/performance-test.js
+        env:
+        - name: K6_PROMETHEUS_REMOTE_URL
+          value: "http://prometheus:9090/api/v1/write"
+        - name: TARGET_HOST
+          value: "api-gateway.pyairtable.svc.cluster.local"
+        volumeMounts:
+        - name: test-scripts
+          mountPath: /scripts
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+      volumes:
+      - name: test-scripts
+        configMap:
+          name: benchmark-scripts
+
+---
+# ConfigMap for Benchmark Scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: benchmark-scripts
+  namespace: performance-monitoring
+data:
+  performance-test.js: |
+    import http from 'k6/http';
+    import { check, sleep } from 'k6';
+    import { Rate, Trend } from 'k6/metrics';
+    
+    const errorRate = new Rate('errors');
+    const responseTime = new Trend('response_time');
+    
+    export let options = {
+      stages: [
+        { duration: '1m', target: 10 },   // Ramp up
+        { duration: '2m', target: 50 },   // Stay at 50 users
+        { duration: '1m', target: 100 },  // Ramp to 100 users
+        { duration: '1m', target: 0 },    // Ramp down
+      ],
+      thresholds: {
+        http_req_duration: ['p(95)<500'],  // 95% of requests under 500ms
+        errors: ['rate<0.01'],             // Error rate under 1%
+      },
+    };
+    
+    const BASE_URL = `http://${__ENV.TARGET_HOST}:8080`;
+    
+    export default function () {
+      // Test various endpoints
+      const endpoints = [
+        '/health',
+        '/api/v1/auth/me',
+        '/api/v1/airtable/bases',
+        '/api/v1/users/profile',
+      ];
+      
+      for (const endpoint of endpoints) {
+        const response = http.get(`${BASE_URL}${endpoint}`, {
+          headers: {
+            'Authorization': 'Bearer test-token',
+            'X-Tenant-ID': 'test-tenant',
+          },
+        });
+        
+        check(response, {
+          'status is 200': (r) => r.status === 200,
+          'response time < 500ms': (r) => r.timings.duration < 500,
+        });
+        
+        errorRate.add(response.status !== 200);
+        responseTime.add(response.timings.duration);
+        
+        sleep(1);
+      }
+    }

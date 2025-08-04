@@ -6,6 +6,7 @@ Production-ready event bus architecture with Apache Kafka
 import asyncio
 import json
 import uuid
+import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
@@ -232,28 +233,118 @@ class EventBus:
     def __init__(
         self, 
         bootstrap_servers: List[str],
-        schema_registry_url: str = None
+        schema_registry_url: str = None,
+        topic_prefix: str = "pyairtable",
+        consumer_group: str = "pyairtable-python-services",
+        security_config: Dict[str, Any] = None
     ):
         self.bootstrap_servers = bootstrap_servers
         self.schema_registry_url = schema_registry_url
+        self.topic_prefix = topic_prefix
+        self.consumer_group = consumer_group
+        self.security_config = security_config or {}
         self.producer = None
         self.consumers: Dict[str, KafkaConsumer] = {}
         self.handlers: Dict[EventType, List[Callable]] = {}
         self.logger = logging.getLogger(__name__)
+        self.running = False
+        self.consumer_threads: Dict[str, threading.Thread] = {}
+        self.dead_letter_topic = f"{topic_prefix}.dlq.events"
+        
+    def _get_producer_config(self) -> Dict[str, Any]:
+        """Get producer configuration with security settings"""
+        config = {
+            'bootstrap_servers': self.bootstrap_servers,
+            'value_serializer': lambda v: json.dumps(v, default=str).encode('utf-8'),
+            'key_serializer': lambda k: k.encode('utf-8') if k else None,
+            'retries': 3,
+            'acks': 'all',  # Wait for all replicas
+            'compression_type': 'snappy',
+            'batch_size': 16384,
+            'linger_ms': 5,  # Small delay for batching
+            'max_in_flight_requests_per_connection': 5,  # Better throughput
+            'enable_idempotence': True,  # Exactly-once semantics
+            'request_timeout_ms': 30000,
+            'delivery_timeout_ms': 120000,
+        }
+        
+        # Apply security configuration
+        if self.security_config.get('security_protocol'):
+            config['security_protocol'] = self.security_config['security_protocol']
+            
+        if self.security_config.get('sasl_mechanism'):
+            config['sasl_mechanism'] = self.security_config['sasl_mechanism']
+            config['sasl_plain_username'] = self.security_config.get('sasl_username')
+            config['sasl_plain_password'] = self.security_config.get('sasl_password')
+            
+        if self.security_config.get('ssl_cafile'):
+            config['ssl_cafile'] = self.security_config['ssl_cafile']
+            config['ssl_certfile'] = self.security_config.get('ssl_certfile')
+            config['ssl_keyfile'] = self.security_config.get('ssl_keyfile')
+            config['ssl_check_hostname'] = self.security_config.get('ssl_check_hostname', True)
+            
+        return config
+        
+    def _get_consumer_config(self) -> Dict[str, Any]:
+        """Get consumer configuration with security settings"""
+        config = {
+            'bootstrap_servers': self.bootstrap_servers,
+            'group_id': self.consumer_group,
+            'auto_offset_reset': 'earliest',
+            'enable_auto_commit': True,
+            'auto_commit_interval_ms': 5000,
+            'value_deserializer': lambda v: json.loads(v.decode('utf-8')),
+            'consumer_timeout_ms': 1000,
+            'session_timeout_ms': 30000,
+            'heartbeat_interval_ms': 3000,
+            'max_poll_records': 500,
+            'max_poll_interval_ms': 300000,
+            'fetch_min_bytes': 1,
+            'fetch_max_wait_ms': 500,
+            'isolation_level': 'read_committed',
+        }
+        
+        # Apply security configuration (same as producer)
+        if self.security_config.get('security_protocol'):
+            config['security_protocol'] = self.security_config['security_protocol']
+            
+        if self.security_config.get('sasl_mechanism'):
+            config['sasl_mechanism'] = self.security_config['sasl_mechanism']
+            config['sasl_plain_username'] = self.security_config.get('sasl_username')
+            config['sasl_plain_password'] = self.security_config.get('sasl_password')
+            
+        if self.security_config.get('ssl_cafile'):
+            config['ssl_cafile'] = self.security_config['ssl_cafile']
+            config['ssl_certfile'] = self.security_config.get('ssl_certfile')
+            config['ssl_keyfile'] = self.security_config.get('ssl_keyfile')
+            config['ssl_check_hostname'] = self.security_config.get('ssl_check_hostname', True)
+            
+        return config
     
     def start(self):
-        """Initialize Kafka producer"""
-        self.producer = KafkaProducer(
-            bootstrap_servers=self.bootstrap_servers,
-            value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-            key_serializer=lambda k: k.encode('utf-8') if k else None,
-            retries=3,
-            acks='all',  # Wait for all replicas
-            compression_type='snappy',
-            batch_size=16384,
-            linger_ms=5,  # Small delay for batching
-            max_in_flight_requests_per_connection=1  # Ensure ordering
-        )
+        """Initialize Kafka producer and consumer infrastructure"""
+        try:
+            # Create producer
+            producer_config = self._get_producer_config()
+            self.producer = KafkaProducer(**producer_config)
+            self.running = True
+            
+            self.logger.info(
+                f"Kafka EventBus started successfully with brokers: {self.bootstrap_servers}"
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to start Kafka EventBus: {e}")
+            raise
+    
+    def _get_topic_name(self, event_type: str) -> str:
+        """Generate topic name from event type"""
+        # Convert event type to topic name format
+        # e.g., "user.registered" -> "pyairtable.auth.events"
+        parts = event_type.split('.')
+        if len(parts) >= 2:
+            domain = parts[0]
+            return f"{self.topic_prefix}.{domain}.events"
+        return f"{self.topic_prefix}.system.events"
     
     async def publish_event(self, event: Event, topic: str = None) -> None:
         """Publish event to Kafka topic"""
@@ -262,19 +353,28 @@ class EventBus:
         
         # Determine topic from event type if not specified
         if not topic:
-            topic = f"pyairtable.{event.aggregate_type}.{event.type.value}"
+            topic = self._get_topic_name(event.type.value)
         
         try:
+            # Prepare event data
+            event_data = event.to_dict()
+            
+            # Create headers
+            headers = [
+                ('event_type', event.type.value.encode()),
+                ('event_id', event.id.encode()),
+                ('aggregate_type', event.aggregate_type.encode()),
+                ('correlation_id', (event.correlation_id or '').encode()),
+                ('timestamp', event.timestamp.isoformat().encode()),
+                ('tenant_id', (getattr(event, 'tenant_id', '') or '').encode())
+            ]
+            
             # Use aggregate_id as partition key for ordering
             future = self.producer.send(
                 topic=topic,
                 key=event.aggregate_id,
-                value=event.to_dict(),
-                headers=[
-                    ('event_type', event.type.value.encode()),
-                    ('correlation_id', (event.correlation_id or '').encode()),
-                    ('timestamp', event.timestamp.isoformat().encode())
-                ]
+                value=event_data,
+                headers=headers
             )
             
             # Wait for confirmation
@@ -288,60 +388,210 @@ class EventBus:
             
         except KafkaError as e:
             self.logger.error(f"Failed to publish event: {e}")
+            await self._send_to_dead_letter_queue(event, str(e))
+            raise
+        except Exception as e:
+            self.logger.error(f"Unexpected error publishing event: {e}")
+            await self._send_to_dead_letter_queue(event, str(e))
             raise
     
     def subscribe(
         self, 
-        topics: List[str], 
-        consumer_group: str,
+        event_type: EventType,
         handler: Callable[[Event], None]
     ) -> None:
-        """Subscribe to events from topics"""
-        consumer = KafkaConsumer(
-            *topics,
-            bootstrap_servers=self.bootstrap_servers,
-            group_id=consumer_group,
-            auto_offset_reset='earliest',
-            enable_auto_commit=True,
-            auto_commit_interval_ms=1000,
-            value_deserializer=lambda v: json.loads(v.decode('utf-8')),
-            consumer_timeout_ms=1000
-        )
+        """Subscribe to events of a specific type"""
+        if not self.running:
+            raise RuntimeError("Event bus not started")
+            
+        # Add handler to the registry
+        if event_type not in self.handlers:
+            self.handlers[event_type] = []
+        self.handlers[event_type].append(handler)
         
-        self.consumers[consumer_group] = consumer
+        # Determine topic name
+        topic = self._get_topic_name(event_type.value)
         
-        # Start consumer loop in background
-        asyncio.create_task(self._consume_events(consumer, handler))
+        # Start consumer for this topic if not already started
+        if topic not in self.consumers:
+            self._start_consumer(topic)
+        
+        self.logger.info(f"Subscribed to {event_type.value} events on topic {topic}")
     
-    async def _consume_events(
-        self, 
-        consumer: KafkaConsumer, 
-        handler: Callable[[Event], None]
-    ) -> None:
-        """Consume events from Kafka topics"""
+    def _start_consumer(self, topic: str) -> None:
+        """Start a consumer for a specific topic"""
         try:
-            for message in consumer:
+            consumer_config = self._get_consumer_config()
+            consumer = KafkaConsumer(topic, **consumer_config)
+            self.consumers[topic] = consumer
+            
+            # Start consumer thread
+            consumer_thread = threading.Thread(
+                target=self._consume_events,
+                args=(topic, consumer),
+                daemon=True
+            )
+            consumer_thread.start()
+            self.consumer_threads[topic] = consumer_thread
+            
+            self.logger.info(f"Started consumer for topic: {topic}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to start consumer for topic {topic}: {e}")
+            raise
+    
+    def _consume_events(self, topic: str, consumer: KafkaConsumer) -> None:
+        """Consume events from Kafka topics (runs in thread)"""
+        self.logger.info(f"Starting consumer loop for topic: {topic}")
+        
+        try:
+            while self.running:
                 try:
-                    event = Event.from_dict(message.value)
-                    await handler(event)
-                    
+                    message_pack = consumer.poll(timeout_ms=1000)
+                    if not message_pack:
+                        continue
+                        
+                    for topic_partition, messages in message_pack.items():
+                        for message in messages:
+                            try:
+                                # Deserialize event
+                                event_data = message.value
+                                
+                                # Get event type from headers or data
+                                event_type_str = None
+                                if message.headers:
+                                    for key, value in message.headers:
+                                        if key == 'event_type':
+                                            event_type_str = value.decode('utf-8')
+                                            break
+                                
+                                if not event_type_str:
+                                    event_type_str = event_data.get('type')
+                                    
+                                if not event_type_str:
+                                    self.logger.warning(f"No event type found in message from {topic}")
+                                    continue
+                                
+                                # Find matching event type enum
+                                matching_event_type = None
+                                for event_type in EventType:
+                                    if event_type.value == event_type_str:
+                                        matching_event_type = event_type
+                                        break
+                                
+                                if not matching_event_type:
+                                    self.logger.warning(f"Unknown event type: {event_type_str}")
+                                    continue
+                                
+                                # Create event object
+                                event = Event.from_dict(event_data)
+                                
+                                # Process with registered handlers
+                                handlers = self.handlers.get(matching_event_type, [])
+                                for handler in handlers:
+                                    try:
+                                        if asyncio.iscoroutinefunction(handler):
+                                            # Run async handler in event loop
+                                            asyncio.run_coroutine_threadsafe(
+                                                handler(event),
+                                                asyncio.get_event_loop()
+                                            )
+                                        else:
+                                            handler(event)
+                                    except Exception as e:
+                                        self.logger.error(
+                                            f"Handler error for {event_type_str}: {e}",
+                                            extra={'event_id': event.id}
+                                        )
+                                
+                            except Exception as e:
+                                self.logger.error(
+                                    f"Error processing message from {topic}: {e}",
+                                    extra={'message': str(message.value)[:500]}
+                                )
+                                
                 except Exception as e:
-                    self.logger.error(
-                        f"Error processing event: {e}", 
-                        extra={'event': message.value}
-                    )
+                    self.logger.error(f"Consumer polling error for {topic}: {e}")
+                    if not self.running:
+                        break
+                    # Short delay before retrying
+                    threading.Event().wait(1.0)
                     
         except Exception as e:
-            self.logger.error(f"Consumer error: {e}")
+            self.logger.error(f"Consumer loop error for {topic}: {e}")
+        finally:
+            self.logger.info(f"Consumer loop ended for topic: {topic}")
+    
+    async def _send_to_dead_letter_queue(self, event: Event, error_message: str) -> None:
+        """Send failed event to dead letter queue"""
+        try:
+            if not self.producer:
+                return
+                
+            dlq_event_data = event.to_dict()
+            dlq_event_data['error_message'] = error_message
+            dlq_event_data['failed_at'] = datetime.now(timezone.utc).isoformat()
+            dlq_event_data['original_topic'] = self._get_topic_name(event.type.value)
+            
+            future = self.producer.send(
+                topic=self.dead_letter_topic,
+                key=event.aggregate_id,
+                value=dlq_event_data,
+                headers=[
+                    ('original_event_type', event.type.value.encode()),
+                    ('error_message', error_message.encode()),
+                    ('failed_at', datetime.now(timezone.utc).isoformat().encode())
+                ]
+            )
+            
+            future.get(timeout=5)
+            self.logger.info(f"Event {event.id} sent to dead letter queue")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to send event to dead letter queue: {e}")
     
     def stop(self):
         """Stop event bus and close connections"""
-        if self.producer:
-            self.producer.flush()
-            self.producer.close()
+        self.logger.info("Stopping Kafka EventBus...")
+        self.running = False
         
-        for consumer in self.consumers.values():
-            consumer.close()
+        # Close producer
+        if self.producer:
+            try:
+                self.producer.flush(timeout=10)
+                self.producer.close(timeout=10)
+            except Exception as e:
+                self.logger.error(f"Error closing producer: {e}")
+        
+        # Close consumers
+        for topic, consumer in self.consumers.items():
+            try:
+                consumer.close()
+            except Exception as e:
+                self.logger.error(f"Error closing consumer for {topic}: {e}")
+        
+        # Wait for consumer threads to finish
+        for topic, thread in self.consumer_threads.items():
+            try:
+                thread.join(timeout=5)
+                if thread.is_alive():
+                    self.logger.warning(f"Consumer thread for {topic} did not stop gracefully")
+            except Exception as e:
+                self.logger.error(f"Error joining consumer thread for {topic}: {e}")
+        
+        self.consumers.clear()
+        self.consumer_threads.clear()
+        self.logger.info("Kafka EventBus stopped")
+    
+    def get_consumer_lag(self, topic: str) -> Dict[str, Any]:
+        """Get consumer lag information for monitoring"""
+        # This would typically integrate with Kafka's consumer group APIs
+        # For now, return basic information
+        return {
+            "topic": topic,
+            "consumer_group": self.consumer_group,
+            "status": "active" if topic in self.consumers else "inactive"
+        }
 
 # =============================================================================
 # SAGA PATTERN IMPLEMENTATION
@@ -822,7 +1072,22 @@ async def main():
     
     # Initialize components
     event_store = EventStore("postgresql://user:pass@localhost/eventstore")
-    event_bus = EventBus(["localhost:9092"])
+    
+    # Initialize Kafka EventBus with security config
+    security_config = {
+        'security_protocol': 'PLAINTEXT',  # Change to SASL_SSL for production
+        # 'sasl_mechanism': 'SCRAM-SHA-256',
+        # 'sasl_username': 'your_username',
+        # 'sasl_password': 'your_password',
+    }
+    
+    event_bus = EventBus(
+        bootstrap_servers=["localhost:9092", "localhost:9093", "localhost:9094"],
+        topic_prefix="pyairtable",
+        consumer_group="pyairtable-saga-orchestrator",
+        security_config=security_config
+    )
+    
     redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
     
     saga_orchestrator = SagaOrchestrator(event_store, event_bus, redis_client)
@@ -830,40 +1095,49 @@ async def main():
     # Start event bus
     event_bus.start()
     
-    # Example: Start user onboarding SAGA
-    user_data = {
-        "email": "newuser@example.com",
-        "password": "secure_password",
-        "first_name": "John",
-        "last_name": "Doe",
-        "company_name": "Acme Corp"
-    }
-    
-    steps = UserOnboardingSaga.create_steps(user_data)
-    saga_id = await saga_orchestrator.start_saga(
-        saga_type="user_onboarding",
-        steps=steps,
-        input_data=user_data
-    )
-    
-    print(f"Started user onboarding SAGA: {saga_id}")
-    
-    # Example: Start Airtable integration SAGA
-    integration_data = {
-        "base_id": "appXXXXXXXXXXXXXX",
-        "api_key": "keyXXXXXXXXXXXXXX",
-        "tenant_id": str(uuid.uuid4()),
-        "webhook_url": "https://api.pyairtable.com/webhooks/receive"
-    }
-    
-    integration_steps = AirtableIntegrationSaga.create_steps(integration_data)
-    integration_saga_id = await saga_orchestrator.start_saga(
-        saga_type="airtable_integration",
-        steps=integration_steps,
-        input_data=integration_data
-    )
-    
-    print(f"Started Airtable integration SAGA: {integration_saga_id}")
+    try:
+        # Example: Start user onboarding SAGA
+        user_data = {
+            "email": "newuser@example.com",
+            "password": "secure_password",
+            "first_name": "John",
+            "last_name": "Doe",
+            "company_name": "Acme Corp"
+        }
+        
+        steps = UserOnboardingSaga.create_steps(user_data)
+        saga_id = await saga_orchestrator.start_saga(
+            saga_type="user_onboarding",
+            steps=steps,
+            input_data=user_data
+        )
+        
+        print(f"Started user onboarding SAGA: {saga_id}")
+        
+        # Example: Start Airtable integration SAGA
+        integration_data = {
+            "base_id": "appXXXXXXXXXXXXXX",
+            "api_key": "keyXXXXXXXXXXXXXX",
+            "tenant_id": str(uuid.uuid4()),
+            "webhook_url": "https://api.pyairtable.com/webhooks/receive"
+        }
+        
+        integration_steps = AirtableIntegrationSaga.create_steps(integration_data)
+        integration_saga_id = await saga_orchestrator.start_saga(
+            saga_type="airtable_integration",
+            steps=integration_steps,
+            input_data=integration_data
+        )
+        
+        print(f"Started Airtable integration SAGA: {integration_saga_id}")
+        
+        # Keep running for a while to see events
+        await asyncio.sleep(30)
+        
+    finally:
+        # Clean shutdown
+        event_bus.stop()
+        print("Event bus stopped")
 
 if __name__ == "__main__":
     asyncio.run(main())

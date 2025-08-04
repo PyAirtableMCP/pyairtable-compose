@@ -1,0 +1,863 @@
+# Database Migration Automation for PyAirtable
+# Provides automated database schema migrations with rollback capabilities
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: migration-config
+  namespace: pyairtable-prod
+data:
+  config.yaml: |
+    migrations:
+      enabled: true
+      auto_migrate: false
+      backup_before_migration: true
+      rollback_on_failure: true
+      max_retry_attempts: 3
+      timeout_seconds: 1800  # 30 minutes
+      
+    environments:
+      dev:
+        auto_migrate: true
+        backup_before_migration: false
+      staging:
+        auto_migrate: false
+        backup_before_migration: true
+      prod:
+        auto_migrate: false
+        backup_before_migration: true
+        
+    notifications:
+      slack_webhook: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+      email_recipients:
+        - "engineering@pyairtable.com"
+        - "ops@pyairtable.com"
+        
+    database:
+      connection_pool_size: 5
+      connection_timeout: 30
+      query_timeout: 600
+      
+    storage:
+      migration_logs_bucket: "pyairtable-prod-migration-logs"
+      backup_bucket: "pyairtable-prod-db-backups"
+
+---
+# Migration Job Template
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: database-migration-template
+  namespace: pyairtable-prod
+  labels:
+    app: database-migration
+    component: migration-job
+spec:
+  ttlSecondsAfterFinished: 86400  # Keep job for 24 hours
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: database-migration
+        component: migration-job
+    spec:
+      restartPolicy: Never
+      serviceAccountName: migration-service-account
+      initContainers:
+      # Pre-migration backup
+      - name: pre-migration-backup
+        image: postgres:15
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          
+          echo "Creating pre-migration backup..."
+          BACKUP_FILE="pre_migration_backup_$(date +%Y%m%d_%H%M%S).sql"
+          
+          pg_dump "${DATABASE_URL}" \
+            --verbose \
+            --no-owner \
+            --no-privileges \
+            --clean \
+            --if-exists \
+            --format=plain \
+            --file="/tmp/${BACKUP_FILE}"
+          
+          # Compress and upload to S3
+          gzip "/tmp/${BACKUP_FILE}"
+          aws s3 cp "/tmp/${BACKUP_FILE}.gz" \
+            "s3://${BACKUP_BUCKET}/pre-migration/${BACKUP_FILE}.gz" \
+            --server-side-encryption=AES256
+          
+          echo "Pre-migration backup completed: ${BACKUP_FILE}.gz"
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: url
+        - name: BACKUP_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: migration-config
+              key: backup_bucket
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 999
+          capabilities:
+            drop:
+            - ALL
+      containers:
+      - name: migration-runner
+        image: migrate/migrate:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -euo pipefail
+          
+          echo "Starting database migration at $(date)"
+          echo "Migration version: ${MIGRATION_VERSION:-latest}"
+          echo "Environment: ${ENVIRONMENT}"
+          
+          # Check current database version
+          current_version=$(migrate -database "${DATABASE_URL}" -path /migrations version 2>/dev/null || echo "0")
+          echo "Current database version: ${current_version}"
+          
+          # Validate migrations
+          echo "Validating migrations..."
+          migrate -database "${DATABASE_URL}" -path /migrations validate
+          
+          if [ $? -ne 0 ]; then
+            echo "Migration validation failed"
+            exit 1
+          fi
+          
+          # Run migrations
+          echo "Running migrations..."
+          if [ -n "${MIGRATION_VERSION:-}" ] && [ "${MIGRATION_VERSION}" != "latest" ]; then
+            # Migrate to specific version
+            migrate -database "${DATABASE_URL}" -path /migrations goto "${MIGRATION_VERSION}"
+          else
+            # Migrate to latest
+            migrate -database "${DATABASE_URL}" -path /migrations up
+          fi
+          
+          migration_exit_code=$?
+          
+          if [ $migration_exit_code -eq 0 ]; then
+            echo "Database migration completed successfully"
+            
+            # Get final version
+            final_version=$(migrate -database "${DATABASE_URL}" -path /migrations version)
+            echo "Final database version: ${final_version}"
+            
+            # Log migration success
+            curl -X POST http://migration-tracker:8080/api/migrations \
+              -H "Content-Type: application/json" \
+              -d '{
+                "status": "success",
+                "environment": "'${ENVIRONMENT}'",
+                "from_version": "'${current_version}'",
+                "to_version": "'${final_version}'",
+                "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+              }'
+            
+            # Send success notification
+            curl -X POST "${SLACK_WEBHOOK}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "text": "✅ Database migration completed successfully",
+                "attachments": [{
+                  "color": "good",
+                  "fields": [
+                    {"title": "Environment", "value": "'${ENVIRONMENT}'", "short": true},
+                    {"title": "From Version", "value": "'${current_version}'", "short": true},
+                    {"title": "To Version", "value": "'${final_version}'", "short": true},
+                    {"title": "Timestamp", "value": "'$(date)'", "short": false}
+                  ]
+                }]
+              }'
+          else
+            echo "Database migration failed with exit code: ${migration_exit_code}"
+            
+            # Log migration failure
+            curl -X POST http://migration-tracker:8080/api/migrations \
+              -H "Content-Type: application/json" \
+              -d '{
+                "status": "failed",
+                "environment": "'${ENVIRONMENT}'",
+                "from_version": "'${current_version}'",
+                "error_code": "'${migration_exit_code}'",
+                "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+              }'
+            
+            # Send failure notification
+            curl -X POST "${SLACK_WEBHOOK}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "text": "❌ Database migration failed",
+                "attachments": [{
+                  "color": "danger",
+                  "fields": [
+                    {"title": "Environment", "value": "'${ENVIRONMENT}'", "short": true},
+                    {"title": "From Version", "value": "'${current_version}'", "short": true},
+                    {"title": "Error Code", "value": "'${migration_exit_code}'", "short": true},
+                    {"title": "Timestamp", "value": "'$(date)'", "short": false}
+                  ]
+                }]
+              }'
+            
+            exit ${migration_exit_code}
+          fi
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: url
+        - name: ENVIRONMENT
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: MIGRATION_VERSION
+          value: ""  # Set via job parameter
+        - name: SLACK_WEBHOOK
+          valueFrom:
+            secretKeyRef:
+              name: notification-secrets
+              key: slack_webhook
+        volumeMounts:
+        - name: migrations
+          mountPath: /migrations
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: migrations
+        configMap:
+          name: database-migrations
+
+---
+# Migration Tracker Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: migration-tracker
+  namespace: pyairtable-prod
+  labels:
+    app: migration-tracker
+    component: tracker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: migration-tracker
+  template:
+    metadata:
+      labels:
+        app: migration-tracker
+        component: tracker
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: migration-tracker
+        image: python:3.11-slim
+        ports:
+        - containerPort: 8080
+          name: http
+        command:
+        - python
+        - /app/tracker.py
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-credentials
+              key: url
+        volumeMounts:
+        - name: tracker-code
+          mountPath: /app
+          readOnly: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: tracker-code
+        configMap:
+          name: migration-tracker-code
+          defaultMode: 0755
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: migration-tracker-code
+  namespace: pyairtable-prod
+data:
+  tracker.py: |
+    #!/usr/bin/env python3
+    """
+    Database Migration Tracker
+    Tracks migration history and provides rollback capabilities
+    """
+    
+    import os
+    import json
+    import time
+    import psycopg2
+    import redis
+    from datetime import datetime
+    from http.server import HTTPServer, BaseHTTPRequestHandler
+    from urllib.parse import urlparse, parse_qs
+    from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
+    
+    # Prometheus metrics
+    migration_counter = Counter('database_migrations_total', 'Total database migrations', ['environment', 'status'])
+    migration_duration = Histogram('database_migration_duration_seconds', 'Migration duration', ['environment'])
+    current_schema_version = Gauge('database_schema_version', 'Current database schema version', ['environment'])
+    
+    class MigrationTracker:
+        def __init__(self):
+            self.db_url = os.getenv('DATABASE_URL')
+            self.redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
+            
+            # Initialize database connection
+            self.init_database()
+            
+            # Initialize Redis connection
+            self.redis_client = redis.from_url(self.redis_url)
+            
+        def init_database(self):
+            """Initialize migration tracking table"""
+            try:
+                conn = psycopg2.connect(self.db_url)
+                cur = conn.cursor()
+                
+                # Create migration history table
+                cur.execute('''
+                    CREATE TABLE IF NOT EXISTS migration_history (
+                        id SERIAL PRIMARY KEY,
+                        environment VARCHAR(50) NOT NULL,
+                        from_version VARCHAR(50),
+                        to_version VARCHAR(50),
+                        status VARCHAR(20) NOT NULL,
+                        error_message TEXT,
+                        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        completed_at TIMESTAMP,
+                        duration_seconds INTEGER,
+                        rollback_sql TEXT
+                    )
+                ''')
+                
+                conn.commit()
+                cur.close()
+                conn.close()
+                
+                print("Migration tracking table initialized")
+                
+            except Exception as e:
+                print(f"Error initializing database: {e}")
+        
+        def record_migration(self, data):
+            """Record migration in database and Redis"""
+            try:
+                conn = psycopg2.connect(self.db_url)
+                cur = conn.cursor()
+                
+                # Insert migration record
+                cur.execute('''
+                    INSERT INTO migration_history 
+                    (environment, from_version, to_version, status, error_message, completed_at)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                ''', (
+                    data.get('environment'),
+                    data.get('from_version'),
+                    data.get('to_version'),
+                    data.get('status'),
+                    data.get('error_message'),
+                    datetime.utcnow()
+                ))
+                
+                conn.commit()
+                cur.close()
+                conn.close()
+                
+                # Update metrics
+                environment = data.get('environment', 'unknown')
+                status = data.get('status', 'unknown')
+                
+                migration_counter.labels(environment=environment, status=status).inc()
+                
+                if data.get('to_version'):
+                    try:
+                        version_num = int(data['to_version'])
+                        current_schema_version.labels(environment=environment).set(version_num)
+                    except ValueError:
+                        pass
+                
+                # Cache in Redis for quick access
+                cache_key = f"migration:latest:{environment}"
+                self.redis_client.setex(cache_key, 3600, json.dumps(data))  # Cache for 1 hour
+                
+                print(f"Migration recorded: {data}")
+                return True
+                
+            except Exception as e:
+                print(f"Error recording migration: {e}")
+                return False
+        
+        def get_migration_history(self, environment=None, limit=50):
+            """Get migration history"""
+            try:
+                conn = psycopg2.connect(self.db_url)
+                cur = conn.cursor()
+                
+                if environment:
+                    cur.execute('''
+                        SELECT environment, from_version, to_version, status, 
+                               error_message, started_at, completed_at, duration_seconds
+                        FROM migration_history
+                        WHERE environment = %s
+                        ORDER BY started_at DESC
+                        LIMIT %s
+                    ''', (environment, limit))
+                else:
+                    cur.execute('''
+                        SELECT environment, from_version, to_version, status, 
+                               error_message, started_at, completed_at, duration_seconds
+                        FROM migration_history
+                        ORDER BY started_at DESC
+                        LIMIT %s
+                    ''', (limit,))
+                
+                rows = cur.fetchall()
+                cur.close()
+                conn.close()
+                
+                # Convert to list of dictionaries
+                columns = ['environment', 'from_version', 'to_version', 'status', 
+                          'error_message', 'started_at', 'completed_at', 'duration_seconds']
+                
+                history = []
+                for row in rows:
+                    record = dict(zip(columns, row))
+                    # Convert datetime objects to strings
+                    for key, value in record.items():
+                        if isinstance(value, datetime):
+                            record[key] = value.isoformat()
+                    history.append(record)
+                
+                return history
+                
+            except Exception as e:
+                print(f"Error getting migration history: {e}")
+                return []
+    
+    class MigrationHandler(BaseHTTPRequestHandler):
+        def __init__(self, tracker, *args, **kwargs):
+            self.tracker = tracker
+            super().__init__(*args, **kwargs)
+        
+        def do_GET(self):
+            if self.path == '/metrics':
+                self.send_response(200)
+                self.send_header('Content-Type', CONTENT_TYPE_LATEST)
+                self.end_headers()
+                self.wfile.write(generate_latest())
+            
+            elif self.path == '/health':
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'healthy'}).encode())
+            
+            elif self.path.startswith('/api/migrations'):
+                # Parse query parameters
+                parsed = urlparse(self.path)
+                params = parse_qs(parsed.query)
+                
+                environment = params.get('environment', [None])[0]
+                limit = int(params.get('limit', [50])[0])
+                
+                history = self.tracker.get_migration_history(environment, limit)
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(history).encode())
+            
+            else:
+                self.send_response(404)
+                self.end_headers()
+        
+        def do_POST(self):
+            if self.path == '/api/migrations':
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                
+                try:
+                    data = json.loads(post_data.decode('utf-8'))
+                    success = self.tracker.record_migration(data)
+                    
+                    if success:
+                        self.send_response(200)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        self.wfile.write(json.dumps({'status': 'recorded'}).encode())
+                    else:
+                        self.send_response(500)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        self.wfile.write(json.dumps({'error': 'Failed to record migration'}).encode())
+                        
+                except Exception as e:
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'error': str(e)}).encode())
+            else:
+                self.send_response(404)
+                self.end_headers()
+        
+        def log_message(self, format, *args):
+            pass  # Suppress access logs
+    
+    def make_handler(tracker):
+        def handler(*args, **kwargs):
+            return MigrationHandler(tracker, *args, **kwargs)
+        return handler
+    
+    if __name__ == '__main__':
+        tracker = MigrationTracker()
+        handler = make_handler(tracker)
+        server = HTTPServer(('0.0.0.0', 8080), handler)
+        print("Starting migration tracker server on port 8080")
+        server.serve_forever()
+
+---
+# Database Migration Scripts ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: database-migrations
+  namespace: pyairtable-prod
+data:
+  001_initial_schema.up.sql: |
+    -- Initial schema migration
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
+    
+    -- Users table
+    CREATE TABLE IF NOT EXISTS users (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        first_name VARCHAR(100),
+        last_name VARCHAR(100),
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Create indexes
+    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+    CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
+    
+  001_initial_schema.down.sql: |
+    -- Rollback initial schema
+    DROP TABLE IF EXISTS users CASCADE;
+    DROP EXTENSION IF EXISTS "pg_stat_statements";
+    DROP EXTENSION IF EXISTS "uuid-ossp";
+    
+  002_add_workspaces.up.sql: |
+    -- Add workspaces functionality
+    CREATE TABLE IF NOT EXISTS workspaces (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Workspace members
+    CREATE TABLE IF NOT EXISTS workspace_members (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role VARCHAR(50) NOT NULL DEFAULT 'member',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(workspace_id, user_id)
+    );
+    
+    -- Create indexes
+    CREATE INDEX IF NOT EXISTS idx_workspaces_owner ON workspaces(owner_id);
+    CREATE INDEX IF NOT EXISTS idx_workspace_members_workspace ON workspace_members(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_workspace_members_user ON workspace_members(user_id);
+    
+  002_add_workspaces.down.sql: |
+    -- Rollback workspaces
+    DROP TABLE IF EXISTS workspace_members CASCADE;
+    DROP TABLE IF EXISTS workspaces CASCADE;
+
+---
+# Migration Service Account and RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: migration-service-account
+  namespace: pyairtable-prod
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/PyAirtableMigrationRole
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: migration-role
+  namespace: pyairtable-prod
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "create", "update", "patch", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: migration-role-binding
+  namespace: pyairtable-prod
+subjects:
+- kind: ServiceAccount
+  name: migration-service-account
+  namespace: pyairtable-prod
+roleRef:
+  kind: Role
+  name: migration-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Migration Tracker Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: migration-tracker
+  namespace: pyairtable-prod
+  labels:
+    app: migration-tracker
+spec:
+  selector:
+    app: migration-tracker
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP
+
+---
+# Migration CLI Tool
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: migration-cli
+  namespace: pyairtable-prod
+data:
+  migrate.sh: |
+    #!/bin/bash
+    
+    # PyAirtable Database Migration CLI
+    
+    set -euo pipefail
+    
+    NAMESPACE="pyairtable-prod"
+    
+    usage() {
+        echo "PyAirtable Database Migration CLI"
+        echo ""
+        echo "Usage: $0 <command> [options]"
+        echo ""
+        echo "Commands:"
+        echo "  up [version]     - Apply migrations (to specific version or latest)"
+        echo "  down [version]   - Rollback migrations (to specific version)"
+        echo "  status          - Show current migration status"
+        echo "  history         - Show migration history"
+        echo "  create <name>   - Create new migration files"
+        echo "  validate        - Validate migration files"
+        echo ""
+        echo "Examples:"
+        echo "  $0 up           # Migrate to latest"
+        echo "  $0 up 002       # Migrate to version 002"
+        echo "  $0 down 001     # Rollback to version 001"
+        echo "  $0 status       # Show current status"
+        echo "  $0 create add_indexes  # Create new migration"
+    }
+    
+    run_migration() {
+        local version=${1:-""}
+        
+        echo "Starting database migration..."
+        
+        # Create migration job
+        local job_name="migration-$(date +%s)"
+        
+        kubectl create job ${job_name} --from=job/database-migration-template -n ${NAMESPACE}
+        
+        # Set migration version if provided
+        if [[ -n "$version" ]]; then
+            kubectl patch job ${job_name} -n ${NAMESPACE} -p '{"spec":{"template":{"spec":{"containers":[{"name":"migration-runner","env":[{"name":"MIGRATION_VERSION","value":"'${version}'"}]}]}}}}'
+        fi
+        
+        echo "Migration job created: ${job_name}"
+        echo "Waiting for completion..."
+        
+        # Wait for job completion
+        kubectl wait --for=condition=complete --timeout=1800s job/${job_name} -n ${NAMESPACE}
+        
+        # Show job logs
+        kubectl logs job/${job_name} -n ${NAMESPACE}
+        
+        # Clean up job
+        kubectl delete job ${job_name} -n ${NAMESPACE}
+        
+        echo "Migration completed successfully"
+    }
+    
+    show_status() {
+        echo "Current migration status:"
+        curl -s http://migration-tracker.${NAMESPACE}:8080/api/migrations?limit=1 | jq '.[0]'
+    }
+    
+    show_history() {
+        echo "Migration history:"
+        curl -s http://migration-tracker.${NAMESPACE}:8080/api/migrations?limit=10 | jq '.'
+    }
+    
+    create_migration() {
+        local name=$1
+        local timestamp=$(date +%s)
+        local version=$(printf "%03d" $((timestamp % 1000)))
+        
+        echo "Creating migration: ${version}_${name}"
+        
+        # Create up migration
+        cat > "${version}_${name}.up.sql" << EOF
+    -- Migration: ${name}
+    -- Created: $(date)
+    
+    -- Add your migration SQL here
+    
+    EOF
+        
+        # Create down migration
+        cat > "${version}_${name}.down.sql" << EOF
+    -- Rollback: ${name}
+    -- Created: $(date)
+    
+    -- Add your rollback SQL here
+    
+    EOF
+        
+        echo "Created migration files:"
+        echo "  ${version}_${name}.up.sql"
+        echo "  ${version}_${name}.down.sql"
+    }
+    
+    case "${1:-help}" in
+        "up")
+            run_migration "${2:-}"
+            ;;
+        "down")
+            if [[ $# -lt 2 ]]; then
+                echo "Error: down command requires version parameter"
+                exit 1
+            fi
+            run_migration "$2"
+            ;;
+        "status")
+            show_status
+            ;;
+        "history")
+            show_history
+            ;;
+        "create")
+            if [[ $# -lt 2 ]]; then
+                echo "Error: create command requires migration name"
+                exit 1
+            fi
+            create_migration "$2"
+            ;;
+        "validate")
+            echo "Validating migrations..."
+            # Add validation logic here
+            echo "Validation completed"
+            ;;
+        "help"|*)
+            usage
+            ;;
+    esac
+
+---
+# ServiceMonitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: migration-tracker
+  namespace: pyairtable-prod
+  labels:
+    app: migration-tracker
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: migration-tracker
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+    honorLabels: true

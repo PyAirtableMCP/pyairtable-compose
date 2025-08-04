@@ -167,8 +167,9 @@ func (s *AuthService) RefreshToken(refreshToken string) (*models.TokenResponse, 
 // ValidateToken validates an access token and returns claims
 func (s *AuthService) ValidateToken(tokenString string) (*models.Claims, error) {
     token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-        if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-            return nil, errors.New("unexpected signing method")
+        // Explicitly validate algorithm to prevent algorithm confusion attacks
+        if token.Method != jwt.SigningMethodHS256 {
+            return nil, errors.New("unexpected signing method: only HS256 allowed")
         }
         return []byte(s.jwtSecret), nil
     })

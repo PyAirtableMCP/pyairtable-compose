@@ -1,0 +1,99 @@
+# Kibana Configuration for PyAirtable Platform
+# Optimized for log analysis and cost monitoring
+
+# Server configuration
+server.name: "pyairtable-kibana"
+server.host: "0.0.0.0"
+server.port: 5601
+server.basePath: ""
+server.rewriteBasePath: false
+
+# Elasticsearch configuration
+elasticsearch.hosts: ["http://elasticsearch:9200"]
+elasticsearch.username: ""
+elasticsearch.password: ""
+
+# Disable security (development setup)
+elasticsearch.ssl.verificationMode: none
+
+# Index patterns
+elasticsearch.index: ".kibana"
+
+# Logging
+logging.appenders:
+  file:
+    type: file
+    fileName: /usr/share/kibana/logs/kibana.log
+    layout:
+      type: json
+
+logging.root:
+  appenders:
+    - default
+    - file
+  level: info
+
+# Monitoring
+monitoring.ui.enabled: true
+monitoring.kibana.collection.enabled: true
+monitoring.kibana.collection.interval: 10000
+
+# Performance settings
+ops.interval: 30000
+
+# Default application
+kibana.defaultAppId: "discover"
+
+# Saved objects
+savedObjects.maxImportPayloadBytes: 26214400
+
+# Map settings
+map.includeElasticMapsService: true
+map.tilemap.url: ""
+
+# Telemetry
+telemetry.enabled: false
+telemetry.optIn: false
+
+# Dashboard settings
+dashboard.defaultDarkMode: false
+
+# Advanced settings
+advanced_settings:
+  # Default index pattern
+  defaultIndex: "pyairtable-logs-*"
+  
+  # Date format
+  dateFormat: "MMM D, YYYY @ HH:mm:ss.SSS"
+  
+  # Timezone
+  dateFormat:tz: "UTC"
+  
+  # CSV export settings
+  csv:max_size_bytes: 104857600
+  
+  # Discover settings
+  discover:sampleSize: 500
+  discover:sort:defaultOrder: "desc"
+  
+  # Histogram settings
+  histogram:barTarget: 50
+  histogram:maxBars: 100
+
+# Custom index patterns for PyAirtable
+index_patterns:
+  - name: "pyairtable-logs-*"
+    title: "PyAirtable Application Logs"
+    timeFieldName: "@timestamp"
+    
+  - name: "pyairtable-security-*"
+    title: "PyAirtable Security Events"
+    timeFieldName: "@timestamp"
+    
+  - name: "pyairtable-errors-*"
+    title: "PyAirtable Error Events"
+    timeFieldName: "@timestamp"
+    
+  - name: "filebeat-*"
+    title: "Filebeat System Logs"
+    timeFieldName: "@timestamp"

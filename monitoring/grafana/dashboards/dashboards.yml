@@ -1,0 +1,36 @@
+# Grafana Dashboard Provisioning Configuration
+apiVersion: 1
+
+providers:
+  # PyAirtable Platform dashboards
+  - name: 'pyairtable-platform'
+    orgId: 1
+    folder: 'PyAirtable Platform'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/platform
+
+  # Infrastructure dashboards
+  - name: 'infrastructure'
+    orgId: 1
+    folder: 'Infrastructure'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/infrastructure
+
+  # Cost optimization dashboards
+  - name: 'cost-optimization'
+    orgId: 1
+    folder: 'Cost Optimization'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/cost

@@ -1,0 +1,365 @@
+{
+  "type": "record",
+  "name": "AirtableBaseConnectedEvent",
+  "namespace": "io.pyairtable.events.airtable",
+  "doc": "Event emitted when an Airtable base is connected to PyAirtable",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "doc": "Unique identifier for this event instance"
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "airtable.base.connected",
+      "doc": "Type of the event"
+    },
+    {
+      "name": "aggregate_id",
+      "type": "string",
+      "doc": "Airtable connection ID"
+    },
+    {
+      "name": "aggregate_type",
+      "type": "string",
+      "default": "AirtableConnection",
+      "doc": "Type of the aggregate"
+    },
+    {
+      "name": "version",
+      "type": "long",
+      "doc": "Version of the connection aggregate"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "logicalType": "timestamp-millis",
+      "doc": "When the base was connected"
+    },
+    {
+      "name": "tenant_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Tenant identifier"
+    },
+    {
+      "name": "correlation_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Correlation identifier"
+    },
+    {
+      "name": "causation_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Causation identifier"
+    },
+    {
+      "name": "base_data",
+      "type": {
+        "type": "record",
+        "name": "AirtableBaseData",
+        "fields": [
+          {
+            "name": "base_id",
+            "type": "string",
+            "doc": "Airtable base identifier"
+          },
+          {
+            "name": "base_name",
+            "type": "string",
+            "doc": "Name of the Airtable base"
+          },
+          {
+            "name": "user_id",
+            "type": "string",
+            "doc": "ID of the user who connected the base"
+          },
+          {
+            "name": "workspace_id",
+            "type": ["null", "string"],
+            "default": null,
+            "doc": "PyAirtable workspace ID"
+          },
+          {
+            "name": "permission_level",
+            "type": "string",
+            "default": "read",
+            "doc": "Permission level (read, write, admin)"
+          },
+          {
+            "name": "tables_discovered",
+            "type": "int",
+            "default": 0,
+            "doc": "Number of tables discovered in the base"
+          }
+        ]
+      },
+      "doc": "Airtable base connection data"
+    },
+    {
+      "name": "metadata",
+      "type": {
+        "type": "map",
+        "values": "string"
+      },
+      "default": {},
+      "doc": "Additional metadata"
+    }
+  ]
+}
+
+{
+  "type": "record",
+  "name": "AirtableRecordSyncedEvent",
+  "namespace": "io.pyairtable.events.airtable",
+  "doc": "Event emitted when Airtable records are synchronized",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "doc": "Unique identifier for this event instance"
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "airtable.records.synced",
+      "doc": "Type of the event"
+    },
+    {
+      "name": "aggregate_id",
+      "type": "string",
+      "doc": "Sync operation ID"
+    },
+    {
+      "name": "aggregate_type",
+      "type": "string",
+      "default": "AirtableSync",
+      "doc": "Type of the aggregate"
+    },
+    {
+      "name": "version",
+      "type": "long",
+      "doc": "Version of the sync aggregate"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "logicalType": "timestamp-millis",
+      "doc": "When the sync completed"
+    },
+    {
+      "name": "tenant_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Tenant identifier"
+    },
+    {
+      "name": "correlation_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Correlation identifier"
+    },
+    {
+      "name": "causation_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Causation identifier"
+    },
+    {
+      "name": "sync_data",
+      "type": {
+        "type": "record",
+        "name": "SyncData",
+        "fields": [
+          {
+            "name": "base_id",
+            "type": "string",
+            "doc": "Airtable base identifier"
+          },
+          {
+            "name": "table_id",
+            "type": "string",
+            "doc": "Airtable table identifier"
+          },
+          {
+            "name": "table_name",
+            "type": "string",
+            "doc": "Name of the Airtable table"
+          },
+          {
+            "name": "sync_type",
+            "type": "string",
+            "doc": "Type of sync (full, incremental, delta)"
+          },
+          {
+            "name": "records_processed",
+            "type": "int",
+            "doc": "Number of records processed"
+          },
+          {
+            "name": "records_created",
+            "type": "int",
+            "default": 0,
+            "doc": "Number of records created"
+          },
+          {
+            "name": "records_updated",
+            "type": "int",
+            "default": 0,
+            "doc": "Number of records updated"
+          },
+          {
+            "name": "records_deleted",
+            "type": "int",
+            "default": 0,
+            "doc": "Number of records deleted"
+          },
+          {
+            "name": "sync_duration_ms",
+            "type": "long",
+            "doc": "Duration of sync operation in milliseconds"
+          },
+          {
+            "name": "last_sync_timestamp",
+            "type": ["null", "long"],
+            "default": null,
+            "logicalType": "timestamp-millis",
+            "doc": "Timestamp of previous sync"
+          }
+        ]
+      },
+      "doc": "Sync operation results"
+    },
+    {
+      "name": "metadata",
+      "type": {
+        "type": "map",
+        "values": "string"
+      },
+      "default": {},
+      "doc": "Additional metadata"
+    }
+  ]
+}
+
+{
+  "type": "record",
+  "name": "AirtableWebhookReceivedEvent",
+  "namespace": "io.pyairtable.events.airtable",
+  "doc": "Event emitted when an Airtable webhook is received",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "doc": "Unique identifier for this event instance"
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "airtable.webhook.received",
+      "doc": "Type of the event"
+    },
+    {
+      "name": "aggregate_id",
+      "type": "string",
+      "doc": "Webhook event ID"
+    },
+    {
+      "name": "aggregate_type",
+      "type": "string",
+      "default": "AirtableWebhook",
+      "doc": "Type of the aggregate"
+    },
+    {
+      "name": "version",
+      "type": "long",
+      "doc": "Version of the webhook aggregate"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "logicalType": "timestamp-millis",
+      "doc": "When the webhook was received"
+    },
+    {
+      "name": "tenant_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Tenant identifier"
+    },
+    {
+      "name": "correlation_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Correlation identifier"
+    },
+    {
+      "name": "causation_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Causation identifier"
+    },
+    {
+      "name": "webhook_data",
+      "type": {
+        "type": "record",
+        "name": "WebhookData",
+        "fields": [
+          {
+            "name": "webhook_id",
+            "type": "string",
+            "doc": "Airtable webhook identifier"
+          },
+          {
+            "name": "base_id",
+            "type": "string",
+            "doc": "Airtable base identifier"
+          },
+          {
+            "name": "table_id",
+            "type": ["null", "string"],
+            "default": null,
+            "doc": "Airtable table identifier (if table-specific)"
+          },
+          {
+            "name": "action_type",
+            "type": "string",
+            "doc": "Type of action (create, update, delete)"
+          },
+          {
+            "name": "record_id",
+            "type": ["null", "string"],
+            "default": null,
+            "doc": "Affected record ID"
+          },
+          {
+            "name": "changed_fields",
+            "type": {
+              "type": "array",
+              "items": "string"
+            },
+            "default": [],
+            "doc": "List of fields that changed"
+          },
+          {
+            "name": "webhook_payload",
+            "type": "string",
+            "doc": "Raw webhook payload (JSON string)"
+          }
+        ]
+      },
+      "doc": "Webhook event data"
+    },
+    {
+      "name": "metadata",
+      "type": {
+        "type": "map",
+        "values": "string"
+      },
+      "default": {},
+      "doc": "Additional metadata"
+    }
+  ]
+}

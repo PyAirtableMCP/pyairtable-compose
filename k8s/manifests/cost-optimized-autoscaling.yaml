@@ -1,0 +1,762 @@
+# Cost-Optimized Autoscaling for PyAirtable
+# Advanced scheduling, spot instances, and cost-aware scaling policies
+
+---
+# Namespace for cost optimization components
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cost-optimization
+  labels:
+    name: cost-optimization
+
+---
+# ConfigMap for cost optimization policies
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cost-optimization-config
+  namespace: cost-optimization
+data:
+  config.yaml: |
+    cost_optimization:
+      enabled: true
+      max_hourly_cost: 50.0
+      target_cost_savings: 0.3  # 30% savings target
+      
+      # Time-based scaling policies
+      scheduling:
+        business_hours:
+          start: "08:00"
+          end: "18:00"
+          timezone: "UTC"
+          weekdays_only: true
+        
+        scaling_schedules:
+          development:
+            weekday_morning:
+              time: "08:00"
+              min_replicas: 2
+              max_replicas: 10
+            weekday_evening:
+              time: "18:00"
+              min_replicas: 1
+              max_replicas: 5
+            weekend:
+              time: "18:00"
+              min_replicas: 0
+              max_replicas: 2
+          
+          production:
+            peak_hours:
+              time: "08:00"
+              min_replicas: 3
+              max_replicas: 20
+            off_peak:
+              time: "20:00"
+              min_replicas: 2
+              max_replicas: 10
+            night_hours:
+              time: "23:00"
+              min_replicas: 1
+              max_replicas: 5
+      
+      # Spot instance preferences
+      spot_instances:
+        enabled: true
+        max_spot_percentage: 0.7  # 70% of instances can be spot
+        interruption_handling: true
+        diversification_strategy: "balanced"
+        fallback_to_on_demand: true
+        
+        workload_preferences:
+          batch_jobs: 0.9       # 90% spot for batch processing
+          analytics: 0.8        # 80% spot for analytics
+          file_processing: 0.9  # 90% spot for file processing
+          api_services: 0.3     # 30% spot for API services
+          databases: 0.0        # No spot for databases
+      
+      # Cost thresholds and actions
+      cost_controls:
+        daily_budget: 500.0
+        weekly_budget: 3000.0
+        monthly_budget: 12000.0
+        
+        alert_thresholds:
+          warning: 0.8   # 80% of budget
+          critical: 0.95 # 95% of budget
+        
+        emergency_actions:
+          scale_down_factor: 0.5
+          disable_non_critical: true
+          notify_stakeholders: true
+
+---
+# ServiceAccount for cost optimization controller
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cost-optimizer
+  namespace: cost-optimization
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/pyairtable-cost-optimizer-role
+
+---
+# ClusterRole for cost optimization operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cost-optimizer
+rules:
+- apiGroups: [""]
+  resources: ["pods", "nodes", "services"]
+  verbs: ["get", "list", "watch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch", "patch", "update"]
+- apiGroups: ["autoscaling"]
+  resources: ["horizontalpodautoscalers"]
+  verbs: ["get", "list", "watch", "patch", "update"]
+- apiGroups: ["keda.sh"]
+  resources: ["scaledobjects", "scaledjobs"]
+  verbs: ["get", "list", "watch", "patch", "update"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "delete"]
+- apiGroups: ["policy"]
+  resources: ["poddisruptionbudgets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+---
+# ClusterRoleBinding for cost optimizer
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cost-optimizer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cost-optimizer
+subjects:
+- kind: ServiceAccount
+  name: cost-optimizer
+  namespace: cost-optimization
+
+---
+# Cost Optimization Controller Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cost-optimization-controller
+  namespace: cost-optimization
+  labels:
+    app: cost-optimization-controller
+    app.kubernetes.io/name: cost-optimization-controller
+    app.kubernetes.io/component: cost-controller
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cost-optimization-controller
+  template:
+    metadata:
+      labels:
+        app: cost-optimization-controller
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: cost-optimizer
+      containers:
+      - name: cost-controller
+        image: pyairtable/cost-optimizer:latest
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: PROMETHEUS_URL
+          value: "http://prometheus.pyairtable-monitoring.svc.cluster.local:9090"
+        - name: AWS_REGION
+          value: "us-east-1"
+        - name: CLUSTER_NAME
+          value: "pyairtable-cluster"
+        - name: COST_EXPLORER_ENABLED
+          value: "true"
+        - name: OPTIMIZATION_INTERVAL_MINUTES
+          value: "5"
+        - name: LOG_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: cost-optimization-config
+
+---
+# Cost Optimization Controller Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: cost-optimization-controller
+  namespace: cost-optimization
+  labels:
+    app: cost-optimization-controller
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+    protocol: TCP
+  selector:
+    app: cost-optimization-controller
+
+---
+# Scheduled HPA for Development Environment - Business Hours Scaling
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: business-hours-scale-up
+  namespace: pyairtable
+spec:
+  schedule: "0 8 * * 1-5"  # 8 AM weekdays
+  timeZone: "UTC"
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: scheduled-scaler
+        spec:
+          serviceAccountName: cost-optimizer
+          restartPolicy: OnFailure
+          containers:
+          - name: scaler
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/bash
+            - -c
+            - |
+              echo "Scaling up for business hours..."
+              
+              # Scale up API Gateway
+              kubectl patch hpa api-gateway-hpa -n pyairtable --type='merge' -p='{"spec":{"minReplicas":3,"maxReplicas":20}}'
+              
+              # Scale up Platform Services
+              kubectl patch hpa platform-services-hpa -n pyairtable --type='merge' -p='{"spec":{"minReplicas":2,"maxReplicas":15}}'
+              
+              # Scale up File Service
+              kubectl patch scaledobject file-service-processing-scaler -n pyairtable --type='merge' -p='{"spec":{"minReplicaCount":1,"maxReplicaCount":12}}'
+              
+              # Scale up Analytics Service
+              kubectl patch scaledobject analytics-service-batch-scaler -n pyairtable --type='merge' -p='{"spec":{"minReplicaCount":2,"maxReplicaCount":10}}'
+              
+              echo "Business hours scaling completed"
+
+---
+# Scheduled HPA for Development Environment - After Hours Scaling
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: after-hours-scale-down
+  namespace: pyairtable
+spec:
+  schedule: "0 18 * * 1-5"  # 6 PM weekdays
+  timeZone: "UTC"
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: scheduled-scaler
+        spec:
+          serviceAccountName: cost-optimizer
+          restartPolicy: OnFailure
+          containers:
+          - name: scaler
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/bash
+            - -c
+            - |
+              echo "Scaling down for after hours..."
+              
+              # Scale down API Gateway
+              kubectl patch hpa api-gateway-hpa -n pyairtable --type='merge' -p='{"spec":{"minReplicas":1,"maxReplicas":8}}'
+              
+              # Scale down Platform Services
+              kubectl patch hpa platform-services-hpa -n pyairtable --type='merge' -p='{"spec":{"minReplicas":1,"maxReplicas":6}}'
+              
+              # Scale down File Service to zero (if no work)
+              kubectl patch scaledobject file-service-processing-scaler -n pyairtable --type='merge' -p='{"spec":{"minReplicaCount":0,"maxReplicaCount":6}}'
+              
+              # Scale down Analytics Service
+              kubectl patch scaledobject analytics-service-batch-scaler -n pyairtable --type='merge' -p='{"spec":{"minReplicaCount":1,"maxReplicaCount":5}}'
+              
+              echo "After hours scaling completed"
+
+---
+# Weekend Scale Down for Development Environment
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: weekend-scale-down
+  namespace: pyairtable
+spec:
+  schedule: "0 20 * * 5"  # 8 PM Friday
+  timeZone: "UTC"
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: scheduled-scaler
+        spec:
+          serviceAccountName: cost-optimizer
+          restartPolicy: OnFailure
+          containers:
+          - name: scaler
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/bash
+            - -c
+            - |
+              echo "Weekend scale down starting..."
+              
+              # Check if this is production environment
+              ENVIRONMENT=$(kubectl get configmap cluster-info -n kube-system -o jsonpath='{.data.environment}' || echo "dev")
+              
+              if [ "$ENVIRONMENT" != "prod" ]; then
+                echo "Non-production environment detected. Performing aggressive weekend scaling."
+                
+                # Scale down to minimal levels
+                kubectl patch hpa api-gateway-hpa -n pyairtable --type='merge' -p='{"spec":{"minReplicas":1,"maxReplicas":4}}'
+                kubectl patch hpa platform-services-hpa -n pyairtable --type='merge' -p='{"spec":{"minReplicas":1,"maxReplicas":3}}'
+                
+                # Scale most services to zero
+                kubectl patch scaledobject file-service-processing-scaler -n pyairtable --type='merge' -p='{"spec":{"minReplicaCount":0,"maxReplicaCount":2}}'
+                kubectl patch scaledobject analytics-service-batch-scaler -n pyairtable --type='merge' -p='{"spec":{"minReplicaCount":0,"maxReplicaCount":2}}'
+                kubectl patch scaledobject automation-services-celery-scaler -n pyairtable --type='merge' -p='{"spec":{"minReplicaCount":0,"maxReplicaCount":3}}'
+                
+                echo "Weekend scaling completed for non-production environment"
+              else
+                echo "Production environment - applying conservative weekend scaling"
+                kubectl patch hpa api-gateway-hpa -n pyairtable --type='merge' -p='{"spec":{"minReplicas":2,"maxReplicas":10}}'
+                kubectl patch hpa platform-services-hpa -n pyairtable --type='merge' -p='{"spec":{"minReplicas":2,"maxReplicas":8}}'
+              fi
+
+---
+# Monday Morning Scale Up for Development Environment
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: monday-morning-scale-up
+  namespace: pyairtable
+spec:
+  schedule: "0 7 * * 1"  # 7 AM Monday
+  timeZone: "UTC"
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: scheduled-scaler
+        spec:
+          serviceAccountName: cost-optimizer
+          restartPolicy: OnFailure
+          containers:
+          - name: scaler
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/bash
+            - -c
+            - |
+              echo "Monday morning scale up starting..."
+              
+              # Restore business hours scaling
+              kubectl patch hpa api-gateway-hpa -n pyairtable --type='merge' -p='{"spec":{"minReplicas":3,"maxReplicas":20}}'
+              kubectl patch hpa platform-services-hpa -n pyairtable --type='merge' -p='{"spec":{"minReplicas":2,"maxReplicas":15}}'
+              kubectl patch scaledobject file-service-processing-scaler -n pyairtable --type='merge' -p='{"spec":{"minReplicaCount":1,"maxReplicaCount":12}}'
+              kubectl patch scaledobject analytics-service-batch-scaler -n pyairtable --type='merge' -p='{"spec":{"minReplicaCount":2,"maxReplicaCount":10}}'
+              kubectl patch scaledobject automation-services-celery-scaler -n pyairtable --type='merge' -p='{"spec":{"minReplicaCount":1,"maxReplicaCount":20}}'
+              
+              echo "Monday morning scale up completed"
+
+---
+# Spot Instance Tolerations and Node Affinity for Cost Optimization
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: batch-processing-spot
+  namespace: pyairtable
+  labels:
+    app: batch-processing
+    cost-optimization: spot-preferred
+spec:
+  replicas: 0  # Will be scaled by KEDA
+  selector:
+    matchLabels:
+      app: batch-processing
+  template:
+    metadata:
+      labels:
+        app: batch-processing
+        cost-optimization: spot-preferred
+    spec:
+      # Prefer spot instances but tolerate interruptions
+      tolerations:
+      - key: "spot-instance"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      - key: "kubernetes.io/arch"
+        operator: "Equal"
+        value: "amd64"
+        effect: "NoSchedule"
+      
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: "node.kubernetes.io/instance-lifecycle"
+                operator: In
+                values: ["spot"]
+          - weight: 50
+            preference:
+              matchExpressions:
+              - key: "node-type"
+                operator: In
+                values: ["cost-optimized"]
+        
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values: ["batch-processing"]
+              topologyKey: kubernetes.io/hostname
+      
+      containers:
+      - name: batch-processor
+        image: pyairtable/batch-processor:latest
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        env:
+        - name: SPOT_INSTANCE_AWARE
+          value: "true"
+        - name: GRACEFUL_SHUTDOWN_TIMEOUT
+          value: "120s"
+
+---
+# Priority Classes for Cost-Aware Scheduling
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: cost-optimized-critical
+value: 1000
+globalDefault: false
+description: "Critical services that should prefer cost-optimized nodes"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: cost-optimized-normal
+value: 500
+globalDefault: false
+description: "Normal services that can use spot instances"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: cost-optimized-batch
+value: 100
+globalDefault: false
+description: "Batch jobs that should strongly prefer spot instances"
+
+---
+# Vertical Pod Autoscaler for Cost Optimization
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: api-gateway-cost-vpa
+  namespace: pyairtable
+  labels:
+    app: api-gateway
+    optimization: cost-aware
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: api-gateway
+      maxAllowed:
+        cpu: 1000m
+        memory: 2Gi
+      minAllowed:
+        cpu: 50m
+        memory: 64Mi
+      mode: Auto
+      controlledResources: ["cpu", "memory"]
+      # Cost optimization: prefer smaller resource requests
+    - containerName: istio-proxy
+      maxAllowed:
+        cpu: 200m
+        memory: 256Mi
+      minAllowed:
+        cpu: 10m
+        memory: 32Mi
+      mode: Auto
+
+---
+# Cost Anomaly Detection CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cost-anomaly-detector
+  namespace: cost-optimization
+spec:
+  schedule: "*/30 * * * *"  # Every 30 minutes
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: cost-anomaly-detector
+        spec:
+          serviceAccountName: cost-optimizer
+          restartPolicy: OnFailure
+          containers:
+          - name: anomaly-detector
+            image: pyairtable/cost-analyzer:latest
+            env:
+            - name: AWS_REGION
+              value: "us-east-1"
+            - name: COST_THRESHOLD_PERCENTAGE
+              value: "120"  # 20% above normal
+            - name: SNS_TOPIC_ARN
+              value: "arn:aws:sns:us-east-1:ACCOUNT_ID:pyairtable-cost-alerts"
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+            command:
+            - python3
+            - -c
+            - |
+              import boto3
+              import json
+              import os
+              from datetime import datetime, timedelta
+              
+              def detect_cost_anomalies():
+                  # Initialize AWS clients
+                  ce_client = boto3.client('ce', region_name=os.environ['AWS_REGION'])
+                  sns_client = boto3.client('sns', region_name=os.environ['AWS_REGION'])
+                  
+                  # Get cost data for the last 7 days
+                  end_date = datetime.now().strftime('%Y-%m-%d')
+                  start_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+                  
+                  try:
+                      response = ce_client.get_cost_and_usage(
+                          TimePeriod={
+                              'Start': start_date,
+                              'End': end_date
+                          },
+                          Granularity='DAILY',
+                          Metrics=['BlendedCost'],
+                          GroupBy=[
+                              {
+                                  'Type': 'DIMENSION',
+                                  'Key': 'SERVICE'
+                              }
+                          ],
+                          Filter={
+                              'Dimensions': {
+                                  'Key': 'SERVICE',
+                                  'Values': ['Amazon Elastic Kubernetes Service', 'Amazon Elastic Compute Cloud - Compute']
+                              }
+                          }
+                      )
+                      
+                      # Analyze cost trends
+                      daily_costs = []
+                      for result_by_time in response['ResultsByTime']:
+                          daily_cost = 0
+                          for group in result_by_time['Groups']:
+                              daily_cost += float(group['Metrics']['BlendedCost']['Amount'])
+                          daily_costs.append(daily_cost)
+                      
+                      if len(daily_costs) >= 3:
+                          avg_cost = sum(daily_costs[:-1]) / len(daily_costs[:-1])
+                          current_cost = daily_costs[-1]
+                          
+                          threshold = float(os.environ['COST_THRESHOLD_PERCENTAGE']) / 100
+                          
+                          if current_cost > avg_cost * threshold:
+                              # Cost anomaly detected
+                              message = f"""
+                              Cost Anomaly Detected for PyAirtable Infrastructure
+                              
+                              Current daily cost: ${current_cost:.2f}
+                              Average daily cost: ${avg_cost:.2f}
+                              Percentage increase: {((current_cost / avg_cost) - 1) * 100:.1f}%
+                              
+                              Recommended Actions:
+                              1. Review scaling policies
+                              2. Check for runaway processes
+                              3. Verify spot instance utilization
+                              4. Review unused resources
+                              
+                              Time: {datetime.now().isoformat()}
+                              """
+                              
+                              sns_client.publish(
+                                  TopicArn=os.environ['SNS_TOPIC_ARN'],
+                                  Message=message,
+                                  Subject='PyAirtable Cost Anomaly Alert'
+                              )
+                              
+                              print(f"Cost anomaly detected and notification sent. Current: ${current_cost:.2f}, Average: ${avg_cost:.2f}")
+                          else:
+                              print(f"Cost within normal range. Current: ${current_cost:.2f}, Average: ${avg_cost:.2f}")
+                      else:
+                          print("Insufficient cost data for anomaly detection")
+                          
+                  except Exception as e:
+                      error_message = f"Error in cost anomaly detection: {str(e)}"
+                      print(error_message)
+                      try:
+                          sns_client.publish(
+                              TopicArn=os.environ['SNS_TOPIC_ARN'],
+                              Message=error_message,
+                              Subject='PyAirtable Cost Monitoring Error'
+                          )
+                      except:
+                          pass
+              
+              if __name__ == "__main__":
+                  detect_cost_anomalies()
+
+---
+# ServiceMonitor for Cost Optimization metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cost-optimization-metrics
+  namespace: pyairtable-monitoring
+  labels:
+    app: cost-optimization-controller
+spec:
+  selector:
+    matchLabels:
+      app: cost-optimization-controller
+  namespaceSelector:
+    matchNames:
+    - cost-optimization
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+
+---
+# Prometheus Rules for Cost Optimization
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cost-optimization-rules
+  namespace: pyairtable-monitoring
+  labels:
+    app: pyairtable
+    component: cost-optimization
+spec:
+  groups:
+  - name: cost.optimization.rules
+    rules:
+    # Calculate potential cost savings from spot instances
+    - record: cost_optimization:spot_savings_potential
+      expr: |
+        (
+          count(kube_node_info{node_type="on-demand"}) * 0.10 -
+          count(kube_node_info{node_type="spot"}) * 0.03
+        ) * 24  # Estimated daily savings
+    
+    # Track scaling efficiency
+    - record: cost_optimization:scaling_efficiency
+      expr: |
+        sum(kube_deployment_status_replicas) /
+        sum(kube_deployment_spec_replicas)
+    
+    # Monitor resource waste
+    - record: cost_optimization:resource_waste_cpu
+      expr: |
+        1 - (
+          sum(rate(container_cpu_usage_seconds_total[5m])) /
+          sum(kube_pod_container_resource_requests{resource="cpu"})
+        )
+    
+    - record: cost_optimization:resource_waste_memory
+      expr: |
+        1 - (
+          sum(container_memory_usage_bytes) /
+          sum(kube_pod_container_resource_requests{resource="memory"})
+        )
+    
+    # Cost per service
+    - record: cost_optimization:cost_per_service_hourly
+      expr: |
+        (
+          sum(kube_pod_container_resource_requests{resource="cpu"}) by (app) * 0.048 +
+          sum(kube_pod_container_resource_requests{resource="memory"}) by (app) / (1024*1024*1024) * 0.006
+        )
+    
+    # Weekend vs weekday cost difference
+    - record: cost_optimization:weekend_savings
+      expr: |
+        (
+          cost_optimization:cost_per_service_hourly offset 1w -
+          cost_optimization:cost_per_service_hourly
+        ) * 48  # Weekend hours

@@ -1,0 +1,549 @@
+# Comprehensive Event-Driven Autoscaling for PyAirtable
+# KEDA-based scaling for all service types with advanced triggers and cost optimization
+
+---
+# Install KEDA operator
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: keda
+  labels:
+    name: keda
+
+---
+# KEDA ScaledObject for API Gateway - HTTP Request Based Scaling
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: api-gateway-http-scaler
+  namespace: pyairtable
+  labels:
+    app: api-gateway
+    scaling-type: http-requests
+spec:
+  scaleTargetRef:
+    name: api-gateway
+  pollingInterval: 15
+  cooldownPeriod: 180
+  minReplicaCount: 2
+  maxReplicaCount: 25
+  triggers:
+  # Scale based on HTTP request rate from Prometheus
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.pyairtable-monitoring.svc.cluster.local:9090
+      metricName: http_requests_per_second
+      threshold: "100"
+      query: sum(rate(http_requests_total{service="api-gateway"}[2m]))
+  # Scale based on response time (P95)
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.pyairtable-monitoring.svc.cluster.local:9090
+      metricName: http_request_duration_p95
+      threshold: "0.5"
+      query: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="api-gateway"}[5m]))
+  # Scale based on concurrent connections
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.pyairtable-monitoring.svc.cluster.local:9090
+      metricName: concurrent_connections
+      threshold: "200"
+      query: sum(http_active_connections{service="api-gateway"})
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 4
+        periodSeconds: 60
+
+---
+# KEDA ScaledObject for SAGA Orchestrator - Event Processing
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: saga-orchestrator-event-scaler
+  namespace: pyairtable
+  labels:
+    app: saga-orchestrator
+    scaling-type: event-driven
+spec:
+  scaleTargetRef:
+    name: saga-orchestrator
+  pollingInterval: 10
+  cooldownPeriod: 300
+  minReplicaCount: 1
+  maxReplicaCount: 15
+  triggers:
+  # Scale based on Kafka consumer lag for SAGA events
+  - type: kafka
+    metadata:
+      bootstrapServers: msk-cluster.kafka.amazonaws.com:9092
+      consumerGroup: saga-orchestrator
+      topic: pyairtable.saga.events
+      lagThreshold: "50"
+      sasl: aws_msk_iam
+      tls: enable
+  # Scale based on pending SAGA transactions in Redis
+  - type: redis
+    metadata:
+      address: redis.pyairtable.svc.cluster.local:6379
+      listName: saga_pending_transactions
+      listLength: "10"
+      enableTLS: "false"
+  # Scale based on workflow complexity metrics
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.pyairtable-monitoring.svc.cluster.local:9090
+      metricName: saga_workflow_complexity
+      threshold: "5"
+      query: sum(saga_active_workflows_by_steps{steps="gt_5"})
+
+---
+# KEDA ScaledObject for File Processing Service
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: file-service-processing-scaler
+  namespace: pyairtable
+  labels:
+    app: file-service
+    scaling-type: queue-based
+spec:
+  scaleTargetRef:
+    name: file-service
+  pollingInterval: 20
+  cooldownPeriod: 600
+  minReplicaCount: 0  # Can scale to zero when no files to process
+  maxReplicaCount: 12
+  triggers:
+  # Scale based on file upload queue in Redis
+  - type: redis
+    metadata:
+      address: redis.pyairtable.svc.cluster.local:6379
+      listName: file_upload_queue
+      listLength: "5"
+      enableTLS: "false"
+  # Scale based on file processing queue
+  - type: redis
+    metadata:
+      address: redis.pyairtable.svc.cluster.local:6379
+      listName: file_processing_queue
+      listLength: "3"
+      enableTLS: "false"
+  # Scale based on S3 events from SQS
+  - type: aws-sqs-queue
+    metadata:
+      queueURL: https://sqs.us-east-1.amazonaws.com/ACCOUNT_ID/pyairtable-file-events
+      queueLength: "10"
+      awsRegion: us-east-1
+      identityOwner: operator
+
+---
+# KEDA ScaledObject for AI/LLM Services
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: llm-orchestrator-ai-scaler
+  namespace: pyairtable
+  labels:
+    app: llm-orchestrator
+    scaling-type: ai-workload
+spec:
+  scaleTargetRef:
+    name: llm-orchestrator
+  pollingInterval: 30
+  cooldownPeriod: 900  # Longer cooldown for AI services due to cold start
+  minReplicaCount: 1
+  maxReplicaCount: 8
+  triggers:
+  # Scale based on AI request queue
+  - type: redis
+    metadata:
+      address: redis.pyairtable.svc.cluster.local:6379
+      listName: ai_request_queue
+      listLength: "3"
+      enableTLS: "false"
+  # Scale based on GPU utilization
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.pyairtable-monitoring.svc.cluster.local:9090
+      metricName: gpu_utilization
+      threshold: "70"
+      query: avg(gpu_utilization_percent{service="llm-orchestrator"})
+  # Scale based on model inference time
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.pyairtable-monitoring.svc.cluster.local:9090
+      metricName: model_inference_duration
+      threshold: "10"
+      query: avg(model_inference_duration_seconds{service="llm-orchestrator"})
+
+---
+# KEDA ScaledObject for Analytics Service - Batch Processing
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: analytics-service-batch-scaler
+  namespace: pyairtable
+  labels:
+    app: analytics-service
+    scaling-type: batch-processing
+spec:
+  scaleTargetRef:
+    name: analytics-service
+  pollingInterval: 60
+  cooldownPeriod: 600
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  triggers:
+  # Scale based on analytics job queue
+  - type: redis
+    metadata:
+      address: redis.pyairtable.svc.cluster.local:6379
+      listName: analytics_jobs
+      listLength: "20"
+      enableTLS: "false"
+  # Scale based on Kafka analytics events lag
+  - type: kafka
+    metadata:
+      bootstrapServers: msk-cluster.kafka.amazonaws.com:9092
+      consumerGroup: analytics-processor
+      topic: pyairtable.analytics.events
+      lagThreshold: "100"
+      sasl: aws_msk_iam
+      tls: enable
+  # Scale based on CPU utilization with higher threshold for batch jobs
+  - type: cpu
+    metadata:
+      type: Utilization
+      value: "80"
+
+---
+# KEDA ScaledObject for Notification Service
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: notification-service-queue-scaler
+  namespace: pyairtable
+  labels:
+    app: notification-service
+    scaling-type: notification-queue
+spec:
+  scaleTargetRef:
+    name: notification-service
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 1
+  maxReplicaCount: 8
+  triggers:
+  # Scale based on email notification queue
+  - type: redis
+    metadata:
+      address: redis.pyairtable.svc.cluster.local:6379
+      listName: email_notifications_queue
+      listLength: "50"
+      enableTLS: "false"
+  # Scale based on push notification queue
+  - type: redis
+    metadata:
+      address: redis.pyairtable.svc.cluster.local:6379
+      listName: push_notifications_queue
+      listLength: "100"
+      enableTLS: "false"
+  # Scale based on webhook delivery queue
+  - type: redis
+    metadata:
+      address: redis.pyairtable.svc.cluster.local:6379
+      listName: webhook_delivery_queue
+      listLength: "30"
+      enableTLS: "false"
+
+---
+# KEDA ScaledObject for Webhook Service
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: webhook-service-delivery-scaler
+  namespace: pyairtable
+  labels:
+    app: webhook-service
+    scaling-type: webhook-delivery
+spec:
+  scaleTargetRef:
+    name: webhook-service
+  pollingInterval: 10
+  cooldownPeriod: 180
+  minReplicaCount: 2
+  maxReplicaCount: 12
+  triggers:
+  # Scale based on outbound webhook queue
+  - type: redis
+    metadata:
+      address: redis.pyairtable.svc.cluster.local:6379
+      listName: outbound_webhooks
+      listLength: "20"
+      enableTLS: "false"
+  # Scale based on webhook retry queue
+  - type: redis
+    metadata:
+      address: redis.pyairtable.svc.cluster.local:6379
+      listName: webhook_retries
+      listLength: "10"
+      enableTLS: "false"
+  # Scale based on failed webhook processing rate
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.pyairtable-monitoring.svc.cluster.local:9090
+      metricName: webhook_failure_rate
+      threshold: "0.1"
+      query: rate(webhook_delivery_failures_total{service="webhook-service"}[5m])
+
+---
+# KEDA ScaledObject for Automation Services (Celery-based)
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: automation-services-celery-scaler
+  namespace: pyairtable
+  labels:
+    app: automation-services
+    scaling-type: celery-worker
+spec:
+  scaleTargetRef:
+    name: automation-services
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 0  # Scale to zero during off-hours
+  maxReplicaCount: 20
+  triggers:
+  # Scale based on Celery task queue in Redis
+  - type: redis
+    metadata:
+      address: redis.pyairtable.svc.cluster.local:6379
+      listName: celery
+      listLength: "10"
+      enableTLS: "false"
+  # Scale based on high priority tasks
+  - type: redis
+    metadata:
+      address: redis.pyairtable.svc.cluster.local:6379
+      listName: celery:high_priority
+      listLength: "5"
+      enableTLS: "false"
+  # Scale based on scheduled tasks
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.pyairtable-monitoring.svc.cluster.local:9090
+      metricName: celery_scheduled_tasks
+      threshold: "20"
+      query: sum(celery_tasks_scheduled)
+
+---
+# KEDA ScaledObject for Database Connection Pool Management
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: db-connection-pool-scaler
+  namespace: pyairtable
+  labels:
+    app: postgres-proxy
+    scaling-type: connection-pool
+spec:
+  scaleTargetRef:
+    name: postgres-proxy
+  pollingInterval: 30
+  cooldownPeriod: 600
+  minReplicaCount: 2
+  maxReplicaCount: 8
+  triggers:
+  # Scale based on active database connections
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.pyairtable-monitoring.svc.cluster.local:9090
+      metricName: db_active_connections
+      threshold: "40"
+      query: sum(pg_stat_activity_count{state="active"})
+  # Scale based on database connection pool utilization
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.pyairtable-monitoring.svc.cluster.local:9090
+      metricName: db_pool_utilization
+      threshold: "75"
+      query: avg(pgbouncer_pools_server_active_connections / pgbouncer_pools_server_maxwait_time * 100)
+
+---
+# KEDA TriggerAuthentication for AWS resources
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: aws-sqs-auth
+  namespace: pyairtable
+spec:
+  podIdentity:
+    provider: aws-eks
+
+---
+# KEDA TriggerAuthentication for Kafka
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: kafka-msk-auth
+  namespace: pyairtable
+spec:
+  podIdentity:
+    provider: aws-eks
+  secretTargetRef:
+  - parameter: sasl
+    name: kafka-config
+    key: sasl_mechanism
+  - parameter: username
+    name: kafka-config
+    key: username
+  - parameter: password
+    name: kafka-config
+    key: password
+
+---
+# KEDA TriggerAuthentication for Redis
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: redis-auth
+  namespace: pyairtable
+spec:
+  secretTargetRef:
+  - parameter: password
+    name: redis-secret
+    key: password
+
+---
+# Custom Prometheus Rules for Advanced Scaling Metrics
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pyairtable-scaling-metrics
+  namespace: pyairtable-monitoring
+  labels:
+    app: pyairtable
+    component: autoscaling
+spec:
+  groups:
+  - name: pyairtable.autoscaling.rules
+    rules:
+    # Request rate per service
+    - record: pyairtable:http_requests_per_second
+      expr: sum(rate(http_requests_total[2m])) by (service)
+    
+    # Response time percentiles
+    - record: pyairtable:http_request_duration_p95
+      expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (service, le))
+    
+    # Error rate
+    - record: pyairtable:http_error_rate
+      expr: sum(rate(http_requests_total{status=~"5.."}[5m])) by (service) / sum(rate(http_requests_total[5m])) by (service)
+    
+    # Queue depth metrics
+    - record: pyairtable:queue_depth_total
+      expr: sum(redis_list_length) by (list_name)
+    
+    # Database connection utilization
+    - record: pyairtable:db_connection_utilization
+      expr: sum(pg_stat_activity_count{state="active"}) / sum(pg_settings_max_connections) * 100
+    
+    # Kafka consumer lag
+    - record: pyairtable:kafka_consumer_lag_sum
+      expr: sum(kafka_consumer_lag_sum) by (consumergroup, topic)
+    
+    # Memory pressure
+    - record: pyairtable:memory_pressure
+      expr: (sum(container_memory_usage_bytes) by (pod) / sum(container_spec_memory_limit_bytes) by (pod)) * 100
+    
+    # CPU saturation
+    - record: pyairtable:cpu_saturation
+      expr: sum(rate(container_cpu_usage_seconds_total[5m])) by (pod) / sum(container_spec_cpu_quota / container_spec_cpu_period) by (pod) * 100
+
+---
+# ServiceMonitor for KEDA metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: keda-metrics
+  namespace: pyairtable-monitoring
+  labels:
+    app: keda-operator
+spec:
+  selector:
+    matchLabels:
+      app: keda-operator
+  namespaceSelector:
+    matchNames:
+    - keda
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+
+---
+# ConfigMap for KEDA scaling policies
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keda-scaling-policies
+  namespace: pyairtable
+data:
+  policies.yaml: |
+    scaling_policies:
+      api_gateway:
+        min_replicas: 2
+        max_replicas: 25
+        scale_up_rate: "100%"
+        scale_down_rate: "50%"
+        stabilization_window: 180
+      
+      saga_orchestrator:
+        min_replicas: 1
+        max_replicas: 15
+        scale_up_rate: "200%"
+        scale_down_rate: "25%"
+        stabilization_window: 300
+      
+      file_service:
+        min_replicas: 0
+        max_replicas: 12
+        scale_up_rate: "300%"
+        scale_down_rate: "100%"
+        stabilization_window: 600
+      
+      llm_orchestrator:
+        min_replicas: 1
+        max_replicas: 8
+        scale_up_rate: "100%"
+        scale_down_rate: "50%"
+        stabilization_window: 900
+      
+      analytics_service:
+        min_replicas: 1
+        max_replicas: 10
+        scale_up_rate: "100%"
+        scale_down_rate: "25%"
+        stabilization_window: 600
+      
+    cost_optimization:
+      enable_scale_to_zero: true
+      off_hours_schedule: "0 22 * * MON-FRI"  # 10 PM weekdays
+      on_hours_schedule: "0 8 * * MON-FRI"    # 8 AM weekdays
+      spot_instance_preference: true
+      max_cost_per_hour: 50

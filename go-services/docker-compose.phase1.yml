@@ -123,8 +123,22 @@ services:
       - "${USER_SERVICE_PORT:-8002}:8002"
     environment:
       PORT: 8002
+      # Database connection URL format
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_dev_password}@postgres:5432/${POSTGRES_DB:-pyairtable}?sslmode=disable
+      # Individual database variables (fallback for config)
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev_password}
+      DB_NAME: ${POSTGRES_DB:-pyairtable}
+      DB_SSL_MODE: disable
+      # Redis
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_dev_password}@redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_dev_password}
+      REDIS_DB: 0
+      # Auth
       JWT_SECRET: ${JWT_SECRET}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       CORS_ORIGINS: "${CORS_ORIGINS:-*}"

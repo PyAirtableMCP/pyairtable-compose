@@ -1,0 +1,694 @@
+# Kafka Event Processing and Topic Management for PyAirtable
+# Production-ready event streaming infrastructure
+
+---
+# Namespace for Kafka operations
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kafka-system
+  labels:
+    name: kafka-system
+    istio-injection: enabled
+
+---
+# ServiceAccount for Kafka operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kafka-operator
+  namespace: kafka-system
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/pyairtable-kafka-client-role
+
+---
+# ClusterRole for Kafka operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kafka-operator
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets", "services"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["monitoring.coreos.com"]
+  resources: ["servicemonitors"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+---
+# ClusterRoleBinding for Kafka operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kafka-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kafka-operator
+subjects:
+- kind: ServiceAccount
+  name: kafka-operator
+  namespace: kafka-system
+
+---
+# ConfigMap with Kafka topic definitions
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-topics-config
+  namespace: kafka-system
+data:
+  topics.yaml: |
+    topics:
+      - name: pyairtable.auth.events
+        partitions: 6
+        replication_factor: 3
+        configs:
+          cleanup.policy: delete
+          retention.ms: "604800000"  # 7 days
+          compression.type: snappy
+          min.insync.replicas: "2"
+          
+      - name: pyairtable.airtable.events
+        partitions: 12
+        replication_factor: 3
+        configs:
+          cleanup.policy: delete
+          retention.ms: "1209600000"  # 14 days
+          compression.type: snappy
+          min.insync.replicas: "2"
+          
+      - name: pyairtable.files.events
+        partitions: 8
+        replication_factor: 3
+        configs:
+          cleanup.policy: delete
+          retention.ms: "86400000"  # 1 day
+          compression.type: lz4
+          min.insync.replicas: "2"
+          
+      - name: pyairtable.workflows.events
+        partitions: 10
+        replication_factor: 3
+        configs:
+          cleanup.policy: delete
+          retention.ms: "2592000000"  # 30 days
+          compression.type: snappy
+          min.insync.replicas: "2"
+          
+      - name: pyairtable.ai.events
+        partitions: 4
+        replication_factor: 3
+        configs:
+          cleanup.policy: delete
+          retention.ms: "604800000"  # 7 days
+          compression.type: gzip
+          min.insync.replicas: "2"
+          
+      - name: pyairtable.system.events
+        partitions: 6
+        replication_factor: 3
+        configs:
+          cleanup.policy: delete
+          retention.ms: "7776000000"  # 90 days
+          compression.type: snappy
+          min.insync.replicas: "2"
+          
+      - name: pyairtable.dlq.events
+        partitions: 3
+        replication_factor: 3
+        configs:
+          cleanup.policy: delete
+          retention.ms: "2592000000"  # 30 days
+          compression.type: snappy
+          min.insync.replicas: "2"
+          
+      - name: pyairtable.saga.events
+        partitions: 6
+        replication_factor: 3
+        configs:
+          cleanup.policy: delete
+          retention.ms: "2592000000"  # 30 days
+          compression.type: snappy
+          min.insync.replicas: "2"
+          
+      - name: pyairtable.analytics.events
+        partitions: 8
+        replication_factor: 3
+        configs:
+          cleanup.policy: delete
+          retention.ms: "86400000"  # 1 day
+          compression.type: lz4
+          min.insync.replicas: "2"
+          
+      - name: pyairtable.commands
+        partitions: 12
+        replication_factor: 3
+        configs:
+          cleanup.policy: delete
+          retention.ms: "604800000"  # 7 days
+          compression.type: snappy
+          min.insync.replicas: "2"
+
+---
+# Job for creating Kafka topics
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-topic-creator
+  namespace: kafka-system
+spec:
+  template:
+    metadata:
+      labels:
+        app: kafka-topic-creator
+    spec:
+      serviceAccountName: kafka-operator
+      restartPolicy: OnFailure
+      containers:
+      - name: topic-creator
+        image: confluentinc/cp-kafka:7.5.0
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            secretKeyRef:
+              name: kafka-config
+              key: bootstrap_servers
+        - name: KAFKA_SECURITY_PROTOCOL
+          value: "SASL_SSL"
+        - name: KAFKA_SASL_MECHANISM
+          value: "AWS_MSK_IAM"
+        - name: KAFKA_SASL_JAAS_CONFIG
+          value: "software.amazon.msk.auth.iam.IAMLoginModule required;"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          
+          # Wait for Kafka to be ready
+          echo "Waiting for Kafka cluster to be ready..."
+          while ! kafka-broker-api-versions --bootstrap-server $KAFKA_BOOTSTRAP_SERVERS --command-config /tmp/kafka.properties; do
+            echo "Kafka not ready, waiting..."
+            sleep 10
+          done
+          
+          echo "Kafka cluster is ready. Creating topics..."
+          
+          # Create kafka.properties file
+          cat > /tmp/kafka.properties << EOF
+          security.protocol=SASL_SSL
+          sasl.mechanism=AWS_MSK_IAM
+          sasl.jaas.config=software.amazon.msk.auth.iam.IAMLoginModule required;
+          EOF
+          
+          # Function to create topic if it doesn't exist
+          create_topic() {
+            local topic_name=$1
+            local partitions=$2
+            local replication_factor=$3
+            local configs=$4
+            
+            echo "Creating topic: $topic_name"
+            
+            if kafka-topics --bootstrap-server $KAFKA_BOOTSTRAP_SERVERS \
+                           --command-config /tmp/kafka.properties \
+                           --describe --topic $topic_name >/dev/null 2>&1; then
+              echo "Topic $topic_name already exists"
+            else
+              kafka-topics --bootstrap-server $KAFKA_BOOTSTRAP_SERVERS \
+                          --command-config /tmp/kafka.properties \
+                          --create \
+                          --topic $topic_name \
+                          --partitions $partitions \
+                          --replication-factor $replication_factor \
+                          --config $configs
+              echo "Topic $topic_name created successfully"
+            fi
+          }
+          
+          # Create all topics
+          create_topic "pyairtable.auth.events" 6 3 "cleanup.policy=delete,retention.ms=604800000,compression.type=snappy,min.insync.replicas=2"
+          create_topic "pyairtable.airtable.events" 12 3 "cleanup.policy=delete,retention.ms=1209600000,compression.type=snappy,min.insync.replicas=2"
+          create_topic "pyairtable.files.events" 8 3 "cleanup.policy=delete,retention.ms=86400000,compression.type=lz4,min.insync.replicas=2"
+          create_topic "pyairtable.workflows.events" 10 3 "cleanup.policy=delete,retention.ms=2592000000,compression.type=snappy,min.insync.replicas=2"
+          create_topic "pyairtable.ai.events" 4 3 "cleanup.policy=delete,retention.ms=604800000,compression.type=gzip,min.insync.replicas=2"
+          create_topic "pyairtable.system.events" 6 3 "cleanup.policy=delete,retention.ms=7776000000,compression.type=snappy,min.insync.replicas=2"
+          create_topic "pyairtable.dlq.events" 3 3 "cleanup.policy=delete,retention.ms=2592000000,compression.type=snappy,min.insync.replicas=2"
+          create_topic "pyairtable.saga.events" 6 3 "cleanup.policy=delete,retention.ms=2592000000,compression.type=snappy,min.insync.replicas=2"
+          create_topic "pyairtable.analytics.events" 8 3 "cleanup.policy=delete,retention.ms=86400000,compression.type=lz4,min.insync.replicas=2"
+          create_topic "pyairtable.commands" 12 3 "cleanup.policy=delete,retention.ms=604800000,compression.type=snappy,min.insync.replicas=2"
+          
+          # Kafka Connect internal topics
+          create_topic "pyairtable.connect.configs" 1 3 "cleanup.policy=compact,min.insync.replicas=2"
+          create_topic "pyairtable.connect.offsets" 25 3 "cleanup.policy=compact,min.insync.replicas=2"
+          create_topic "pyairtable.connect.status" 5 3 "cleanup.policy=compact,min.insync.replicas=2"
+          
+          echo "All topics created successfully"
+        volumeMounts:
+        - name: kafka-config
+          mountPath: /etc/kafka-config
+          readOnly: true
+      volumes:
+      - name: kafka-config
+        secret:
+          secretName: kafka-config
+
+---
+# Event Processor Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-processor
+  namespace: pyairtable
+  labels:
+    app: event-processor
+    app.kubernetes.io/name: event-processor
+    app.kubernetes.io/component: event-processing
+    app.kubernetes.io/part-of: pyairtable
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: event-processor
+  template:
+    metadata:
+      labels:
+        app: event-processor
+        app.kubernetes.io/name: event-processor
+        app.kubernetes.io/component: event-processing
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: pyairtable-service-account
+      containers:
+      - name: event-processor
+        image: pyairtable/event-processor:latest
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            secretKeyRef:
+              name: kafka-config
+              key: bootstrap_servers
+        - name: KAFKA_SECURITY_PROTOCOL
+          valueFrom:
+            secretKeyRef:
+              name: kafka-config
+              key: security_protocol
+        - name: KAFKA_SASL_MECHANISM
+          valueFrom:
+            secretKeyRef:
+              name: kafka-config
+              key: sasl_mechanism
+        - name: CONSUMER_GROUP_ID
+          value: "pyairtable-event-processor"
+        - name: POSTGRES_URL
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: url
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: METRICS_PORT
+          value: "9090"
+        - name: AWS_REGION
+          value: "us-east-1"
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 10001
+          capabilities:
+            drop:
+            - ALL
+
+---
+# Event Processor Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: event-processor
+  namespace: pyairtable
+  labels:
+    app: event-processor
+    app.kubernetes.io/name: event-processor
+    app.kubernetes.io/component: event-processing
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: event-processor
+
+---
+# ServiceMonitor for Event Processor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: event-processor
+  namespace: pyairtable
+  labels:
+    app: event-processor
+    app.kubernetes.io/name: event-processor
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: event-processor
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+
+---
+# KEDA ScaledObject for Event Processor
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: event-processor-scaler
+  namespace: pyairtable
+  labels:
+    app: event-processor
+    app.kubernetes.io/component: autoscaler
+spec:
+  scaleTargetRef:
+    name: event-processor
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 2
+  maxReplicaCount: 20
+  triggers:
+  # Scale based on Kafka consumer lag
+  - type: kafka
+    metadata:
+      bootstrapServers: "KAFKA_BOOTSTRAP_SERVERS"
+      consumerGroup: "pyairtable-event-processor"
+      topic: "pyairtable.workflows.events"
+      lagThreshold: "100"
+      # Use SASL_SSL with IAM authentication
+      sasl: "aws_msk_iam"
+      tls: "enable"
+  # Scale based on multiple topics
+  - type: kafka
+    metadata:
+      bootstrapServers: "KAFKA_BOOTSTRAP_SERVERS"
+      consumerGroup: "pyairtable-event-processor"
+      topic: "pyairtable.airtable.events"
+      lagThreshold: "50"
+      sasl: "aws_msk_iam"
+      tls: "enable"
+  # Scale based on CPU utilization
+  - type: cpu
+    metadata:
+      type: Utilization
+      value: "70"
+
+---
+# SAGA Orchestrator Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: saga-orchestrator
+  namespace: pyairtable
+  labels:
+    app: saga-orchestrator
+    app.kubernetes.io/name: saga-orchestrator
+    app.kubernetes.io/component: orchestration
+    app.kubernetes.io/part-of: pyairtable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: saga-orchestrator
+  template:
+    metadata:
+      labels:
+        app: saga-orchestrator
+        app.kubernetes.io/name: saga-orchestrator
+        app.kubernetes.io/component: orchestration
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: pyairtable-service-account
+      containers:
+      - name: saga-orchestrator
+        image: pyairtable/saga-orchestrator:latest
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            secretKeyRef:
+              name: kafka-config
+              key: bootstrap_servers
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: url
+        - name: POSTGRES_URL
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: url
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: AWS_REGION
+          value: "us-east-1"
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 10001
+
+---
+# SAGA Orchestrator Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: saga-orchestrator
+  namespace: pyairtable
+  labels:
+    app: saga-orchestrator
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: saga-orchestrator
+
+---
+# Kafka UI for monitoring and management
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-ui
+  namespace: kafka-system
+  labels:
+    app: kafka-ui
+    app.kubernetes.io/name: kafka-ui
+    app.kubernetes.io/component: management
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka-ui
+  template:
+    metadata:
+      labels:
+        app: kafka-ui
+    spec:
+      serviceAccountName: kafka-operator
+      containers:
+      - name: kafka-ui
+        image: provectuslabs/kafka-ui:latest
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: KAFKA_CLUSTERS_0_NAME
+          value: "pyairtable-kafka"
+        - name: KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS
+          valueFrom:
+            secretKeyRef:
+              name: kafka-config
+              key: bootstrap_servers
+        - name: KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL
+          value: "SASL_SSL"
+        - name: KAFKA_CLUSTERS_0_PROPERTIES_SASL_MECHANISM
+          value: "AWS_MSK_IAM"
+        - name: KAFKA_CLUSTERS_0_PROPERTIES_SASL_JAAS_CONFIG
+          value: "software.amazon.msk.auth.iam.IAMLoginModule required;"
+        - name: SERVER_SERVLET_CONTEXT_PATH
+          value: "/kafka-ui"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /kafka-ui/actuator/health
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /kafka-ui/actuator/health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+---
+# Kafka UI Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-ui
+  namespace: kafka-system
+  labels:
+    app: kafka-ui
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+    protocol: TCP
+  selector:
+    app: kafka-ui
+
+---
+# NetworkPolicy for Kafka system
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-system-network-policy
+  namespace: kafka-system
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from pyairtable namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: pyairtable
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+  # Allow traffic from monitoring namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: pyairtable-monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow HTTPS to AWS services
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow Kafka broker communication
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 9092
+    - protocol: TCP
+      port: 9094
+    - protocol: TCP
+      port: 9096

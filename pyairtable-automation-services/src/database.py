@@ -10,7 +10,7 @@ def get_database_url() -> str:
     """Get database URL from environment"""
     return os.getenv(
         "DATABASE_URL",
-        "postgresql://user:password@localhost:5432/automation_db"
+        "postgresql://user:password@localhost:5432/automation_db?sslmode=require"
     )
 
 # Create engine

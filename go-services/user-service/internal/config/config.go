@@ -57,7 +57,7 @@ func Load() (*Config, error) {
 			User:     getEnv("DB_USER", "postgres"),
 			Password: getEnv("DB_PASSWORD", "postgres"),
 			Name:     getEnv("DB_NAME", "user_service_db"),
-			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
+			SSLMode:  getEnv("DB_SSL_MODE", "require"),
 		},
 		Redis: RedisConfig{
 			Host:     getEnv("REDIS_HOST", "localhost"),

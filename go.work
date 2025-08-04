@@ -7,7 +7,7 @@ use (
 	./go-services/mobile-bff
 	./go-services/notification-service
 	./go-services/permission-service
-	./go-services/tenant-service
+	./go-services/pyairtable-platform
 	./go-services/user-service
 	./go-services/web-bff
 	./go-services/webhook-service

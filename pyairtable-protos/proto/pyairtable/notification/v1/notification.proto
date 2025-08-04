@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+package pyairtable.notification.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+import "pyairtable/common/v1/common.proto";
+
+option go_package = "github.com/pyairtable/pyairtable-protos/generated/go/pyairtable/notification/v1;notificationv1";
+
+// Notification type enum
+enum NotificationType {
+  NOTIFICATION_TYPE_UNSPECIFIED = 0;
+  NOTIFICATION_TYPE_EMAIL = 1;
+  NOTIFICATION_TYPE_SMS = 2;
+  NOTIFICATION_TYPE_PUSH = 3;
+  NOTIFICATION_TYPE_WEBHOOK = 4;
+  NOTIFICATION_TYPE_IN_APP = 5;
+}
+
+// Notification priority enum
+enum NotificationPriority {
+  NOTIFICATION_PRIORITY_UNSPECIFIED = 0;
+  NOTIFICATION_PRIORITY_LOW = 1;
+  NOTIFICATION_PRIORITY_NORMAL = 2;
+  NOTIFICATION_PRIORITY_HIGH = 3;
+  NOTIFICATION_PRIORITY_URGENT = 4;
+}
+
+// Notification status enum
+enum NotificationStatus {
+  NOTIFICATION_STATUS_UNSPECIFIED = 0;
+  NOTIFICATION_STATUS_PENDING = 1;
+  NOTIFICATION_STATUS_SENT = 2;
+  NOTIFICATION_STATUS_DELIVERED = 3;
+  NOTIFICATION_STATUS_FAILED = 4;
+  NOTIFICATION_STATUS_CANCELLED = 5;
+}
+
+// Notification model
+message Notification {
+  pyairtable.common.v1.BaseMetadata metadata = 1;
+  string recipient_id = 2;
+  NotificationType type = 3;
+  NotificationPriority priority = 4;
+  NotificationStatus status = 5;
+  string subject = 6;
+  string content = 7;
+  map<string, string> template_data = 8;
+  optional string template_id = 9;
+  repeated string channels = 10;
+  optional google.protobuf.Timestamp scheduled_at = 11;
+  optional google.protobuf.Timestamp sent_at = 12;
+  optional google.protobuf.Timestamp delivered_at = 13;
+  map<string, string> metadata_fields = 14;
+}
+
+// Send notification request
+message SendNotificationRequest {
+  pyairtable.common.v1.RequestMetadata request_metadata = 1;
+  string recipient_id = 2;
+  NotificationType type = 3;
+  NotificationPriority priority = 4;
+  string subject = 5;
+  string content = 6;
+  map<string, string> template_data = 7;
+  optional string template_id = 8;
+  repeated string channels = 9;
+  optional google.protobuf.Timestamp scheduled_at = 10;
+}
+
+// Send notification response
+message SendNotificationResponse {
+  Notification notification = 1;
+}
+
+// Batch send notifications request
+message BatchSendNotificationsRequest {
+  pyairtable.common.v1.RequestMetadata request_metadata = 1;
+  repeated SendNotificationRequest notifications = 2;
+}
+
+// Batch send notifications response
+message BatchSendNotificationsResponse {
+  repeated Notification notifications = 1;
+  repeated string failed_recipient_ids = 2;
+}
+
+// Notification Service
+service NotificationService {
+  // Send notification
+  rpc SendNotification(SendNotificationRequest) returns (SendNotificationResponse);
+  
+  // Batch send notifications
+  rpc BatchSendNotifications(BatchSendNotificationsRequest) returns (BatchSendNotificationsResponse);
+  
+  // Health check
+  rpc HealthCheck(google.protobuf.Empty) returns (pyairtable.common.v1.HealthCheckResponse);
+}

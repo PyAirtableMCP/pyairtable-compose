@@ -1,0 +1,676 @@
+# PyAirtable Minikube-optimized values
+# Optimized for local development with resource constraints
+# Built for fast iteration and comprehensive testing
+
+# Global configuration for Minikube
+global:
+  namespace: pyairtable
+  imageRegistry: localhost:5000
+  imagePullPolicy: Always  # Always pull for local development
+  storageClassName: standard
+  
+  # Development-specific settings
+  development:
+    enabled: true
+    debugMode: true
+    hotReload: true
+    exposeMetrics: true
+
+# Application configuration
+app:
+  environment: development
+  logLevel: debug
+  
+  # Development features
+  features:
+    enableDebugEndpoints: true
+    enableMetrics: true
+    enableTracing: true
+    enableHealthChecks: true
+
+# Service configurations optimized for Minikube
+services:
+  # API Gateway - Main entry point
+  apiGateway:
+    enabled: true
+    name: api-gateway
+    image: pyairtable-api-gateway
+    tag: latest
+    port: 8000
+    targetPort: 8000
+    replicas: 1
+    
+    # Minikube-optimized resources
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    
+    # Enhanced health checks
+    healthCheck:
+      enabled: true
+      path: /health
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+    
+    # Readiness probe
+    readinessProbe:
+      enabled: true
+      path: /ready
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 3
+      successThreshold: 1
+    
+    # Development environment variables
+    env:
+      - name: DEVELOPMENT_MODE
+        value: "true"
+      - name: DEBUG_LOGGING
+        value: "true"
+      - name: ENABLE_CORS
+        value: "true"
+      - name: CORS_ORIGINS
+        value: "*"
+    
+    # Service configuration
+    service:
+      type: NodePort
+      nodePort: 30800
+      annotations:
+        dev.pyairtable.io/expose: "true"
+
+  # LLM Orchestrator - Gemini integration
+  llmOrchestrator:
+    enabled: true
+    name: llm-orchestrator
+    image: llm-orchestrator-py
+    tag: latest
+    port: 8003
+    targetPort: 8003
+    replicas: 1
+    
+    resources:
+      limits:
+        cpu: 300m
+        memory: 512Mi
+      requests:
+        cpu: 150m
+        memory: 256Mi
+    
+    healthCheck:
+      enabled: true
+      path: /health
+      initialDelaySeconds: 20
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+    
+    readinessProbe:
+      enabled: true
+      path: /ready
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+    
+    env:
+      - name: DEVELOPMENT_MODE
+        value: "true"
+      - name: THINKING_BUDGET
+        value: "2000"
+      - name: LOG_REQUESTS
+        value: "true"
+
+  # MCP Server - Protocol implementation
+  mcpServer:
+    enabled: true
+    name: mcp-server
+    image: mcp-server-py
+    tag: latest
+    port: 8001
+    targetPort: 8001
+    replicas: 1
+    
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    
+    healthCheck:
+      enabled: true
+      path: /health
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+    
+    readinessProbe:
+      enabled: true
+      path: /ready
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 3
+      successThreshold: 1
+
+  # Airtable Gateway - Direct API integration
+  airtableGateway:
+    enabled: true
+    name: airtable-gateway
+    image: airtable-gateway-py
+    tag: latest
+    port: 8002
+    targetPort: 8002
+    replicas: 1
+    
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    
+    healthCheck:
+      enabled: true
+      path: /health
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+    
+    readinessProbe:
+      enabled: true
+      path: /ready
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 3
+      successThreshold: 1
+
+  # Platform Services - Auth & Analytics
+  platformServices:
+    enabled: true
+    name: platform-services
+    image: pyairtable-platform-services
+    tag: latest
+    port: 8007
+    targetPort: 8007
+    replicas: 1
+    
+    resources:
+      limits:
+        cpu: 300m
+        memory: 512Mi
+      requests:
+        cpu: 150m
+        memory: 256Mi
+    
+    healthCheck:
+      enabled: true
+      path: /health
+      initialDelaySeconds: 20
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+    
+    readinessProbe:
+      enabled: true
+      path: /ready
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+
+  # Automation Services - File processing
+  automationServices:
+    enabled: true
+    name: automation-services
+    image: pyairtable-automation-services
+    tag: latest
+    port: 8006
+    targetPort: 8006
+    replicas: 1
+    
+    resources:
+      limits:
+        cpu: 300m
+        memory: 512Mi
+      requests:
+        cpu: 150m
+        memory: 256Mi
+    
+    healthCheck:
+      enabled: true
+      path: /health
+      initialDelaySeconds: 20
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+    
+    readinessProbe:
+      enabled: true
+      path: /ready
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+
+  # SAGA Orchestrator - Transaction coordination
+  sagaOrchestrator:
+    enabled: true
+    name: saga-orchestrator
+    image: pyairtable-saga-orchestrator
+    tag: latest
+    port: 8008
+    targetPort: 8008
+    replicas: 1
+    
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    
+    healthCheck:
+      enabled: true
+      path: /health
+      initialDelaySeconds: 25
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+    
+    readinessProbe:
+      enabled: true
+      path: /ready
+      initialDelaySeconds: 20
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+
+  # Frontend - Next.js web interface
+  frontend:
+    enabled: true
+    name: frontend
+    image: pyairtable-frontend
+    tag: latest
+    port: 3000
+    targetPort: 3000
+    replicas: 1
+    
+    resources:
+      limits:
+        cpu: 300m
+        memory: 512Mi
+      requests:
+        cpu: 150m
+        memory: 256Mi
+    
+    healthCheck:
+      enabled: true
+      path: /api/health
+      initialDelaySeconds: 30
+      periodSeconds: 15
+      timeoutSeconds: 10
+      failureThreshold: 3
+      successThreshold: 1
+    
+    readinessProbe:
+      enabled: true
+      path: /api/ready
+      initialDelaySeconds: 25
+      periodSeconds: 10
+      timeoutSeconds: 8
+      failureThreshold: 3
+      successThreshold: 1
+    
+    # Service configuration for easy access
+    service:
+      type: NodePort
+      nodePort: 30000
+      annotations:
+        dev.pyairtable.io/expose: "true"
+    
+    # Development environment variables
+    env:
+      - name: NODE_ENV
+        value: "development"
+      - name: NEXT_PUBLIC_API_URL
+        value: "http://localhost:30800"
+      - name: NEXT_PUBLIC_ENABLE_DEBUG
+        value: "true"
+
+# Database services optimized for Minikube
+databases:
+  # PostgreSQL with development optimizations
+  postgres:
+    enabled: true
+    name: postgres
+    image: postgres
+    tag: 16-alpine
+    port: 5432
+    replicas: 1
+    
+    # Minikube-optimized resources
+    resources:
+      limits:
+        cpu: 300m
+        memory: 512Mi
+      requests:
+        cpu: 150m
+        memory: 256Mi
+    
+    # Security context
+    securityContext:
+      enabled: true
+      fsGroup: 999
+      runAsUser: 999
+      runAsGroup: 999
+    
+    # PostgreSQL configuration optimized for development
+    config:
+      maxConnections: 100
+      sharedBuffers: "128MB"
+      effectiveCacheSize: "256MB"
+      workMem: "2MB"
+      maintenanceWorkMem: "32MB"
+      checkpointCompletionTarget: 0.7
+      maxWalSize: "512MB"
+      minWalSize: "40MB"
+      walLevel: "replica"
+      logStatement: "'all'"  # Log all statements in development
+      logDuration: "on"
+      logMinDurationStatement: 100  # Log slow queries > 100ms
+      randomPageCost: 1.0
+      effectiveIoConcurrency: 100
+      fsync: "off"  # Faster for development (NOT for production)
+      synchronousCommit: "off"  # Faster for development
+      extraConfig: |
+        log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+        log_checkpoints = on
+        log_connections = on
+        log_disconnections = on
+        log_lock_waits = on
+        log_temp_files = 0
+        log_autovacuum_min_duration = 0
+        shared_preload_libraries = 'pg_stat_statements'
+    
+    # Persistence configuration
+    persistence:
+      enabled: true
+      size: 5Gi  # Smaller for development
+      storageClass: standard
+      accessModes:
+        - ReadWriteOnce
+    
+    # Enhanced health checks
+    healthCheck:
+      enabled: true
+      command: ["pg_isready", "-U", "postgres", "-d", "pyairtable"]
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+    
+    # Backup disabled for development
+    backup:
+      enabled: false
+    
+    # Monitoring enabled
+    metrics:
+      enabled: true
+      image: prometheuscommunity/postgres-exporter
+      tag: v0.15.0
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 50m
+          memory: 64Mi
+    
+    # Migration job
+    migration:
+      enabled: true
+      version: "1.0.0"
+      description: "Initialize development database"
+      createBackup: false
+      ttlSecondsAfterFinished: 600
+      backoffLimit: 2
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+
+  # Redis with development optimizations
+  redis:
+    enabled: true
+    name: redis
+    image: redis
+    tag: 7-alpine
+    port: 6379
+    replicas: 1
+    
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+    
+    # Redis configuration for development
+    config:
+      maxmemory: "64mb"
+      maxmemoryPolicy: "allkeys-lru"
+      save: "60 1000"  # Save every 60 seconds if at least 1000 keys changed
+      appendonly: "yes"
+      logLevel: "verbose"  # More verbose logging in development
+      databases: 16
+    
+    persistence:
+      enabled: true
+      size: 1Gi
+      storageClass: standard
+    
+    # Health checks
+    healthCheck:
+      enabled: true
+      command: ["redis-cli", "ping"]
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+
+# Persistent volumes for development
+persistence:
+  fileUploads:
+    enabled: true
+    size: 2Gi  # Smaller for development
+    storageClass: standard
+
+# Service exposure for Minikube
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"  # No SSL in development
+    dev.pyairtable.io/expose: "true"
+  hosts:
+    - host: pyairtable.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 3000
+        - path: /api
+          pathType: Prefix
+          service: api-gateway
+          port: 8000
+
+# Development secrets (use kubectl create secret for actual values)
+secrets:
+  # Development placeholders - override with actual values
+  apiKey: "dev-api-key-replace-me"
+  geminiApiKey: ""  # Set via kubectl or environment
+  airtableToken: ""  # Set via kubectl or environment
+  airtableBase: ""   # Set via kubectl or environment
+  jwtSecret: "dev-jwt-secret-replace-me-32-chars"
+  nextauthSecret: "dev-nextauth-secret-replace-me-32-chars"
+  redisPassword: "dev-redis-password"
+  
+  # Database credentials
+  postgresDb: pyairtable
+  postgresUser: postgres
+  postgresPassword: "dev-postgres-password"
+  
+  # Development configuration
+  thinkingBudget: "2000"
+  corsOrigins: "*"
+  maxFileSize: "10MB"
+  allowedExtensions: "pdf,doc,docx,txt,csv,xlsx,json,yaml"
+
+# Enhanced health checks for development
+healthChecks:
+  enabled: true
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+  
+  # Development-specific health check features
+  development:
+    verbose: true
+    includeMetrics: true
+    includeDependencies: true
+
+# Horizontal Pod Autoscaler (disabled for development)
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Development-specific monitoring
+monitoring:
+  enabled: true
+  namespace: pyairtable-monitoring
+  
+  # Resource usage monitoring
+  resourceMonitoring:
+    enabled: true
+    interval: 30s
+    alerts:
+      cpuThreshold: 80
+      memoryThreshold: 80
+      diskThreshold: 85
+  
+  # Service monitoring
+  serviceMonitoring:
+    enabled: true
+    healthCheckInterval: 10s
+    responseTimeThreshold: 1000ms
+  
+  # Development metrics
+  developmentMetrics:
+    enabled: true
+    logLevel: debug
+    includeTraces: true
+    includeSpans: true
+
+# Development debugging features
+debugging:
+  enabled: true
+  
+  # Debug endpoints
+  debugEndpoints:
+    enabled: true
+    paths:
+      - /debug/health
+      - /debug/metrics
+      - /debug/config
+      - /debug/dependencies
+  
+  # Remote debugging
+  remoteDebugging:
+    enabled: false  # Enable per service as needed
+    ports:
+      api-gateway: 5005
+      platform-services: 5006
+      automation-services: 5007
+  
+  # Logging configuration
+  logging:
+    level: debug
+    format: json
+    includeStackTraces: true
+    logRequests: true
+    logResponses: true
+
+# Performance profiling for development
+profiling:
+  enabled: false  # Enable when needed
+  tools:
+    - pprof
+    - py-spy
+  ports:
+    api-gateway: 6060
+    platform-services: 6061
+    automation-services: 6062
+
+# Development utilities
+development:
+  # Hot reload configuration
+  hotReload:
+    enabled: true
+    watchPaths:
+      - /app/src
+      - /app/config
+    excludePaths:
+      - /app/node_modules
+      - /app/__pycache__
+  
+  # Development tools
+  tools:
+    enableShell: true
+    enableDebugConsole: true
+    enableMetricsEndpoint: true
+    enableHealthDetailedResponse: true
+  
+  # Testing configuration
+  testing:
+    enabled: true
+    runUnitTests: false  # On demand
+    runIntegrationTests: false  # On demand
+    testDataPersistence: true

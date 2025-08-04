@@ -34,7 +34,7 @@ func Load() *Config {
 		Environment: getEnv("ENVIRONMENT", "development"),
 		
 		// Database
-		DatabaseURL: getEnv("DATABASE_URL", "postgres://postgres:password@localhost:5432/pyairtable_auth"),
+		DatabaseURL: getEnv("DATABASE_URL", "postgres://postgres:password@localhost:5432/pyairtable_auth?sslmode=require"),
 		
 		// Redis
 		RedisURL:      getEnv("REDIS_URL", "redis://localhost:6379"),

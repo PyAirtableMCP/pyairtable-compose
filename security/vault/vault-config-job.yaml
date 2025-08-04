@@ -1,0 +1,291 @@
+# Vault Configuration Job for PyAirtable
+# Configures authentication methods, policies, and secret engines
+# Production-ready setup for 3vantage organization
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-configuration
+  namespace: vault-system
+  labels:
+    app: vault-config
+    security.3vantage.com/type: secrets-management
+spec:
+  template:
+    spec:
+      serviceAccountName: vault
+      restartPolicy: OnFailure
+      containers:
+      - name: vault-config
+        image: hashicorp/vault:1.15.2
+        env:
+        - name: VAULT_ADDR
+          value: "https://vault.vault-system.svc.cluster.local:8200"
+        - name: VAULT_CACERT
+          value: "/etc/certs/ca.crt"
+        - name: VAULT_CLIENT_CERT
+          value: "/etc/certs/tls.crt"
+        - name: VAULT_CLIENT_KEY
+          value: "/etc/certs/tls.key"
+        - name: VAULT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: vault-root-token
+              key: token
+        volumeMounts:
+        - name: vault-certs
+          mountPath: /etc/certs
+          readOnly: true
+        - name: vault-policies
+          mountPath: /vault/policies
+          readOnly: true
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          
+          echo "Configuring Vault for PyAirtable..."
+          
+          # Wait for Vault to be ready and unsealed
+          until vault status | grep -q "Sealed.*false"; do
+            echo "Waiting for Vault to be unsealed..."
+            sleep 10
+          done
+          
+          # Enable audit logging
+          echo "Enabling audit logging..."
+          vault audit enable file file_path=/vault/logs/audit.log || true
+          
+          # Enable secret engines
+          echo "Enabling secret engines..."
+          vault secrets enable -path=pyairtable/data -version=2 kv || true
+          vault secrets enable -path=pyairtable/database database || true
+          vault secrets enable -path=pyairtable/transit transit || true
+          vault secrets enable -path=pyairtable/pki pki || true
+          
+          # Configure PKI for internal certificate management
+          echo "Configuring PKI..."
+          vault secrets tune -max-lease-ttl=87600h pyairtable/pki
+          vault write pyairtable/pki/root/generate/internal \
+            common_name="PyAirtable Internal CA" \
+            ttl=87600h
+          vault write pyairtable/pki/config/urls \
+            issuing_certificates="https://vault.vault-system.svc.cluster.local:8200/v1/pyairtable/pki/ca" \
+            crl_distribution_points="https://vault.vault-system.svc.cluster.local:8200/v1/pyairtable/pki/crl"
+          
+          # Create certificate role
+          vault write pyairtable/pki/roles/pyairtable-services \
+            allowed_domains="pyairtable-system.svc.cluster.local,localhost" \
+            allow_subdomains=true \
+            max_ttl="720h"
+          
+          # Configure Kubernetes authentication
+          echo "Configuring Kubernetes authentication..."
+          vault auth enable kubernetes || true
+          vault write auth/kubernetes/config \
+            token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+            kubernetes_host="https://kubernetes.default.svc:443" \
+            kubernetes_ca_cert="$(cat /var/run/secrets/kubernetes.io/serviceaccount/ca.crt)"
+          
+          # Create policies
+          echo "Creating Vault policies..."
+          for policy_file in /vault/policies/*.hcl; do
+            if [ -f "$policy_file" ]; then
+              policy_name=$(basename "$policy_file" .hcl)
+              echo "Creating policy: $policy_name"
+              vault policy write "$policy_name" "$policy_file"
+            fi
+          done
+          
+          # Create Kubernetes authentication roles
+          echo "Creating authentication roles..."
+          
+          # API Gateway role
+          vault write auth/kubernetes/role/api-gateway \
+            bound_service_account_names=api-gateway \
+            bound_service_account_namespaces=pyairtable-system \
+            policies=api-gateway-policy \
+            ttl=24h
+          
+          # Auth Service role
+          vault write auth/kubernetes/role/auth-service \
+            bound_service_account_names=auth-service \
+            bound_service_account_namespaces=pyairtable-system \
+            policies=auth-service-policy \
+            ttl=24h
+          
+          # Database Service role
+          vault write auth/kubernetes/role/database-service \
+            bound_service_account_names=postgres \
+            bound_service_account_namespaces=pyairtable-system \
+            policies=database-service-policy \
+            ttl=24h
+          
+          # Python Services role
+          vault write auth/kubernetes/role/python-services \
+            bound_service_account_names=python-services \
+            bound_service_account_namespaces=pyairtable-system \
+            policies=python-services-policy \
+            ttl=24h
+          
+          # Go Services role  
+          vault write auth/kubernetes/role/go-services \
+            bound_service_account_names=go-services \
+            bound_service_account_namespaces=pyairtable-system \
+            policies=go-services-policy \
+            ttl=24h
+          
+          # Configure database secrets engine
+          echo "Configuring database secrets engine..."
+          vault write pyairtable/database/config/postgresql \
+            plugin_name=postgresql-database-plugin \
+            connection_url="postgresql://{{username}}:{{password}}@postgres.pyairtable-system.svc.cluster.local:5432/pyairtable?sslmode=require" \
+            allowed_roles="pyairtable-db-role" \
+            username="vault_admin" \
+            password="$(kubectl get secret postgres-credentials -n pyairtable-system -o jsonpath='{.data.password}' | base64 -d)"
+          
+          # Create database role
+          vault write pyairtable/database/roles/pyairtable-db-role \
+            db_name=postgresql \
+            creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
+            default_ttl="1h" \
+            max_ttl="24h"
+          
+          # Store initial secrets
+          echo "Storing initial secrets..."
+          
+          # JWT secrets
+          vault kv put pyairtable/data/jwt \
+            secret="$(openssl rand -base64 64)" \
+            algorithm="HS256" \
+            expiry="24h"
+          
+          # API keys for external services
+          vault kv put pyairtable/data/external-apis \
+            airtable_api_key="CHANGE_ME_IN_PRODUCTION" \
+            gemini_api_key="CHANGE_ME_IN_PRODUCTION" \
+            openai_api_key="CHANGE_ME_IN_PRODUCTION"
+          
+          # Database credentials
+          vault kv put pyairtable/data/database \
+            postgres_admin_password="$(openssl rand -base64 32)" \
+            redis_password="$(openssl rand -base64 32)"
+          
+          # Encryption keys
+          vault write pyairtable/transit/keys/pyairtable-encryption \
+            type=aes256-gcm96
+          
+          echo "Vault configuration completed successfully"
+      volumes:
+      - name: vault-certs
+        secret:
+          secretName: vault-tls
+      - name: vault-policies
+        configMap:
+          name: vault-policies
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-policies
+  namespace: vault-system
+data:
+  api-gateway-policy.hcl: |
+    # Policy for API Gateway service
+    path "pyairtable/data/jwt" {
+      capabilities = ["read"]
+    }
+    
+    path "pyairtable/data/external-apis" {
+      capabilities = ["read"]
+    }
+    
+    path "pyairtable/transit/encrypt/pyairtable-encryption" {
+      capabilities = ["update"]
+    }
+    
+    path "pyairtable/transit/decrypt/pyairtable-encryption" {
+      capabilities = ["update"]
+    }
+    
+    path "pyairtable/pki/issue/pyairtable-services" {
+      capabilities = ["update"]
+    }
+  
+  auth-service-policy.hcl: |
+    # Policy for Auth Service
+    path "pyairtable/data/jwt" {
+      capabilities = ["read", "create", "update"]
+    }
+    
+    path "pyairtable/database/creds/pyairtable-db-role" {
+      capabilities = ["read"]
+    }
+    
+    path "pyairtable/transit/encrypt/pyairtable-encryption" {
+      capabilities = ["update"]
+    }
+    
+    path "pyairtable/transit/decrypt/pyairtable-encryption" {
+      capabilities = ["update"]
+    }
+  
+  database-service-policy.hcl: |
+    # Policy for Database Service
+    path "pyairtable/data/database" {
+      capabilities = ["read"]
+    }
+    
+    path "pyairtable/database/creds/pyairtable-db-role" {
+      capabilities = ["read"]
+    }
+  
+  python-services-policy.hcl: |
+    # Policy for Python Services
+    path "pyairtable/data/external-apis" {
+      capabilities = ["read"]
+    }
+    
+    path "pyairtable/data/database" {
+      capabilities = ["read"]
+    }
+    
+    path "pyairtable/database/creds/pyairtable-db-role" {
+      capabilities = ["read"]
+    }
+    
+    path "pyairtable/transit/encrypt/pyairtable-encryption" {
+      capabilities = ["update"]
+    }
+    
+    path "pyairtable/transit/decrypt/pyairtable-encryption" {
+      capabilities = ["update"]
+    }
+  
+  go-services-policy.hcl: |
+    # Policy for Go Services
+    path "pyairtable/data/jwt" {
+      capabilities = ["read"]
+    }
+    
+    path "pyairtable/data/external-apis" {
+      capabilities = ["read"]
+    }
+    
+    path "pyairtable/data/database" {
+      capabilities = ["read"]
+    }
+    
+    path "pyairtable/database/creds/pyairtable-db-role" {
+      capabilities = ["read"]
+    }
+    
+    path "pyairtable/transit/encrypt/pyairtable-encryption" {
+      capabilities = ["update"]
+    }
+    
+    path "pyairtable/transit/decrypt/pyairtable-encryption" {
+      capabilities = ["update"]
+    }

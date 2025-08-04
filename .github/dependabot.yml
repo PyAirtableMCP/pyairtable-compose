@@ -1,0 +1,77 @@
+version: 2
+updates:
+  # Go modules
+  - package-ecosystem: "gomod"
+    directory: "/go-services"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    reviewers:
+      - "@security-team"
+    assignees:
+      - "@security-team"
+    commit-message:
+      prefix: "[security]"
+      include: "scope"
+    open-pull-requests-limit: 10
+    # Only security updates
+    allow:
+      - dependency-type: "all"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # Python pip
+  - package-ecosystem: "pip"
+    directory: "/python-services"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    reviewers:
+      - "@security-team"
+    assignees:
+      - "@security-team"
+    commit-message:
+      prefix: "[security]"
+      include: "scope"
+    open-pull-requests-limit: 10
+    allow:
+      - dependency-type: "all"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # Docker base images
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "09:00"
+    reviewers:
+      - "@security-team"
+    assignees:
+      - "@security-team"
+    commit-message:
+      prefix: "[security]"
+      include: "scope"
+    open-pull-requests-limit: 5
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "09:00"
+    reviewers:
+      - "@security-team"
+    assignees:
+      - "@security-team"
+    commit-message:
+      prefix: "[security]"
+      include: "scope"
+    open-pull-requests-limit: 5
+EOF < /dev/null

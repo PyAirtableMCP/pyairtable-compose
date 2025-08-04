@@ -1,0 +1,357 @@
+# PyAirtable Integration Test Suite Configuration
+
+# Global Test Configuration
+global:
+  test_timeout: 30m
+  parallel_execution: true
+  cleanup_strategy: "after_each"  # after_each, after_suite, manual
+  environment_reset: "between_categories"  # never, between_tests, between_categories, always
+  
+# Environment Configurations
+environments:
+  local:
+    description: "Local development environment"
+    resource_limits:
+      memory: "2GB"
+      cpu: "2cores"
+    services:
+      api_gateway:
+        port: 8080
+        health_endpoint: "/health"
+        startup_timeout: 30s
+      auth_service:
+        port: 8083
+        health_endpoint: "/health"
+        startup_timeout: 30s
+      user_service:
+        port: 8084
+        health_endpoint: "/health"
+        startup_timeout: 30s
+      workspace_service:
+        port: 8086
+        health_endpoint: "/health"
+        startup_timeout: 30s
+      permission_service:
+        port: 8085
+        health_endpoint: "/health"
+        startup_timeout: 30s
+    databases:
+      postgres_primary:
+        host: localhost
+        port: 5432
+        database: pyairtable_test
+        username: test_user
+        password: test_password
+      postgres_events:
+        host: localhost
+        port: 5433
+        database: pyairtable_events_test
+        username: test_user
+        password: test_password
+      redis_cache:
+        host: localhost
+        port: 6379
+        password: testpassword
+        database: 0
+      redis_sessions:
+        host: localhost
+        port: 6379
+        password: testpassword
+        database: 1
+    monitoring:
+      prometheus:
+        enabled: true
+        port: 9090
+      grafana:
+        enabled: true
+        port: 3000
+
+  ci:
+    description: "CI/CD pipeline environment"
+    inherits_from: local
+    parallel_execution: true
+    resource_limits:
+      memory: "4GB"
+      cpu: "4cores"
+    cleanup_strategy: "aggressive"
+    monitoring:
+      prometheus:
+        enabled: false
+      grafana:
+        enabled: false
+
+  production_like:
+    description: "Production-like testing environment"
+    inherits_from: local
+    high_availability: true
+    security_enabled: true
+    tls_enabled: true
+    resource_limits:
+      memory: "8GB"
+      cpu: "8cores"
+    monitoring:
+      prometheus:
+        enabled: true
+        port: 9090
+      grafana:
+        enabled: true
+        port: 3000
+      jaeger:
+        enabled: true
+        port: 16686
+
+# Test Categories Configuration
+test_categories:
+  e2e:
+    description: "End-to-end architectural pattern tests"
+    timeout: 20m
+    parallel: false  # E2E tests run sequentially for state consistency
+    retry_attempts: 2
+    tests:
+      - saga_workflows
+      - cqrs_projections
+      - event_sourcing
+      - outbox_pattern
+      - unit_of_work
+    
+  service_integration:
+    description: "Service integration and communication tests"
+    timeout: 15m
+    parallel: true
+    retry_attempts: 3
+    tests:
+      - api_gateway_integration
+      - cross_service_communication
+      - database_transactions
+      - cache_invalidation
+      - event_bus_flow
+
+  performance:
+    description: "Performance and load testing"
+    timeout: 30m
+    parallel: true
+    retry_attempts: 1
+    tests:
+      - load_testing
+      - stress_testing
+      - endurance_testing
+      - benchmarking
+
+  chaos:
+    description: "Chaos engineering and fault injection"
+    timeout: 25m
+    parallel: false
+    retry_attempts: 1
+    tests:
+      - service_failures
+      - network_partitions
+      - resource_exhaustion
+      - data_corruption
+
+  contract:
+    description: "API contract and compatibility testing"
+    timeout: 10m
+    parallel: true
+    retry_attempts: 2
+    tests:
+      - api_contract_validation
+      - schema_evolution
+      - version_compatibility
+      - consumer_driven_contracts
+
+  security:
+    description: "Security and vulnerability testing"
+    timeout: 15m
+    parallel: true
+    retry_attempts: 1
+    tests:
+      - authentication_bypass
+      - authorization_violations
+      - input_validation
+      - rate_limit_bypass
+
+# Test Data Configuration
+test_data:
+  strategy: "fixtures"  # fixtures, factories, hybrid
+  cleanup_strategy: "incremental"  # full, incremental, selective
+  
+  tenants:
+    - id: "550e8400-e29b-41d4-a716-446655440001"
+      name: "Alpha Test Tenant"
+      domain: "alpha.test.pyairtable.com"
+      status: "active"
+      plan: "enterprise"
+    - id: "550e8400-e29b-41d4-a716-446655440002"
+      name: "Beta Test Tenant"
+      domain: "beta.test.pyairtable.com"
+      status: "active"
+      plan: "pro"
+    - id: "550e8400-e29b-41d4-a716-446655440003"
+      name: "Gamma Test Tenant"
+      domain: "gamma.test.pyairtable.com"
+      status: "suspended"
+      plan: "free"
+
+  users:
+    alpha_tenant:
+      - id: "660e8400-e29b-41d4-a716-446655440001"
+        email: "admin@alpha.test.com"
+        username: "alpha_admin"
+        role: "tenant_admin"
+      - id: "660e8400-e29b-41d4-a716-446655440002"
+        email: "user1@alpha.test.com"
+        username: "alpha_user1"
+        role: "workspace_admin"
+      - id: "660e8400-e29b-41d4-a716-446655440003"
+        email: "user2@alpha.test.com"
+        username: "alpha_user2"
+        role: "project_member"
+    beta_tenant:
+      - id: "660e8400-e29b-41d4-a716-446655440004"
+        email: "admin@beta.test.com"
+        username: "beta_admin"
+        role: "tenant_admin"
+
+  workspaces:
+    - id: "770e8400-e29b-41d4-a716-446655440001"
+      tenant_id: "550e8400-e29b-41d4-a716-446655440001"
+      name: "Alpha Main Workspace"
+      description: "Primary workspace for Alpha tenant"
+    - id: "770e8400-e29b-41d4-a716-446655440002"
+      tenant_id: "550e8400-e29b-41d4-a716-446655440002"
+      name: "Beta Dev Workspace"
+      description: "Development workspace for Beta tenant"
+
+# Performance Thresholds
+performance_thresholds:
+  response_times:
+    api_gateway:
+      p50: 100ms
+      p90: 200ms
+      p95: 300ms
+      p99: 500ms
+    auth_service:
+      p50: 50ms
+      p90: 100ms
+      p95: 150ms
+      p99: 250ms
+    database_queries:
+      simple_select: 10ms
+      complex_join: 100ms
+      aggregation: 200ms
+  
+  throughput:
+    api_gateway: 1000rps
+    auth_service: 500rps
+    user_service: 300rps
+  
+  resource_usage:
+    memory_usage_max: 80%
+    cpu_usage_max: 70%
+    disk_usage_max: 85%
+
+# Monitoring and Alerting
+monitoring:
+  metrics_collection:
+    enabled: true
+    interval: 5s
+    retention: 1h
+  
+  dashboards:
+    grafana:
+      enabled: true
+      dashboards:
+        - name: "Integration Test Overview"
+          file: "dashboards/integration-overview.json"
+        - name: "Service Performance"
+          file: "dashboards/service-performance.json"
+        - name: "Test Execution Metrics"
+          file: "dashboards/test-execution.json"
+  
+  alerts:
+    enabled: true
+    channels:
+      - type: "console"
+        enabled: true
+      - type: "file"
+        enabled: true
+        file: "test-results/alerts.log"
+    rules:
+      - name: "high_error_rate"
+        condition: "error_rate > 5%"
+        severity: "warning"
+      - name: "service_down"
+        condition: "service_health == 0"
+        severity: "critical"
+      - name: "performance_degradation"
+        condition: "response_time_p95 > threshold * 1.5"
+        severity: "warning"
+
+# Reporting Configuration
+reporting:
+  formats:
+    - html
+    - junit_xml
+    - json
+    - prometheus_metrics
+  
+  output_directory: "test-results"
+  
+  html_report:
+    template: "templates/test-report.html"
+    include_charts: true
+    include_logs: true
+  
+  junit_xml:
+    file: "test-results/junit.xml"
+    include_system_out: true
+  
+  json_report:
+    file: "test-results/test-results.json"
+    include_metrics: true
+    include_timing: true
+
+# Security Configuration
+security:
+  tls:
+    enabled: false  # Enable for production-like tests
+    cert_file: "certs/test.crt"
+    key_file: "certs/test.key"
+  
+  authentication:
+    jwt_secret: "test-jwt-secret-for-testing-only"
+    api_key: "test-api-key-12345"
+    token_expiry: "1h"
+  
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 100
+    burst_size: 10
+
+# Cleanup Configuration
+cleanup:
+  docker:
+    remove_containers: true
+    remove_volumes: true
+    remove_networks: true
+    remove_images: false  # Keep images for faster subsequent runs
+  
+  databases:
+    drop_test_databases: true
+    reset_schemas: true
+    clear_cache: true
+  
+  files:
+    remove_logs: false  # Keep logs for debugging
+    remove_temp_files: true
+    remove_generated_data: true
+
+# Feature Flags
+feature_flags:
+  enable_chaos_testing: true
+  enable_performance_testing: true
+  enable_security_testing: true
+  enable_contract_testing: true
+  enable_distributed_tracing: true
+  enable_metrics_collection: true
+  enable_log_aggregation: true

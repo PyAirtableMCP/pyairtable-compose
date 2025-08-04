@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"crypto/subtle"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -27,7 +28,8 @@ func APIKeyAuth(apiKey string, required bool) fiber.Handler {
 			})
 		}
 
-		if key != apiKey {
+		// Use constant-time comparison to prevent timing attacks
+		if subtle.ConstantTimeCompare([]byte(key), []byte(apiKey)) != 1 {
 			return c.Status(401).JSON(fiber.Map{
 				"error": "Invalid API key",
 			})
@@ -60,9 +62,9 @@ func JWTAuth(secretKey string) fiber.Handler {
 
 		// Parse and validate token
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			// Validate signing method
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fiber.NewError(401, "Invalid signing method")
+			// Explicitly validate algorithm to prevent algorithm confusion attacks
+			if token.Method != jwt.SigningMethodHS256 {
+				return nil, fiber.NewError(401, "Invalid signing method: only HS256 allowed")
 			}
 			return []byte(secretKey), nil
 		})
@@ -111,8 +113,9 @@ func OptionalJWTAuth(secretKey string) fiber.Handler {
 		tokenString := tokenParts[1]
 
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fiber.NewError(401, "Invalid signing method")
+			// Explicitly validate algorithm to prevent algorithm confusion attacks
+			if token.Method != jwt.SigningMethodHS256 {
+				return nil, fiber.NewError(401, "Invalid signing method: only HS256 allowed")
 			}
 			return []byte(secretKey), nil
 		})

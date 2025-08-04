@@ -1,0 +1,227 @@
+version: '3.8'
+
+services:
+  plugin-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PLUGIN_SERVICE_DATABASE_HOST=postgres
+      - PLUGIN_SERVICE_DATABASE_PORT=5432
+      - PLUGIN_SERVICE_DATABASE_USER=plugin_service
+      - PLUGIN_SERVICE_DATABASE_PASSWORD=plugin_password
+      - PLUGIN_SERVICE_DATABASE_DBNAME=plugin_service
+      - PLUGIN_SERVICE_REDIS_HOST=redis
+      - PLUGIN_SERVICE_REDIS_PORT=6379
+      - PLUGIN_SERVICE_SECURITY_JWT_SECRET=your-jwt-secret-here
+      - PLUGIN_SERVICE_REGISTRY_OFFICIAL_REGISTRY=https://plugins.pyairtable.com
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - plugin_data:/app/data
+      - ./configs:/app/configs:ro
+    restart: unless-stopped
+    networks:
+      - plugin-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=plugin_service
+      - POSTGRES_USER=plugin_service
+      - POSTGRES_PASSWORD=plugin_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - plugin-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U plugin_service -d plugin_service"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --requirepass redis_password
+    environment:
+      - REDIS_PASSWORD=redis_password
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - plugin-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Development server for plugin testing
+  plugin-dev-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PLUGIN_SERVICE_URL=http://plugin-service:8080
+    volumes:
+      - ./tools/dev-server:/app
+      - ./examples:/app/examples:ro
+      - plugin_dev_data:/app/data
+    depends_on:
+      - plugin-service
+    restart: unless-stopped
+    networks:
+      - plugin-network
+    profiles:
+      - dev
+
+  # Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+    networks:
+      - plugin-network
+    profiles:
+      - monitoring
+
+  # Metrics visualization with Grafana
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - plugin-network
+    profiles:
+      - monitoring
+
+  # Log aggregation with Loki
+  loki:
+    image: grafana/loki:latest
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki_data:/loki
+      - ./monitoring/loki.yml:/etc/loki/local-config.yaml:ro
+    restart: unless-stopped
+    networks:
+      - plugin-network
+    profiles:
+      - monitoring
+
+  # Log shipping with Promtail
+  promtail:
+    image: grafana/promtail:latest
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./monitoring/promtail.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
+    restart: unless-stopped
+    networks:
+      - plugin-network
+    profiles:
+      - monitoring
+
+  # MinIO for S3-compatible storage (development)
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+    networks:
+      - plugin-network
+    profiles:
+      - storage
+
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+      - "14250:14250"
+    restart: unless-stopped
+    networks:
+      - plugin-network
+    profiles:
+      - tracing
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  plugin_data:
+    driver: local
+  plugin_dev_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  loki_data:
+    driver: local
+  minio_data:
+    driver: local
+
+networks:
+  plugin-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

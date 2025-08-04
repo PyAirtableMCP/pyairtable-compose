@@ -1,0 +1,632 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+data:
+  pyairtable-overview.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "PyAirtable - System Overview",
+        "tags": ["pyairtable", "overview"],
+        "style": "dark",
+        "timezone": "UTC",
+        "refresh": "30s",
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "panels": [
+          {
+            "id": 1,
+            "title": "Request Rate",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total[5m]))",
+                "legendFormat": "Requests/sec"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "reqps",
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 100},
+                    {"color": "red", "value": 500}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Response Time (95th percentile)",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+                "legendFormat": "95th percentile"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "s",
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 1},
+                    {"color": "red", "value": 2}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Error Rate",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
+                "legendFormat": "Error Rate %"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percent",
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 1},
+                    {"color": "red", "value": 5}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0}
+          },
+          {
+            "id": 4,
+            "title": "Active Users",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(pyairtable_active_users)",
+                "legendFormat": "Active Users"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "short",
+                "thresholds": {
+                  "steps": [
+                    {"color": "blue", "value": null}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0}
+          },
+          {
+            "id": 5,
+            "title": "Request Rate by Service",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total[5m])) by (service)",
+                "legendFormat": "{{service}}"
+              }
+            ],
+            "yAxes": [
+              {"label": "Requests/sec", "unit": "reqps"}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 6,
+            "title": "Response Time by Service",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service))",
+                "legendFormat": "{{service}} (95th)"
+              },
+              {
+                "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service))",
+                "legendFormat": "{{service}} (50th)"
+              }
+            ],
+            "yAxes": [
+              {"label": "Response Time", "unit": "s"}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          }
+        ]
+      }
+    }
+
+  pyairtable-database.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "PyAirtable - Database Performance",
+        "tags": ["pyairtable", "database", "postgres"],
+        "style": "dark",
+        "timezone": "UTC",
+        "refresh": "30s",
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "panels": [
+          {
+            "id": 1,
+            "title": "Database Connections",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "pg_stat_activity_count",
+                "legendFormat": "Active Connections"
+              },
+              {
+                "expr": "pg_settings_max_connections",
+                "legendFormat": "Max Connections"
+              }
+            ],
+            "yAxes": [
+              {"label": "Connections", "unit": "short"}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Query Performance",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(pg_stat_database_tup_fetched[5m])",
+                "legendFormat": "Tuples Fetched/sec"
+              },
+              {
+                "expr": "rate(pg_stat_database_tup_returned[5m])",
+                "legendFormat": "Tuples Returned/sec"
+              }
+            ],
+            "yAxes": [
+              {"label": "Tuples/sec", "unit": "short"}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Cache Hit Ratio",
+            "type": "singlestat",
+            "targets": [
+              {
+                "expr": "avg(rate(pg_stat_database_blks_hit[5m]) / (rate(pg_stat_database_blks_hit[5m]) + rate(pg_stat_database_blks_read[5m]))) * 100",
+                "legendFormat": "Cache Hit %"
+              }
+            ],
+            "valueName": "current",
+            "format": "percent",
+            "thresholds": "80,90",
+            "colors": ["#d44a3a", "#e0752d", "#37872d"],
+            "gridPos": {"h": 8, "w": 6, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "Slow Queries",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(pg_stat_activity_max_tx_duration[5m])",
+                "legendFormat": "Long Running Queries"
+              }
+            ],
+            "yAxes": [
+              {"label": "Duration", "unit": "s"}
+            ],
+            "gridPos": {"h": 8, "w": 18, "x": 6, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "Database Size",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "pg_database_size_bytes",
+                "legendFormat": "{{datname}}"
+              }
+            ],
+            "yAxes": [
+              {"label": "Size", "unit": "bytes"}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+          },
+          {
+            "id": 6,
+            "title": "Index Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(pg_stat_user_indexes_idx_scan[5m])",
+                "legendFormat": "Index Scans/sec"
+              },
+              {
+                "expr": "rate(pg_stat_user_tables_seq_scan[5m])",
+                "legendFormat": "Sequential Scans/sec"
+              }
+            ],
+            "yAxes": [
+              {"label": "Scans/sec", "unit": "short"}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+          }
+        ]
+      }
+    }
+
+  pyairtable-kafka.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "PyAirtable - Kafka Performance",
+        "tags": ["pyairtable", "kafka", "messaging"],
+        "style": "dark",
+        "timezone": "UTC",
+        "refresh": "30s",
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "panels": [
+          {
+            "id": 1,
+            "title": "Message Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(kafka_server_brokertopicmetrics_messagesin_total[5m]))",
+                "legendFormat": "Messages In/sec"
+              },
+              {
+                "expr": "sum(rate(kafka_server_brokertopicmetrics_bytesout_total[5m]))",
+                "legendFormat": "Bytes Out/sec"
+              }
+            ],
+            "yAxes": [
+              {"label": "Rate", "unit": "short"}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Consumer Lag",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "kafka_consumer_lag_sum",
+                "legendFormat": "{{topic}} - {{consumergroup}}"
+              }
+            ],
+            "yAxes": [
+              {"label": "Lag", "unit": "short"}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Producer Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(kafka_producer_request_rate[5m])",
+                "legendFormat": "{{client_id}}"
+              }
+            ],
+            "yAxes": [
+              {"label": "Requests/sec", "unit": "reqps"}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "Request Latency",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "kafka_producer_request_latency_avg",
+                "legendFormat": "Producer Latency"
+              },
+              {
+                "expr": "kafka_consumer_fetch_latency_avg",
+                "legendFormat": "Consumer Latency"
+              }
+            ],
+            "yAxes": [
+              {"label": "Latency", "unit": "ms"}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "Partition Count by Topic",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "kafka_topic_partitions",
+                "legendFormat": "{{topic}}",
+                "format": "table"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+          }
+        ]
+      }
+    }
+
+  pyairtable-frontend.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "PyAirtable - Frontend Performance",
+        "tags": ["pyairtable", "frontend", "web-vitals"],
+        "style": "dark",
+        "timezone": "UTC",
+        "refresh": "5m",
+        "time": {
+          "from": "now-6h",
+          "to": "now"
+        },
+        "panels": [
+          {
+            "id": 1,
+            "title": "Core Web Vitals - LCP",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "avg(lighthouse_lcp_value)",
+                "legendFormat": "LCP (ms)"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "ms",
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 2500},
+                    {"color": "red", "value": 4000}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Core Web Vitals - FID",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "avg(lighthouse_fid_value)",
+                "legendFormat": "FID (ms)"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "ms",
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 100},
+                    {"color": "red", "value": 300}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Core Web Vitals - CLS",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "avg(lighthouse_cls_value)",
+                "legendFormat": "CLS"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "short",
+                "decimals": 3,
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 0.1},
+                    {"color": "red", "value": 0.25}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0}
+          },
+          {
+            "id": 4,
+            "title": "Bundle Size Trend",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "lighthouse_bundle_size_bytes",
+                "legendFormat": "{{bundle_type}}"
+              }
+            ],
+            "yAxes": [
+              {"label": "Size", "unit": "bytes"}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "Performance Score",
+            "type": "gauge",
+            "targets": [
+              {
+                "expr": "avg(lighthouse_performance_score)",
+                "legendFormat": "Performance Score"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "short",
+                "min": 0,
+                "max": 100,
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 50},
+                    {"color": "green", "value": 90}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          },
+          {
+            "id": 6,
+            "title": "Page Load Times",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(web_vitals_navigation_timing_bucket[5m])) by (le, page))",
+                "legendFormat": "{{page}} (95th)"
+              },
+              {
+                "expr": "histogram_quantile(0.50, sum(rate(web_vitals_navigation_timing_bucket[5m])) by (le, page))",
+                "legendFormat": "{{page}} (50th)"
+              }
+            ],
+            "yAxes": [
+              {"label": "Load Time", "unit": "ms"}
+            ],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+          }
+        ]
+      }
+    }
+
+  pyairtable-infrastructure.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "PyAirtable - Infrastructure Monitoring",
+        "tags": ["pyairtable", "infrastructure", "kubernetes"],
+        "style": "dark",
+        "timezone": "UTC",
+        "refresh": "30s",
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "panels": [
+          {
+            "id": 1,
+            "title": "CPU Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "100 - (avg by(instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+                "legendFormat": "{{instance}}"
+              }
+            ],
+            "yAxes": [
+              {"label": "CPU %", "unit": "percent", "max": 100}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
+                "legendFormat": "{{instance}}"
+              }
+            ],
+            "yAxes": [
+              {"label": "Memory %", "unit": "percent", "max": 100}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Disk Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "(1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100",
+                "legendFormat": "{{instance}} - {{mountpoint}}"
+              }
+            ],
+            "yAxes": [
+              {"label": "Disk %", "unit": "percent", "max": 100}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "Network I/O",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(node_network_receive_bytes_total[5m])",
+                "legendFormat": "{{instance}} - RX"
+              },
+              {
+                "expr": "rate(node_network_transmit_bytes_total[5m])",
+                "legendFormat": "{{instance}} - TX"
+              }
+            ],
+            "yAxes": [
+              {"label": "Bytes/sec", "unit": "Bps"}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "Pod Status",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "kube_pod_status_phase",
+                "legendFormat": "{{namespace}}/{{pod}}",
+                "format": "table"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+          },
+          {
+            "id": 6,
+            "title": "Container Restarts",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(kube_pod_container_status_restarts_total[5m])",
+                "legendFormat": "{{namespace}}/{{pod}}/{{container}}"
+              }
+            ],
+            "yAxes": [
+              {"label": "Restarts/sec", "unit": "short"}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+          }
+        ]
+      }
+    }

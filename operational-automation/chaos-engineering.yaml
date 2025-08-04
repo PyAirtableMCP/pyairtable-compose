@@ -1,0 +1,907 @@
+# Chaos Engineering for PyAirtable
+# Provides automated chaos testing to improve system resilience
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: chaos-engineering
+  labels:
+    name: chaos-engineering
+
+---
+# Chaos Mesh Installation
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: chaos-mesh
+  namespace: chaos-engineering
+spec:
+  chart: chaos-mesh
+  repo: https://charts.chaos-mesh.org
+  version: 2.6.0
+  targetNamespace: chaos-engineering
+  valuesContent: |-
+    chaosDaemon:
+      runtime: containerd
+      socketPath: /run/containerd/containerd.sock
+      
+    dashboard:
+      create: true
+      serviceType: ClusterIP
+      ingress:
+        enabled: true
+        className: nginx
+        hosts:
+        - name: chaos.pyairtable.com
+          paths:
+          - path: /
+            pathType: Prefix
+        tls:
+        - secretName: chaos-dashboard-tls
+          hosts:
+          - chaos.pyairtable.com
+      
+    controllerManager:
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      
+    webhook:
+      FailurePolicy: Fail
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+    
+    prometheus:
+      serviceMonitor:
+        enabled: true
+        labels:
+          monitoring: prometheus
+
+---
+# Chaos Engineering Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chaos-config
+  namespace: chaos-engineering
+data:
+  config.yaml: |
+    chaos_experiments:
+      # Network chaos
+      network_delay:
+        enabled: true
+        schedule: "0 10 * * 1-5"  # Weekdays at 10 AM
+        duration: "5m"
+        delay: "100ms"
+        jitter: "10ms"
+        target_namespaces: ["pyairtable-staging"]
+        
+      network_loss:
+        enabled: true
+        schedule: "0 14 * * 1-5"  # Weekdays at 2 PM
+        duration: "3m"
+        loss_percentage: 5
+        target_namespaces: ["pyairtable-staging"]
+        
+      # Pod chaos
+      pod_kill:
+        enabled: true
+        schedule: "0 11 * * 1-5"  # Weekdays at 11 AM
+        duration: "2m"
+        target_namespaces: ["pyairtable-staging"]
+        target_labels:
+          app: api-gateway
+        
+      pod_failure:
+        enabled: true
+        schedule: "0 15 * * 1-5"  # Weekdays at 3 PM
+        duration: "5m"
+        target_namespaces: ["pyairtable-staging"]
+        target_labels:
+          component: microservice
+        
+      # Resource chaos
+      memory_stress:
+        enabled: true
+        schedule: "0 13 * * 1-5"  # Weekdays at 1 PM
+        duration: "10m"
+        memory_percentage: 80
+        target_namespaces: ["pyairtable-staging"]
+        
+      cpu_stress:
+        enabled: true
+        schedule: "0 16 * * 1-5"  # Weekdays at 4 PM
+        duration: "5m"
+        cpu_percentage: 70
+        target_namespaces: ["pyairtable-staging"]
+        
+      # Database chaos
+      database_latency:
+        enabled: false  # Only for staging
+        schedule: "0 12 * * 6"   # Saturdays at noon
+        duration: "10m"
+        delay: "200ms"
+        target_services: ["postgres"]
+        
+    environments:
+      staging:
+        enabled: true
+        notification_channel: "#chaos-engineering"
+        max_concurrent_experiments: 2
+      prod:
+        enabled: false  # Disabled by default for production
+        notification_channel: "#alerts"
+        max_concurrent_experiments: 1
+        
+    monitoring:
+      prometheus_metrics: true
+      grafana_dashboard: true
+      alert_on_failure: true
+      
+    safety:
+      enable_emergency_stop: true
+      max_experiment_duration: "30m"
+      business_hours_only: true
+      exclude_critical_services:
+        - "database"
+        - "load-balancer"
+
+---
+# Network Delay Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: network-delay-experiment
+  namespace: chaos-engineering
+spec:
+  schedule: "0 10 * * 1-5"  # Weekdays at 10 AM
+  historyLimit: 5
+  concurrencyPolicy: Forbid
+  type: NetworkChaos
+  networkChaos:
+    selector:
+      namespaces:
+        - pyairtable-staging
+      labelSelectors:
+        app: api-gateway
+    mode: one
+    action: delay
+    delay:
+      latency: "100ms"
+      correlation: "100"
+      jitter: "10ms"
+    duration: "5m"
+
+---
+# Pod Kill Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: pod-kill-experiment
+  namespace: chaos-engineering
+spec:
+  schedule: "0 11 * * 1-5"  # Weekdays at 11 AM
+  historyLimit: 5
+  concurrencyPolicy: Forbid
+  type: PodChaos
+  podChaos:
+    selector:
+      namespaces:
+        - pyairtable-staging
+      labelSelectors:
+        app: api-gateway
+    mode: one
+    action: pod-kill
+    duration: "2m"
+
+---
+# Memory Stress Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: memory-stress-experiment
+  namespace: chaos-engineering
+spec:
+  schedule: "0 13 * * 1-5"  # Weekdays at 1 PM
+  historyLimit: 5
+  concurrencyPolicy: Forbid
+  type: StressChaos
+  stressChaos:
+    selector:
+      namespaces:
+        - pyairtable-staging
+    mode: one
+    stressors:
+      memory:
+        workers: 1
+        size: 80%
+    duration: "10m"
+
+---
+# CPU Stress Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: cpu-stress-experiment
+  namespace: chaos-engineering
+spec:
+  schedule: "0 16 * * 1-5"  # Weekdays at 4 PM
+  historyLimit: 5
+  concurrencyPolicy: Forbid
+  type: StressChaos
+  stressChaos:
+    selector:
+      namespaces:
+        - pyairtable-staging
+    mode: one
+    stressors:
+      cpu:
+        workers: 2
+        load: 70
+    duration: "5m"
+
+---
+# Chaos Experiment Monitor
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chaos-monitor
+  namespace: chaos-engineering
+  labels:
+    app: chaos-monitor
+    component: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chaos-monitor
+  template:
+    metadata:
+      labels:
+        app: chaos-monitor
+        component: monitoring
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: chaos-monitor
+      containers:
+      - name: chaos-monitor
+        image: python:3.11-slim
+        ports:
+        - containerPort: 8080
+          name: metrics
+        command:
+        - python
+        - /app/monitor.py
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: SLACK_WEBHOOK
+          valueFrom:
+            secretKeyRef:
+              name: notification-secrets
+              key: slack_webhook
+        volumeMounts:
+        - name: monitor-code
+          mountPath: /app
+          readOnly: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: monitor-code
+        configMap:
+          name: chaos-monitor-code
+          defaultMode: 0755
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chaos-monitor-code
+  namespace: chaos-engineering
+data:
+  monitor.py: |
+    #!/usr/bin/env python3
+    """
+    Chaos Engineering Monitor
+    Monitors chaos experiments and sends notifications
+    """
+    
+    import os
+    import json
+    import time
+    import requests
+    import logging
+    from datetime import datetime, timedelta
+    from kubernetes import client, config, watch
+    from prometheus_client import start_http_server, Counter, Gauge, Histogram
+    
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    
+    # Prometheus metrics
+    chaos_experiments_total = Counter('chaos_experiments_total', 'Total chaos experiments', ['type', 'status'])
+    active_experiments = Gauge('chaos_active_experiments', 'Currently active experiments')
+    experiment_duration = Histogram('chaos_experiment_duration_seconds', 'Experiment duration', ['type'])
+    
+    class ChaosMonitor:
+        def __init__(self):
+            # Initialize Kubernetes client
+            try:
+                config.load_incluster_config()
+            except:
+                config.load_kube_config()
+            
+            self.v1 = client.CoreV1Api()
+            self.custom_api = client.CustomObjectsApi()
+            
+            self.namespace = os.getenv('NAMESPACE', 'chaos-engineering')
+            self.slack_webhook = os.getenv('SLACK_WEBHOOK')
+            
+            logger.info("Chaos monitor initialized")
+        
+        def get_chaos_experiments(self):
+            """Get all chaos experiments"""
+            experiments = []
+            
+            # Get different types of chaos experiments
+            chaos_types = [
+                ('NetworkChaos', 'networkchaos'),
+                ('PodChaos', 'podchaos'),
+                ('StressChaos', 'stresschaos'),
+                ('IOChaos', 'iochaos'),
+                ('DNSChaos', 'dnschaos')
+            ]
+            
+            for chaos_type, plural in chaos_types:
+                try:
+                    response = self.custom_api.list_cluster_custom_object(
+                        group="chaos-mesh.org",
+                        version="v1alpha1",
+                        plural=plural
+                    )
+                    for item in response.get('items', []):
+                        item['chaos_type'] = chaos_type
+                        experiments.append(item)
+                except Exception as e:
+                    logger.error(f"Error getting {chaos_type}: {e}")
+            
+            return experiments
+        
+        def monitor_experiment(self, experiment):
+            """Monitor individual experiment"""
+            name = experiment['metadata']['name']
+            namespace = experiment['metadata']['namespace']
+            chaos_type = experiment.get('chaos_type', 'Unknown')
+            
+            # Get experiment status
+            status = experiment.get('status', {})
+            conditions = status.get('conditions', [])
+            
+            # Check if experiment is running
+            is_running = False
+            for condition in conditions:
+                if condition.get('type') == 'AllInjected' and condition.get('status') == 'True':
+                    is_running = True
+                    break
+            
+            # Update metrics
+            if is_running:
+                chaos_experiments_total.labels(type=chaos_type, status='running').inc()
+            else:
+                chaos_experiments_total.labels(type=chaos_type, status='completed').inc()
+            
+            # Check for failures
+            for condition in conditions:
+                if condition.get('type') == 'AllRecovered' and condition.get('status') == 'False':
+                    logger.error(f"Experiment {name} failed to recover")
+                    self.send_failure_alert(name, namespace, chaos_type, condition.get('message', ''))
+            
+            logger.info(f"Monitored experiment: {name} ({chaos_type}) - Running: {is_running}")
+        
+        def send_experiment_start_alert(self, name, namespace, chaos_type, duration):
+            """Send experiment start notification"""
+            if not self.slack_webhook:
+                return
+            
+            message = {
+                "text": f"🧪 Chaos Experiment Started",
+                "attachments": [{
+                    "color": "warning",
+                    "fields": [
+                        {"title": "Experiment", "value": name, "short": True},
+                        {"title": "Type", "value": chaos_type, "short": True},
+                        {"title": "Namespace", "value": namespace, "short": True},
+                        {"title": "Duration", "value": duration, "short": True},
+                        {"title": "Started At", "value": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "short": False}
+                    ]
+                }]
+            }
+            
+            try:
+                requests.post(self.slack_webhook, json=message, timeout=10)
+            except Exception as e:
+                logger.error(f"Failed to send Slack notification: {e}")
+        
+        def send_failure_alert(self, name, namespace, chaos_type, error_message):
+            """Send experiment failure alert"""
+            if not self.slack_webhook:
+                return
+            
+            message = {
+                "text": f"🚨 Chaos Experiment Failed",
+                "attachments": [{
+                    "color": "danger",
+                    "fields": [
+                        {"title": "Experiment", "value": name, "short": True},
+                        {"title": "Type", "value": chaos_type, "short": True},
+                        {"title": "Namespace", "value": namespace, "short": True},
+                        {"title": "Error", "value": error_message[:500], "short": False},
+                        {"title": "Failed At", "value": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "short": False}
+                    ]
+                }]
+            }
+            
+            try:
+                requests.post(self.slack_webhook, json=message, timeout=10)
+            except Exception as e:
+                logger.error(f"Failed to send Slack notification: {e}")
+        
+        def emergency_stop_all(self):
+            """Emergency stop all chaos experiments"""
+            logger.warning("Initiating emergency stop of all chaos experiments")
+            
+            experiments = self.get_chaos_experiments()
+            stopped_count = 0
+            
+            for experiment in experiments:
+                name = experiment['metadata']['name']
+                namespace = experiment['metadata']['namespace']
+                chaos_type = experiment.get('chaos_type', 'Unknown')
+                
+                try:
+                    # Pause the experiment
+                    patch_body = {
+                        "spec": {
+                            "scheduler": {
+                                "suspend": True
+                            }
+                        }
+                    }
+                    
+                    # Determine the correct API call based on chaos type
+                    plural = chaos_type.lower() + 's' if not chaos_type.endswith('s') else chaos_type.lower()
+                    
+                    self.custom_api.patch_namespaced_custom_object(
+                        group="chaos-mesh.org",
+                        version="v1alpha1",
+                        namespace=namespace,
+                        plural=plural,
+                        name=name,
+                        body=patch_body
+                    )
+                    
+                    logger.info(f"Stopped experiment: {name}")
+                    stopped_count += 1
+                    
+                except Exception as e:
+                    logger.error(f"Failed to stop experiment {name}: {e}")
+            
+            # Send notification
+            if self.slack_webhook and stopped_count > 0:
+                message = {
+                    "text": f"🛑 Emergency Stop: Stopped {stopped_count} chaos experiments",
+                    "attachments": [{
+                        "color": "danger",
+                        "fields": [
+                            {"title": "Stopped Experiments", "value": str(stopped_count), "short": True},
+                            {"title": "Timestamp", "value": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "short": True}
+                        ]
+                    }]
+                }
+                
+                try:
+                    requests.post(self.slack_webhook, json=message, timeout=10)
+                except Exception as e:
+                    logger.error(f"Failed to send emergency stop notification: {e}")
+        
+        def run(self):
+            """Run the chaos monitor"""
+            # Start Prometheus metrics server
+            start_http_server(8080)
+            logger.info("Started Prometheus metrics server on port 8080")
+            
+            while True:
+                try:
+                    experiments = self.get_chaos_experiments()
+                    active_count = 0
+                    
+                    for experiment in experiments:
+                        self.monitor_experiment(experiment)
+                        
+                        # Count active experiments
+                        status = experiment.get('status', {})
+                        conditions = status.get('conditions', [])
+                        for condition in conditions:
+                            if condition.get('type') == 'AllInjected' and condition.get('status') == 'True':
+                                active_count += 1
+                                break
+                    
+                    # Update active experiments metric
+                    active_experiments.set(active_count)
+                    
+                    logger.info(f"Monitored {len(experiments)} experiments, {active_count} active")
+                    
+                except Exception as e:
+                    logger.error(f"Error in monitoring loop: {e}")
+                
+                time.sleep(30)  # Check every 30 seconds
+    
+    if __name__ == '__main__':
+        monitor = ChaosMonitor()
+        monitor.run()
+
+---
+# RBAC for Chaos Monitor
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chaos-monitor
+  namespace: chaos-engineering
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: chaos-monitor
+rules:
+- apiGroups: ["chaos-mesh.org"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch", "patch"]
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chaos-monitor
+subjects:
+- kind: ServiceAccount
+  name: chaos-monitor
+  namespace: chaos-engineering
+roleRef:
+  kind: ClusterRole
+  name: chaos-monitor
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Chaos Engineering Dashboard Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: chaos-monitor
+  namespace: chaos-engineering
+  labels:
+    app: chaos-monitor
+spec:
+  selector:
+    app: chaos-monitor
+  ports:
+  - name: metrics
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP
+
+---
+# Chaos Engineering CLI
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chaos-cli
+  namespace: chaos-engineering
+data:
+  chaos.sh: |
+    #!/bin/bash
+    
+    # PyAirtable Chaos Engineering CLI
+    
+    set -euo pipefail
+    
+    NAMESPACE="chaos-engineering"
+    
+    usage() {
+        echo "PyAirtable Chaos Engineering CLI"
+        echo ""
+        echo "Usage: $0 <command> [options]"
+        echo ""
+        echo "Commands:"
+        echo "  list              - List all chaos experiments"
+        echo "  status            - Show chaos experiment status"
+        echo "  start <name>      - Start a chaos experiment"
+        echo "  stop <name>       - Stop a chaos experiment"
+        echo "  emergency-stop    - Stop all chaos experiments"
+        echo "  logs <name>       - Show experiment logs"
+        echo "  create <type>     - Create new chaos experiment"
+        echo ""
+        echo "Examples:"
+        echo "  $0 list"
+        echo "  $0 start network-delay-experiment"
+        echo "  $0 stop pod-kill-experiment"
+        echo "  $0 emergency-stop"
+    }
+    
+    list_experiments() {
+        echo "Chaos Experiments:"
+        echo ""
+        
+        # List NetworkChaos
+        echo "=== Network Chaos ==="
+        kubectl get networkchaos --all-namespaces -o wide
+        echo ""
+        
+        # List PodChaos
+        echo "=== Pod Chaos ==="
+        kubectl get podchaos --all-namespaces -o wide
+        echo ""
+        
+        # List StressChaos
+        echo "=== Stress Chaos ==="
+        kubectl get stresschaos --all-namespaces -o wide
+        echo ""
+        
+        # List Schedules
+        echo "=== Scheduled Experiments ==="
+        kubectl get schedule -n ${NAMESPACE} -o wide
+    }
+    
+    show_status() {
+        echo "Chaos Engineering Status:"
+        echo ""
+        
+        # Get metrics from monitor
+        curl -s http://chaos-monitor.${NAMESPACE}:8080/metrics | grep chaos_
+    }
+    
+    start_experiment() {
+        local name=$1
+        
+        echo "Starting chaos experiment: ${name}"
+        
+        # Resume the schedule
+        kubectl patch schedule ${name} -n ${NAMESPACE} -p '{"spec":{"suspend":false}}'
+        
+        echo "Experiment ${name} started"
+    }
+    
+    stop_experiment() {
+        local name=$1
+        
+        echo "Stopping chaos experiment: ${name}"
+        
+        # Suspend the schedule
+        kubectl patch schedule ${name} -n ${NAMESPACE} -p '{"spec":{"suspend":true}}'
+        
+        echo "Experiment ${name} stopped"
+    }
+    
+    emergency_stop() {
+        echo "🚨 EMERGENCY STOP: Stopping all chaos experiments"
+        
+        # Stop all schedules
+        kubectl get schedule -n ${NAMESPACE} -o name | while read schedule; do
+            kubectl patch ${schedule} -n ${NAMESPACE} -p '{"spec":{"suspend":true}}'
+        done
+        
+        # Stop all active experiments
+        kubectl get networkchaos --all-namespaces -o name | while read exp; do
+            kubectl delete ${exp} --ignore-not-found=true
+        done
+        
+        kubectl get podchaos --all-namespaces -o name | while read exp; do
+            kubectl delete ${exp} --ignore-not-found=true
+        done
+        
+        kubectl get stresschaos --all-namespaces -o name | while read exp; do
+            kubectl delete ${exp} --ignore-not-found=true
+        done
+        
+        echo "All chaos experiments stopped"
+    }
+    
+    show_logs() {
+        local name=$1
+        
+        echo "Logs for chaos experiment: ${name}"
+        
+        # Get the latest job for this schedule
+        local job=$(kubectl get jobs -n ${NAMESPACE} -l schedule=${name} --sort-by=.metadata.creationTimestamp -o name | tail -1)
+        
+        if [[ -n "$job" ]]; then
+            kubectl logs ${job} -n ${NAMESPACE}
+        else
+            echo "No jobs found for experiment: ${name}"
+        fi
+    }
+    
+    create_experiment() {
+        local type=$1
+        
+        case "$type" in
+            "network-delay")
+                cat > chaos-experiment.yaml << EOF
+    apiVersion: chaos-mesh.org/v1alpha1
+    kind: NetworkChaos
+    metadata:
+      name: custom-network-delay
+      namespace: pyairtable-staging
+    spec:
+      selector:
+        namespaces:
+          - pyairtable-staging
+      mode: one
+      action: delay
+      delay:
+        latency: "100ms"
+        correlation: "100"
+        jitter: "10ms"
+      duration: "5m"
+    EOF
+                ;;
+            "pod-kill")
+                cat > chaos-experiment.yaml << EOF
+    apiVersion: chaos-mesh.org/v1alpha1
+    kind: PodChaos
+    metadata:
+      name: custom-pod-kill
+      namespace: pyairtable-staging
+    spec:
+      selector:
+        namespaces:
+          - pyairtable-staging
+      mode: one
+      action: pod-kill
+      duration: "2m"
+    EOF
+                ;;
+            *)
+                echo "Unknown experiment type: $type"
+                echo "Available types: network-delay, pod-kill"
+                exit 1
+                ;;
+        esac
+        
+        echo "Created chaos-experiment.yaml"
+        echo "Edit the file and apply with: kubectl apply -f chaos-experiment.yaml"
+    }
+    
+    case "${1:-help}" in
+        "list")
+            list_experiments
+            ;;
+        "status")
+            show_status
+            ;;
+        "start")
+            if [[ $# -lt 2 ]]; then
+                echo "Error: start command requires experiment name"
+                exit 1
+            fi
+            start_experiment "$2"
+            ;;
+        "stop")
+            if [[ $# -lt 2 ]]; then
+                echo "Error: stop command requires experiment name"
+                exit 1
+            fi
+            stop_experiment "$2"
+            ;;
+        "emergency-stop")
+            emergency_stop
+            ;;
+        "logs")
+            if [[ $# -lt 2 ]]; then
+                echo "Error: logs command requires experiment name"
+                exit 1
+            fi
+            show_logs "$2"
+            ;;
+        "create")
+            if [[ $# -lt 2 ]]; then
+                echo "Error: create command requires experiment type"
+                exit 1
+            fi
+            create_experiment "$2"
+            ;;
+        "help"|*)
+            usage
+            ;;
+    esac
+
+---
+# ServiceMonitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: chaos-monitor
+  namespace: chaos-engineering
+  labels:
+    app: chaos-monitor
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: chaos-monitor
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    honorLabels: true
+
+---
+# PrometheusRule for Chaos Engineering Alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: chaos-engineering-alerts
+  namespace: chaos-engineering
+  labels:
+    monitoring: prometheus
+spec:
+  groups:
+  - name: chaos-engineering
+    rules:
+    - alert: ChaosExperimentFailed
+      expr: increase(chaos_experiments_total{status="failed"}[5m]) > 0
+      for: 0m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Chaos experiment failed"
+        description: "Chaos experiment of type {{ $labels.type }} has failed"
+    
+    - alert: TooManyChaosExperiments
+      expr: chaos_active_experiments > 3
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Too many active chaos experiments"
+        description: "{{ $value }} chaos experiments are currently active"
+    
+    - alert: ChaosExperimentStuck
+      expr: chaos_experiment_duration_seconds > 1800  # 30 minutes
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Chaos experiment running too long"
+        description: "Chaos experiment has been running for more than 30 minutes"

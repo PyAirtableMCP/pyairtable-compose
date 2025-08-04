@@ -1,0 +1,331 @@
+# Kafka Monitoring and Alerting Rules for PyAirtable
+# These rules define alerts for critical Kafka infrastructure metrics
+
+groups:
+- name: kafka.rules
+  rules:
+
+  # ============================================================================
+  # KAFKA CLUSTER HEALTH ALERTS
+  # ============================================================================
+
+  - alert: KafkaBrokerDown
+    expr: up{job="kafka-exporter"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      service: kafka
+      component: broker
+    annotations:
+      summary: "Kafka broker is down"
+      description: "Kafka broker {{ $labels.instance }} has been down for more than 1 minute"
+      runbook_url: "https://pyairtable.com/runbooks/kafka-broker-down"
+
+  - alert: KafkaClusterUnavailable
+    expr: count(up{job="kafka-exporter"} == 1) < 2
+    for: 2m
+    labels:
+      severity: critical
+      service: kafka
+      component: cluster
+    annotations:
+      summary: "Kafka cluster has insufficient brokers"
+      description: "Less than 2 Kafka brokers are available, cluster may be unavailable"
+      runbook_url: "https://pyairtable.com/runbooks/kafka-cluster-unavailable"
+
+  # ============================================================================
+  # KAFKA PERFORMANCE ALERTS
+  # ============================================================================
+
+  - alert: KafkaHighCPUUsage
+    expr: kafka_server_BrokerTopicMetrics_TotalTimeMs{quantile="0.99"} > 1000
+    for: 5m
+    labels:
+      severity: warning
+      service: kafka
+      component: performance
+    annotations:
+      summary: "Kafka broker high CPU usage"
+      description: "Kafka broker {{ $labels.instance }} has high CPU usage (99th percentile > 1000ms)"
+      runbook_url: "https://pyairtable.com/runbooks/kafka-high-cpu"
+
+  - alert: KafkaHighMemoryUsage
+    expr: kafka_server_BrokerTopicMetrics_TotalTimeMs{quantile="0.95"} > 500
+    for: 10m
+    labels:
+      severity: warning
+      service: kafka
+      component: performance
+    annotations:
+      summary: "Kafka broker high memory usage"
+      description: "Kafka broker {{ $labels.instance }} has high memory usage"
+
+  # ============================================================================
+  # KAFKA REPLICATION ALERTS
+  # ============================================================================
+
+  - alert: KafkaUnderReplicatedPartitions
+    expr: kafka_server_ReplicaManager_UnderReplicatedPartitions > 0
+    for: 5m
+    labels:
+      severity: critical
+      service: kafka
+      component: replication
+    annotations:
+      summary: "Kafka has under-replicated partitions"
+      description: "Kafka broker {{ $labels.instance }} has {{ $value }} under-replicated partitions"
+      runbook_url: "https://pyairtable.com/runbooks/kafka-under-replicated"
+
+  - alert: KafkaISRShrinks
+    expr: increase(kafka_server_ReplicaManager_IsrShrinksPerSec[5m]) > 0
+    for: 2m
+    labels:
+      severity: warning
+      service: kafka
+      component: replication
+    annotations:
+      summary: "Kafka ISR shrinking"
+      description: "Kafka broker {{ $labels.instance }} ISR is shrinking"
+      runbook_url: "https://pyairtable.com/runbooks/kafka-isr-shrinks"
+
+  # ============================================================================
+  # KAFKA CONSUMER LAG ALERTS
+  # ============================================================================
+
+  - alert: KafkaConsumerLagHigh
+    expr: kafka_consumer_lag_sum > 10000
+    for: 5m
+    labels:
+      severity: warning
+      service: kafka
+      component: consumer
+    annotations:
+      summary: "High consumer lag detected"
+      description: "Consumer group {{ $labels.consumergroup }} has high lag ({{ $value }}) on topic {{ $labels.topic }}"
+      runbook_url: "https://pyairtable.com/runbooks/kafka-consumer-lag"
+
+  - alert: KafkaConsumerLagCritical
+    expr: kafka_consumer_lag_sum > 50000
+    for: 2m
+    labels:
+      severity: critical
+      service: kafka
+      component: consumer
+    annotations:
+      summary: "Critical consumer lag detected"
+      description: "Consumer group {{ $labels.consumergroup }} has critical lag ({{ $value }}) on topic {{ $labels.topic }}"
+      runbook_url: "https://pyairtable.com/runbooks/kafka-consumer-lag"
+
+  # ============================================================================
+  # KAFKA TOPIC AND PARTITION ALERTS
+  # ============================================================================
+
+  - alert: KafkaTopicOfflinePartitions
+    expr: kafka_controller_KafkaController_OfflinePartitionsCount > 0
+    for: 1m
+    labels:
+      severity: critical
+      service: kafka
+      component: partition
+    annotations:
+      summary: "Kafka has offline partitions"
+      description: "Kafka cluster has {{ $value }} offline partitions"
+      runbook_url: "https://pyairtable.com/runbooks/kafka-offline-partitions"
+
+  - alert: KafkaTopicUnderMinISR
+    expr: kafka_cluster_partition_under_min_isr > 0
+    for: 1m
+    labels:
+      severity: critical
+      service: kafka
+      component: partition
+    annotations:
+      summary: "Kafka partitions under minimum ISR"
+      description: "{{ $value }} Kafka partitions are under minimum ISR"
+      runbook_url: "https://pyairtable.com/runbooks/kafka-under-min-isr"
+
+  # ============================================================================
+  # KAFKA DISK AND STORAGE ALERTS
+  # ============================================================================
+
+  - alert: KafkaDiskUsageHigh
+    expr: (kafka_log_size / kafka_log_size_limit) * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+      service: kafka
+      component: storage
+    annotations:
+      summary: "Kafka disk usage high"
+      description: "Kafka broker {{ $labels.instance }} disk usage is above 80%"
+      runbook_url: "https://pyairtable.com/runbooks/kafka-disk-usage"
+
+  - alert: KafkaDiskUsageCritical
+    expr: (kafka_log_size / kafka_log_size_limit) * 100 > 95
+    for: 1m
+    labels:
+      severity: critical
+      service: kafka
+      component: storage
+    annotations:
+      summary: "Kafka disk usage critical"
+      description: "Kafka broker {{ $labels.instance }} disk usage is above 95%"
+      runbook_url: "https://pyairtable.com/runbooks/kafka-disk-usage"
+
+  # ============================================================================
+  # KAFKA NETWORK AND REQUEST ALERTS
+  # ============================================================================
+
+  - alert: KafkaRequestHandlerIdleRatioLow
+    expr: kafka_server_KafkaRequestHandlerPool_RequestHandlerAvgIdlePercent < 0.2
+    for: 5m
+    labels:
+      severity: warning
+      service: kafka
+      component: network
+    annotations:
+      summary: "Kafka request handler idle ratio low"
+      description: "Kafka broker {{ $labels.instance }} request handler idle ratio is low ({{ $value }})"
+      runbook_url: "https://pyairtable.com/runbooks/kafka-request-handler"
+
+  - alert: KafkaNetworkProcessorIdleRatioLow
+    expr: kafka_server_SocketServer_NetworkProcessorAvgIdlePercent < 0.2
+    for: 5m
+    labels:
+      severity: warning
+      service: kafka
+      component: network
+    annotations:
+      summary: "Kafka network processor idle ratio low"
+      description: "Kafka broker {{ $labels.instance }} network processor idle ratio is low ({{ $value }})"
+
+  # ============================================================================
+  # SCHEMA REGISTRY ALERTS
+  # ============================================================================
+
+  - alert: SchemaRegistryDown
+    expr: up{job="schema-registry"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      service: schema-registry
+      component: service
+    annotations:
+      summary: "Schema Registry is down"
+      description: "Schema Registry {{ $labels.instance }} has been down for more than 1 minute"
+      runbook_url: "https://pyairtable.com/runbooks/schema-registry-down"
+
+  - alert: SchemaRegistryHighRequestLatency
+    expr: histogram_quantile(0.99, schema_registry_request_duration_seconds_bucket) > 1
+    for: 5m
+    labels:
+      severity: warning
+      service: schema-registry
+      component: performance
+    annotations:
+      summary: "Schema Registry high request latency"
+      description: "Schema Registry 99th percentile request latency is above 1 second"
+
+  # ============================================================================
+  # KAFKA CONNECT ALERTS
+  # ============================================================================
+
+  - alert: KafkaConnectDown
+    expr: up{job="kafka-connect"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      service: kafka-connect
+      component: service
+    annotations:
+      summary: "Kafka Connect is down"
+      description: "Kafka Connect {{ $labels.instance }} has been down for more than 1 minute"
+      runbook_url: "https://pyairtable.com/runbooks/kafka-connect-down"
+
+  - alert: KafkaConnectConnectorFailed
+    expr: kafka_connect_connector_status{status!="RUNNING"} > 0
+    for: 2m
+    labels:
+      severity: warning
+      service: kafka-connect
+      component: connector
+    annotations:
+      summary: "Kafka Connect connector failed"
+      description: "Kafka Connect connector {{ $labels.connector }} is in {{ $labels.status }} state"
+      runbook_url: "https://pyairtable.com/runbooks/kafka-connect-connector-failed"
+
+  # ============================================================================
+  # PYAIRTABLE-SPECIFIC ALERTS
+  # ============================================================================
+
+  - alert: PyAirtableEventProcessingLag
+    expr: kafka_consumer_lag_sum{topic=~"pyairtable.*"} > 5000
+    for: 3m
+    labels:
+      severity: warning
+      service: pyairtable
+      component: event-processing
+    annotations:
+      summary: "PyAirtable event processing lag"
+      description: "PyAirtable consumer group {{ $labels.consumergroup }} has processing lag ({{ $value }}) on topic {{ $labels.topic }}"
+      runbook_url: "https://pyairtable.com/runbooks/event-processing-lag"
+
+  - alert: PyAirtableDLQMessagesHigh
+    expr: rate(kafka_topic_partition_current_offset{topic="pyairtable.dlq.events"}[5m]) > 10
+    for: 2m
+    labels:
+      severity: warning
+      service: pyairtable
+      component: dead-letter-queue
+    annotations:
+      summary: "High rate of messages in PyAirtable DLQ"
+      description: "PyAirtable dead letter queue is receiving messages at rate {{ $value }}/sec"
+      runbook_url: "https://pyairtable.com/runbooks/dlq-messages"
+
+  - alert: PyAirtableSagaFailureRate
+    expr: rate(kafka_topic_partition_current_offset{topic="pyairtable.saga.events"}[5m]) > 5
+    for: 5m
+    labels:
+      severity: warning
+      service: pyairtable
+      component: saga
+    annotations:
+      summary: "High SAGA failure rate"
+      description: "PyAirtable SAGA events are being generated at high rate ({{ $value }}/sec)"
+
+  # ============================================================================
+  # BUSINESS LOGIC ALERTS
+  # ============================================================================
+
+  - alert: PyAirtableUserRegistrationFailures
+    expr: rate(kafka_topic_partition_current_offset{topic="pyairtable.auth.events"}[10m]) < 0.1
+    for: 15m
+    labels:
+      severity: warning
+      service: pyairtable
+      component: user-registration
+    annotations:
+      summary: "Low user registration rate"
+      description: "PyAirtable user registration rate is very low ({{ $value }}/sec over 10 minutes)"
+
+  - alert: PyAirtableAirtableSyncFailures
+    expr: rate(kafka_topic_partition_current_offset{topic="pyairtable.airtable.events"}[5m]) > 100
+    for: 3m
+    labels:
+      severity: warning
+      service: pyairtable
+      component: airtable-sync
+    annotations:
+      summary: "High Airtable sync event rate"
+      description: "PyAirtable Airtable sync events are being generated at high rate ({{ $value }}/sec)"
+
+  - alert: PyAirtableWorkflowExecutionFailures
+    expr: rate(kafka_topic_partition_current_offset{topic="pyairtable.workflows.events"}[5m]) > 50
+    for: 5m
+    labels:
+      severity: warning
+      service: pyairtable
+      component: workflow-execution
+    annotations:
+      summary: "High workflow execution event rate"
+      description: "PyAirtable workflow execution events are being generated at high rate ({{ $value }}/sec)"

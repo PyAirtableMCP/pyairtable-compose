@@ -1,0 +1,594 @@
+# Feature Flag Service for PyAirtable
+# Provides dynamic feature control with real-time updates
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: feature-flags-config
+  namespace: pyairtable-prod
+data:
+  config.yaml: |
+    feature_flags:
+      # Core Features
+      new_ui_enabled:
+        enabled: false
+        description: "Enable new user interface"
+        rollout_percentage: 0
+        target_groups: []
+        environments: ["dev", "staging"]
+        
+      enhanced_analytics:
+        enabled: true
+        description: "Enhanced analytics dashboard"
+        rollout_percentage: 100
+        target_groups: ["premium_users"]
+        environments: ["prod", "staging"]
+        
+      # API Features
+      api_v2_enabled:
+        enabled: true
+        description: "Enable API v2 endpoints"
+        rollout_percentage: 50
+        target_groups: ["beta_users", "internal_users"]
+        environments: ["prod"]
+        
+      rate_limiting_v2:
+        enabled: false
+        description: "New rate limiting algorithm"
+        rollout_percentage: 10
+        target_groups: ["internal_users"]
+        environments: ["dev", "staging"]
+        
+      # Performance Features
+      redis_caching:
+        enabled: true
+        description: "Redis-based caching layer"
+        rollout_percentage: 100
+        target_groups: []
+        environments: ["prod", "staging", "dev"]
+        
+      query_optimization:
+        enabled: true
+        description: "Database query optimization"
+        rollout_percentage: 75
+        target_groups: []
+        environments: ["prod"]
+        
+      # Security Features
+      enhanced_auth:
+        enabled: false
+        description: "Enhanced authentication flow"
+        rollout_percentage: 0
+        target_groups: ["internal_users"]
+        environments: ["dev"]
+        
+      two_factor_auth:
+        enabled: true
+        description: "Two-factor authentication"
+        rollout_percentage: 100
+        target_groups: []
+        environments: ["prod", "staging"]
+        
+      # AI Features
+      ai_suggestions:
+        enabled: false
+        description: "AI-powered suggestions"
+        rollout_percentage: 25
+        target_groups: ["beta_users", "premium_users"]
+        environments: ["staging"]
+        
+      smart_automation:
+        enabled: false
+        description: "Smart automation features"
+        rollout_percentage: 0
+        target_groups: ["alpha_users"]
+        environments: ["dev"]
+        
+    # User group definitions
+    user_groups:
+      alpha_users:
+        - "user1@pyairtable.com"
+        - "user2@pyairtable.com"
+      beta_users:
+        - "beta1@pyairtable.com"
+        - "beta2@pyairtable.com"
+      internal_users:
+        - "@pyairtable.com"
+      premium_users:
+        - "premium_user_id_1"
+        - "premium_user_id_2"
+        
+    # Environment-specific overrides
+    environment_overrides:
+      dev:
+        new_ui_enabled:
+          enabled: true
+          rollout_percentage: 100
+        enhanced_auth:
+          enabled: true
+          rollout_percentage: 100
+      staging:
+        api_v2_enabled:
+          enabled: true
+          rollout_percentage: 100
+        ai_suggestions:
+          enabled: true
+          rollout_percentage: 50
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: feature-flag-service
+  namespace: pyairtable-prod
+  labels:
+    app: feature-flag-service
+    component: infrastructure
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: feature-flag-service
+  template:
+    metadata:
+      labels:
+        app: feature-flag-service
+        component: infrastructure
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: feature-flag-service
+        image: flagsmith/flagsmith:latest  # Using Flagsmith as feature flag service
+        ports:
+        - containerPort: 8000
+          name: http
+        - containerPort: 8080
+          name: metrics
+        env:
+        - name: DJANGO_ALLOWED_HOSTS
+          value: "*"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: feature-flag-secrets
+              key: database_url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: feature-flag-secrets
+              key: redis_url
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: feature-flag-secrets
+              key: secret_key
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        livenessProbe:
+          httpGet:
+            path: /health/
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: feature-flags-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: feature-flag-service
+  namespace: pyairtable-prod
+  labels:
+    app: feature-flag-service
+spec:
+  selector:
+    app: feature-flag-service
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+  - name: metrics
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+
+---
+# Custom Feature Flag Controller
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: feature-flag-controller
+  namespace: pyairtable-prod
+  labels:
+    app: feature-flag-controller
+    component: controller
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: feature-flag-controller
+  template:
+    metadata:
+      labels:
+        app: feature-flag-controller
+        component: controller
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: controller
+        image: python:3.11-slim
+        command:
+        - python
+        - /app/controller.py
+        ports:
+        - containerPort: 8080
+          name: metrics
+        env:
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: feature-flag-secrets
+              key: redis_url
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: CONFIG_MAP_NAME
+          value: "feature-flags-config"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: controller-code
+          mountPath: /app
+          readOnly: true
+      volumes:
+      - name: controller-code
+        configMap:
+          name: feature-flag-controller-code
+          defaultMode: 0755
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: feature-flag-controller-code
+  namespace: pyairtable-prod
+data:
+  controller.py: |
+    #!/usr/bin/env python3
+    """
+    Feature Flag Controller
+    Watches ConfigMap changes and updates feature flags in real-time
+    """
+    
+    import os
+    import time
+    import json
+    import yaml
+    import redis
+    import logging
+    from kubernetes import client, config, watch
+    from prometheus_client import start_http_server, Counter, Gauge
+    
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    
+    # Prometheus metrics
+    flag_updates = Counter('feature_flag_updates_total', 'Total feature flag updates')
+    active_flags = Gauge('feature_flags_active', 'Number of active feature flags')
+    
+    class FeatureFlagController:
+        def __init__(self):
+            # Initialize Kubernetes client
+            try:
+                config.load_incluster_config()
+            except:
+                config.load_kube_config()
+            
+            self.v1 = client.CoreV1Api()
+            self.namespace = os.getenv('NAMESPACE', 'pyairtable-prod')
+            self.config_map_name = os.getenv('CONFIG_MAP_NAME', 'feature-flags-config')
+            
+            # Initialize Redis client
+            redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
+            self.redis_client = redis.from_url(redis_url)
+            
+            logger.info(f"Initialized controller for namespace: {self.namespace}")
+        
+        def update_feature_flags(self, config_data):
+            """Update feature flags in Redis"""
+            try:
+                config_yaml = yaml.safe_load(config_data)
+                feature_flags = config_yaml.get('feature_flags', {})
+                
+                # Update each feature flag in Redis
+                for flag_name, flag_config in feature_flags.items():
+                    redis_key = f"feature_flag:{flag_name}"
+                    self.redis_client.set(redis_key, json.dumps(flag_config))
+                    logger.info(f"Updated feature flag: {flag_name}")
+                    flag_updates.inc()
+                
+                # Update metrics
+                active_flags.set(len(feature_flags))
+                
+                # Store user groups
+                user_groups = config_yaml.get('user_groups', {})
+                self.redis_client.set('feature_flag:user_groups', json.dumps(user_groups))
+                
+                # Store environment overrides
+                env_overrides = config_yaml.get('environment_overrides', {})
+                self.redis_client.set('feature_flag:environment_overrides', json.dumps(env_overrides))
+                
+                logger.info(f"Updated {len(feature_flags)} feature flags")
+                
+            except Exception as e:
+                logger.error(f"Error updating feature flags: {e}")
+        
+        def watch_config_map(self):
+            """Watch for ConfigMap changes"""
+            w = watch.Watch()
+            
+            while True:
+                try:
+                    for event in w.stream(
+                        self.v1.list_namespaced_config_map,
+                        namespace=self.namespace,
+                        field_selector=f"metadata.name={self.config_map_name}"
+                    ):
+                        event_type = event['type']
+                        config_map = event['object']
+                        
+                        if event_type in ['ADDED', 'MODIFIED']:
+                            logger.info(f"ConfigMap {event_type}: {config_map.metadata.name}")
+                            config_data = config_map.data.get('config.yaml', '')
+                            self.update_feature_flags(config_data)
+                        
+                except Exception as e:
+                    logger.error(f"Error watching ConfigMap: {e}")
+                    time.sleep(10)  # Wait before retrying
+        
+        def run(self):
+            """Run the controller"""
+            # Start Prometheus metrics server
+            start_http_server(8080)
+            logger.info("Started Prometheus metrics server on port 8080")
+            
+            # Initial load of feature flags
+            try:
+                config_map = self.v1.read_namespaced_config_map(
+                    name=self.config_map_name,
+                    namespace=self.namespace
+                )
+                config_data = config_map.data.get('config.yaml', '')
+                self.update_feature_flags(config_data)
+            except Exception as e:
+                logger.error(f"Error loading initial config: {e}")
+            
+            # Start watching for changes
+            logger.info("Starting ConfigMap watcher...")
+            self.watch_config_map()
+    
+    if __name__ == '__main__':
+        controller = FeatureFlagController()
+        controller.run()
+  
+  requirements.txt: |
+    kubernetes==28.1.0
+    redis==5.0.1
+    PyYAML==6.0.1
+    prometheus_client==0.19.0
+
+---
+# RBAC for Feature Flag Controller
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: feature-flag-controller
+  namespace: pyairtable-prod
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: feature-flag-controller
+  namespace: pyairtable-prod
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: feature-flag-controller
+  namespace: pyairtable-prod
+subjects:
+- kind: ServiceAccount
+  name: feature-flag-controller
+  namespace: pyairtable-prod
+roleRef:
+  kind: Role
+  name: feature-flag-controller
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Feature Flag Client Library ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: feature-flag-client-lib
+  namespace: pyairtable-prod
+data:
+  client.py: |
+    """
+    PyAirtable Feature Flag Client Library
+    """
+    
+    import json
+    import redis
+    import logging
+    from typing import Dict, List, Optional, Any
+    
+    logger = logging.getLogger(__name__)
+    
+    class FeatureFlagClient:
+        def __init__(self, redis_url: str = "redis://localhost:6379"):
+            self.redis_client = redis.from_url(redis_url)
+            self.environment = os.getenv('ENVIRONMENT', 'prod')
+        
+        def is_enabled(self, flag_name: str, user_id: str = None, user_email: str = None) -> bool:
+            """Check if a feature flag is enabled for a user"""
+            try:
+                # Get flag configuration
+                flag_config = self._get_flag_config(flag_name)
+                if not flag_config:
+                    return False
+                
+                # Check environment
+                if self.environment not in flag_config.get('environments', []):
+                    return False
+                
+                # Check if flag is globally enabled
+                if not flag_config.get('enabled', False):
+                    return False
+                
+                # Check user group targeting
+                target_groups = flag_config.get('target_groups', [])
+                if target_groups and not self._user_in_target_groups(user_id, user_email, target_groups):
+                    return False
+                
+                # Check rollout percentage
+                rollout_percentage = flag_config.get('rollout_percentage', 0)
+                if rollout_percentage < 100:
+                    user_hash = hash(f"{flag_name}:{user_id or user_email}") % 100
+                    if user_hash >= rollout_percentage:
+                        return False
+                
+                return True
+                
+            except Exception as e:
+                logger.error(f"Error checking feature flag {flag_name}: {e}")
+                return False
+        
+        def get_flag_config(self, flag_name: str) -> Dict[str, Any]:
+            """Get complete flag configuration"""
+            return self._get_flag_config(flag_name) or {}
+        
+        def _get_flag_config(self, flag_name: str) -> Optional[Dict[str, Any]]:
+            """Get flag configuration from Redis"""
+            try:
+                redis_key = f"feature_flag:{flag_name}"
+                config_json = self.redis_client.get(redis_key)
+                if config_json:
+                    return json.loads(config_json)
+                return None
+            except Exception as e:
+                logger.error(f"Error getting flag config for {flag_name}: {e}")
+                return None
+        
+        def _user_in_target_groups(self, user_id: str, user_email: str, target_groups: List[str]) -> bool:
+            """Check if user is in any of the target groups"""
+            try:
+                user_groups_json = self.redis_client.get('feature_flag:user_groups')
+                if not user_groups_json:
+                    return False
+                
+                user_groups = json.loads(user_groups_json)
+                
+                for group_name in target_groups:
+                    if group_name in user_groups:
+                        group_members = user_groups[group_name]
+                        
+                        # Check exact user ID match
+                        if user_id and user_id in group_members:
+                            return True
+                        
+                        # Check email domain match (e.g., "@pyairtable.com")
+                        if user_email:
+                            for member in group_members:
+                                if member.startswith('@') and user_email.endswith(member):
+                                    return True
+                                elif member == user_email:
+                                    return True
+                
+                return False
+                
+            except Exception as e:
+                logger.error(f"Error checking user groups: {e}")
+                return False
+
+---
+# ServiceMonitor for Prometheus monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: feature-flag-service
+  namespace: pyairtable-prod
+  labels:
+    app: feature-flag-service
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: feature-flag-service
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    honorLabels: true

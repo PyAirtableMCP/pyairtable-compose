@@ -1,0 +1,468 @@
+# PyAirtable Production Migration Configuration
+# ===========================================
+
+# Migration Environment Configuration
+environment:
+  name: "production"
+  region: "eu-central-1"
+  cluster_name: "pyairtable-prod"
+  domain: "pyairtable.com"
+  namespace: "pyairtable"
+
+# Database Configuration
+database:
+  source_url: "${SOURCE_DATABASE_URL}"
+  target_url: "${TARGET_DATABASE_URL}"
+  replication_user: "replication_user"
+  backup_retention_days: 30
+  max_lag_seconds: 60
+
+# Redis Configuration
+redis:
+  url: "${REDIS_URL}"
+  cluster_mode: true
+  sentinel_endpoints:
+    - "redis-sentinel-1:26379"
+    - "redis-sentinel-2:26379"
+    - "redis-sentinel-3:26379"
+
+# Kafka Configuration
+kafka:
+  brokers: "${KAFKA_BROKERS}"
+  security_protocol: "SSL"
+  ssl_config:
+    keystore_location: "/etc/kafka/ssl/kafka.keystore.jks"
+    truststore_location: "/etc/kafka/ssl/kafka.truststore.jks"
+
+# AWS Configuration
+aws:
+  region: "eu-central-1"
+  account_id: "${AWS_ACCOUNT_ID}"
+  ecr_registry: "${AWS_ACCOUNT_ID}.dkr.ecr.eu-central-1.amazonaws.com"
+  
+  # Load Balancer Configuration
+  load_balancers:
+    staging: "pyairtable-staging-alb-1234567890.eu-central-1.elb.amazonaws.com"
+    production: "pyairtable-prod-alb-1234567890.eu-central-1.elb.amazonaws.com"
+  
+  # DNS Configuration
+  route53:
+    hosted_zone_id: "${HOSTED_ZONE_ID}"
+    ssl_cert_arn: "${SSL_CERT_ARN}"
+    
+  # RDS Configuration
+  rds:
+    cluster_identifier: "pyairtable-prod"
+    backup_retention_period: 30
+    preferred_backup_window: "03:00-04:00"
+    preferred_maintenance_window: "sun:04:00-sun:05:00"
+
+# Service Configuration
+services:
+  # Infrastructure Services
+  infrastructure:
+    - name: "postgres"
+      type: "database"
+      priority: 1
+      health_check: "/health"
+      dependencies: []
+      
+    - name: "redis"
+      type: "cache"
+      priority: 1
+      health_check: "/health"
+      dependencies: []
+      
+    - name: "kafka"
+      type: "messaging"
+      priority: 1
+      health_check: "/health"
+      dependencies: []
+
+  # Core Services
+  core:
+    - name: "api-gateway"
+      type: "go"
+      priority: 2
+      health_check: "/health"
+      dependencies: ["postgres", "redis"]
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "256Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+      
+    - name: "auth-service"
+      type: "go"
+      priority: 2
+      health_check: "/health"
+      dependencies: ["postgres", "redis"]
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "256Mi"
+        limits:
+          cpu: "400m"
+          memory: "512Mi"
+
+  # Platform Services
+  platform:
+    - name: "user-service"
+      type: "go"
+      priority: 3
+      health_check: "/health"
+      dependencies: ["postgres", "auth-service"]
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "256Mi"
+        limits:
+          cpu: "400m"
+          memory: "512Mi"
+      
+    - name: "workspace-service"
+      type: "go"
+      priority: 3
+      health_check: "/health"
+      dependencies: ["postgres", "user-service"]
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "256Mi"
+        limits:
+          cpu: "400m"
+          memory: "512Mi"
+      
+    - name: "permission-service"
+      type: "go"
+      priority: 3
+      health_check: "/health"
+      dependencies: ["postgres"]
+      resources:
+        requests:
+          cpu: "150m"
+          memory: "256Mi"
+        limits:
+          cpu: "300m"
+          memory: "512Mi"
+
+  # Domain Services
+  domain:
+    - name: "airtable-gateway"
+      type: "python"
+      priority: 4
+      health_check: "/health"
+      dependencies: ["redis", "user-service"]
+      resources:
+        requests:
+          cpu: "300m"
+          memory: "512Mi"
+        limits:
+          cpu: "600m"
+          memory: "1Gi"
+      
+    - name: "llm-orchestrator"
+      type: "python"
+      priority: 4
+      health_check: "/health"
+      dependencies: ["redis", "mcp-server"]
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "1000m"
+          memory: "2Gi"
+      
+    - name: "mcp-server"
+      type: "python"
+      priority: 4
+      health_check: "/health"
+      dependencies: ["airtable-gateway"]
+      resources:
+        requests:
+          cpu: "300m"
+          memory: "512Mi"
+        limits:
+          cpu: "600m"
+          memory: "1Gi"
+      
+    - name: "automation-service"
+      type: "python"
+      priority: 4
+      health_check: "/health"
+      dependencies: ["kafka", "postgres"]
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "512Mi"
+        limits:
+          cpu: "500m"
+          memory: "1Gi"
+
+  # Frontend Services
+  frontend:
+    - name: "web-bff"
+      type: "go"
+      priority: 5
+      health_check: "/health"
+      dependencies: ["api-gateway"]
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "256Mi"
+        limits:
+          cpu: "400m"
+          memory: "512Mi"
+      
+    - name: "mobile-bff"
+      type: "go"
+      priority: 5
+      health_check: "/health"
+      dependencies: ["api-gateway"]
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "256Mi"
+        limits:
+          cpu: "400m"
+          memory: "512Mi"
+      
+    - name: "auth-frontend"
+      type: "nextjs"
+      priority: 5
+      health_check: "/"
+      dependencies: ["auth-service"]
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "256Mi"
+        limits:
+          cpu: "200m"
+          memory: "512Mi"
+
+  # Utility Services
+  utility:
+    - name: "notification-service"
+      type: "go"
+      priority: 6
+      health_check: "/health"
+      dependencies: ["kafka", "user-service"]
+      resources:
+        requests:
+          cpu: "150m"
+          memory: "256Mi"
+        limits:
+          cpu: "300m"
+          memory: "512Mi"
+      
+    - name: "file-service"
+      type: "go"
+      priority: 6
+      health_check: "/health"
+      dependencies: ["postgres"]
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "256Mi"
+        limits:
+          cpu: "400m"
+          memory: "512Mi"
+      
+    - name: "webhook-service"
+      type: "go"
+      priority: 6
+      health_check: "/health"
+      dependencies: ["kafka", "auth-service"]
+      resources:
+        requests:
+          cpu: "150m"
+          memory: "256Mi"
+        limits:
+          cpu: "300m"
+          memory: "512Mi"
+
+# Performance Thresholds
+performance:
+  api_response_time_ms: 500
+  db_query_time_ms: 100
+  cache_operation_time_ms: 10
+  load_test_error_rate: 0.01
+  load_test_response_time_ms: 1000
+  memory_usage_threshold: 0.8
+  cpu_usage_threshold: 0.7
+
+# Migration Phases Configuration
+migration_phases:
+  planning:
+    timeout_minutes: 30
+    retry_attempts: 3
+    validations:
+      - infrastructure_readiness
+      - service_readiness
+      - data_consistency
+      - security_policies
+  
+  database:
+    timeout_minutes: 120
+    retry_attempts: 2
+    validations:
+      - replication_setup
+      - data_sync
+      - integrity_checks
+      - projection_rebuild
+  
+  services:
+    timeout_minutes: 180
+    retry_attempts: 2
+    batch_size: 3
+    health_check_timeout: 300
+    rollback_on_failure: true
+  
+  traffic:
+    timeout_minutes: 60
+    retry_attempts: 1
+    traffic_shift_intervals: [10, 25, 50, 75, 100]
+    monitoring_window_seconds: 120
+    error_rate_threshold: 0.01
+  
+  validation:
+    timeout_minutes: 45
+    retry_attempts: 2
+    comprehensive_tests: true
+    performance_validation: true
+    security_validation: true
+  
+  cleanup:
+    timeout_minutes: 30
+    retry_attempts: 3
+    remove_old_resources: true
+    update_documentation: true
+
+# Monitoring Configuration
+monitoring:
+  endpoints:
+    prometheus: "http://prometheus.monitoring.svc.cluster.local:9090"
+    grafana: "http://grafana.monitoring.svc.cluster.local:3000"
+    alertmanager: "http://alertmanager.monitoring.svc.cluster.local:9093"
+  
+  dashboards:
+    - name: "Infrastructure Overview"
+      url: "/d/infrastructure/infrastructure-overview"
+    - name: "Application Metrics"
+      url: "/d/application/application-metrics"
+    - name: "Business Metrics"
+      url: "/d/business/business-metrics"
+  
+  alerts:
+    - name: "High Error Rate"
+      threshold: 0.05
+      duration: "5m"
+    - name: "High Response Time"
+      threshold: 1000
+      duration: "10m"
+    - name: "Low Success Rate"
+      threshold: 0.95
+      duration: "15m"
+
+# Security Configuration
+security:
+  network_policies: true
+  pod_security_standards: "restricted"
+  service_mesh: "istio"
+  mtls_mode: "STRICT"
+  rbac_enabled: true
+  
+  secrets:
+    - name: "database-secrets"
+      keys: ["url", "username", "password"]
+    - name: "redis-secrets"
+      keys: ["url", "password"]
+    - name: "api-secrets"
+      keys: ["airtable_token", "gemini_api_key", "api_key"]
+    - name: "ssl-certificates"
+      keys: ["tls.crt", "tls.key"]
+
+# Backup Configuration
+backup:
+  database:
+    enabled: true
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    retention_days: 30
+    encryption: true
+  
+  configurations:
+    enabled: true
+    schedule: "0 1 * * *"  # Daily at 1 AM
+    retention_days: 90
+    storage: "s3://pyairtable-backups/configs"
+  
+  volumes:
+    enabled: true
+    schedule: "0 3 * * 0"  # Weekly on Sunday at 3 AM
+    retention_weeks: 4
+    storage: "s3://pyairtable-backups/volumes"
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "json"
+  retention_days: 30
+  
+  aggregation:
+    enabled: true
+    elasticsearch_url: "http://elasticsearch.logging.svc.cluster.local:9200"
+    logstash_url: "http://logstash.logging.svc.cluster.local:5044"
+    
+  shipping:
+    enabled: true
+    shipper: "filebeat"
+    config: "/etc/filebeat/filebeat.yml"
+
+# Rollback Configuration
+rollback:
+  enabled: true
+  automatic_triggers:
+    - high_error_rate: 0.1
+    - service_unavailable: 3
+    - response_time_breach: 5000
+  
+  rollback_points:
+    - phase: "traffic"
+      action: "dns_rollback"
+      timeout_minutes: 5
+    - phase: "services"
+      action: "service_rollback"
+      timeout_minutes: 10
+    - phase: "database"
+      action: "database_rollback"
+      timeout_minutes: 30
+  
+  notification:
+    channels: ["slack", "email", "pagerduty"]
+    escalation_time_minutes: 15
+
+# Success Criteria
+success_criteria:
+  technical:
+    - all_services_healthy: true
+    - error_rate_below_threshold: 0.01
+    - response_time_below_threshold: 500
+    - data_integrity_validated: true
+    - security_policies_active: true
+  
+  business:
+    - user_authentication_working: true
+    - airtable_integration_functional: true
+    - ai_services_operational: true
+    - real_time_features_working: true
+    - api_rate_limits_enforced: true
+  
+  operational:
+    - monitoring_active: true
+    - alerting_configured: true
+    - backups_operational: true
+    - logging_aggregated: true
+    - documentation_updated: true

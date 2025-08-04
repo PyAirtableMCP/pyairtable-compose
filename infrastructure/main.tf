@@ -307,20 +307,68 @@ resource "aws_ecs_cluster" "main" {
   }
 }
 
+# Cost Optimization Module Integration
+module "cost_optimization" {
+  source = "./modules/cost-optimization"
+  
+  project_name         = var.project_name
+  environment         = var.environment
+  vpc_id              = aws_vpc.main.id
+  vpc_cidr            = var.vpc_cidr
+  private_subnet_ids  = aws_subnet.private[*].id
+  cluster_name        = aws_ecs_cluster.main.name
+  
+  # Spot instance configuration for 70/30 split
+  on_demand_percentage     = 30
+  spot_target_capacity     = 100
+  min_spot_instances       = var.environment_configs[var.environment].min_capacity
+  max_spot_instances       = var.environment_configs[var.environment].max_capacity
+  desired_spot_instances   = var.environment_configs[var.environment].min_capacity + 1
+  
+  # Night scaling configuration  
+  enable_night_scaling     = var.environment == "prod" ? true : false
+  night_scale_down_percentage = 50
+  
+  # Cost monitoring
+  daily_cost_threshold = var.environment == "prod" ? 100 : 50
+  alert_email         = var.alert_email
+  
+  # Reserved capacity for production
+  enable_redis_reserved = var.environment == "prod" ? true : false
+  redis_node_type      = var.redis_node_type
+  
+  # Cost allocation tags
+  cost_allocation_tags = {
+    Team        = "3vantage"
+    Service     = "pyairtable"
+    CostCenter  = "engineering"
+    Environment = var.environment
+  }
+  
+  tags = {
+    Project     = var.project_name
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+    Module      = "cost-optimization"
+  }
+}
+
 resource "aws_ecs_cluster_capacity_providers" "main" {
   cluster_name = aws_ecs_cluster.main.name
 
-  capacity_providers = ["FARGATE", "FARGATE_SPOT"]
+  capacity_providers = ["FARGATE", "FARGATE_SPOT", module.cost_optimization.capacity_provider_name]
 
+  # Production: Conservative approach with more on-demand
   default_capacity_provider_strategy {
-    base              = 1
-    weight            = var.environment == "prod" ? 100 : 50
+    base              = 2
+    weight            = var.environment == "prod" ? 30 : 30
     capacity_provider = "FARGATE"
   }
 
+  # Spot instances for cost optimization
   default_capacity_provider_strategy {
-    base              = 0
-    weight            = var.environment == "prod" ? 0 : 50
+    base              = 0  
+    weight            = var.environment == "prod" ? 70 : 70
     capacity_provider = "FARGATE_SPOT"
   }
 }

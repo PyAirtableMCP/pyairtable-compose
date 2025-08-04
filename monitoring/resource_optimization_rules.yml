@@ -1,0 +1,214 @@
+# Resource Optimization Rules for Prometheus
+# Task: immediate-4 - Analyze current resource usage patterns across all 30 microservices
+
+groups:
+- name: resource_optimization
+  interval: 30s
+  rules:
+  
+  # CPU utilization analysis rules
+  - record: pyairtable:cpu_utilization_average
+    expr: |
+      avg_over_time(
+        rate(container_cpu_usage_seconds_total{namespace="pyairtable"}[5m])[2w:]
+      ) by (pod, container)
+    labels:
+      analysis_type: "cpu_baseline"
+      
+  - record: pyairtable:cpu_utilization_p95
+    expr: |
+      quantile_over_time(0.95,
+        rate(container_cpu_usage_seconds_total{namespace="pyairtable"}[5m])[2w:]
+      ) by (pod, container)
+    labels:
+      analysis_type: "cpu_peak"
+      
+  - record: pyairtable:cpu_requests_vs_usage
+    expr: |
+      (
+        avg_over_time(rate(container_cpu_usage_seconds_total{namespace="pyairtable"}[5m])[1h:]) 
+        / 
+        on(pod, container) kube_pod_container_resource_requests{resource="cpu", namespace="pyairtable"}
+      ) * 100
+    labels:
+      analysis_type: "cpu_efficiency"
+
+  # Memory utilization analysis rules  
+  - record: pyairtable:memory_utilization_average
+    expr: |
+      avg_over_time(
+        container_memory_working_set_bytes{namespace="pyairtable"}[2w:]
+      ) by (pod, container)
+    labels:
+      analysis_type: "memory_baseline"
+      
+  - record: pyairtable:memory_utilization_p95
+    expr: |
+      quantile_over_time(0.95,
+        container_memory_working_set_bytes{namespace="pyairtable"}[2w:]
+      ) by (pod, container)
+    labels:
+      analysis_type: "memory_peak"
+      
+  - record: pyairtable:memory_requests_vs_usage
+    expr: |
+      (
+        avg_over_time(container_memory_working_set_bytes{namespace="pyairtable"}[1h:])
+        /
+        on(pod, container) kube_pod_container_resource_requests{resource="memory", namespace="pyairtable"}
+      ) * 100
+    labels:
+      analysis_type: "memory_efficiency"
+
+  # Resource waste identification
+  - record: pyairtable:cpu_waste_percentage
+    expr: |
+      (
+        1 - (
+          avg_over_time(rate(container_cpu_usage_seconds_total{namespace="pyairtable"}[5m])[1h:])
+          /
+          on(pod, container) kube_pod_container_resource_requests{resource="cpu", namespace="pyairtable"}
+        )
+      ) * 100
+    labels:
+      analysis_type: "cpu_waste"
+      
+  - record: pyairtable:memory_waste_percentage
+    expr: |
+      (
+        1 - (
+          avg_over_time(container_memory_working_set_bytes{namespace="pyairtable"}[1h:])
+          /
+          on(pod, container) kube_pod_container_resource_requests{resource="memory", namespace="pyairtable"}
+        )
+      ) * 100
+    labels:
+      analysis_type: "memory_waste"
+
+  # Service-specific optimization recommendations
+  - record: pyairtable:service_rightsizing_cpu
+    expr: |
+      ceil(
+        quantile_over_time(0.95,
+          rate(container_cpu_usage_seconds_total{namespace="pyairtable"}[5m])[2w:]
+        ) * 1.2 * 1000  # Add 20% buffer and convert to millicores
+      ) by (pod, container)
+    labels:
+      recommendation_type: "cpu_request"
+      
+  - record: pyairtable:service_rightsizing_memory
+    expr: |
+      ceil(
+        quantile_over_time(0.95,
+          container_memory_working_set_bytes{namespace="pyairtable"}[2w:]
+        ) * 1.3 / 1024 / 1024  # Add 30% buffer and convert to Mi
+      ) by (pod, container)
+    labels:
+      recommendation_type: "memory_request"
+
+  # Cost optimization metrics
+  - record: pyairtable:monthly_cpu_cost_waste
+    expr: |
+      sum(
+        pyairtable:cpu_waste_percentage * 
+        kube_pod_container_resource_requests{resource="cpu", namespace="pyairtable"} *
+        0.04416 * 24 * 30  # Fargate CPU pricing per vCPU-hour
+      ) by (pod, container)
+    labels:
+      cost_type: "cpu_waste_monthly"
+      
+  - record: pyairtable:monthly_memory_cost_waste
+    expr: |
+      sum(
+        pyairtable:memory_waste_percentage * 
+        kube_pod_container_resource_requests{resource="memory", namespace="pyairtable"} *
+        0.004858 * 24 * 30 / 1024 / 1024 / 1024  # Fargate memory pricing per GB-hour
+      ) by (pod, container)
+    labels:
+      cost_type: "memory_waste_monthly"
+
+  # Performance and efficiency alerts
+  - alert: HighResourceWaste
+    expr: |
+      (pyairtable:cpu_waste_percentage > 50 or pyairtable:memory_waste_percentage > 50)
+    for: 1h
+    labels:
+      severity: warning
+      team: infrastructure
+      cost_impact: high
+    annotations:
+      summary: "High resource waste detected in {{ $labels.pod }}/{{ $labels.container }}"
+      description: |
+        Container {{ $labels.container }} in pod {{ $labels.pod }} is wasting significant resources:
+        CPU waste: {{ $value | humanizePercentage }}
+        This represents potential cost savings opportunity.
+        
+  - alert: UnderProvisionedService
+    expr: |
+      (pyairtable:cpu_requests_vs_usage > 90 or pyairtable:memory_requests_vs_usage > 85)
+    for: 15m
+    labels:
+      severity: critical
+      team: sre
+      performance_impact: high
+    annotations:
+      summary: "Service {{ $labels.pod }}/{{ $labels.container }} is under-provisioned"
+      description: |
+        Container {{ $labels.container }} in pod {{ $labels.pod }} is consistently using:
+        {{ $value | humanizePercentage }} of requested resources.
+        Consider increasing resource requests to prevent throttling.
+
+  - alert: PotentialCostSavings
+    expr: |
+      pyairtable:monthly_cpu_cost_waste + pyairtable:monthly_memory_cost_waste > 20
+    for: 2h
+    labels:
+      severity: info
+      team: finops
+      savings_opportunity: true
+    annotations:
+      summary: "Significant monthly cost savings opportunity: ${{ $value | humanize }}"
+      description: |
+        Resource waste in {{ $labels.pod }}/{{ $labels.container }} could save 
+        approximately ${{ $value | humanize }} per month through rightsizing.
+
+- name: service_performance_analysis
+  interval: 60s
+  rules:
+  
+  # Request rate analysis
+  - record: pyairtable:request_rate_per_service
+    expr: |
+      sum(rate(http_requests_total{namespace="pyairtable"}[5m])) by (service, method, status)
+    labels:
+      metric_type: "performance"
+      
+  # Response time analysis
+  - record: pyairtable:response_time_p95_per_service
+    expr: |
+      histogram_quantile(0.95,
+        sum(rate(http_request_duration_seconds_bucket{namespace="pyairtable"}[5m])) by (service, le)
+      )
+    labels:
+      metric_type: "performance"
+      
+  # Error rate analysis
+  - record: pyairtable:error_rate_per_service
+    expr: |
+      (
+        sum(rate(http_requests_total{namespace="pyairtable", status=~"5.."}[5m])) by (service)
+        /
+        sum(rate(http_requests_total{namespace="pyairtable"}[5m])) by (service)
+      ) * 100
+    labels:
+      metric_type: "reliability"
+
+  # Resource correlation with performance
+  - record: pyairtable:performance_vs_resources
+    expr: |
+      (
+        pyairtable:response_time_p95_per_service * 
+        on(pod) group_left pyairtable:cpu_utilization_average
+      )
+    labels:
+      analysis_type: "performance_correlation"

@@ -1,0 +1,1 @@
+"""Test suite for PyAirtable Automation Domain Service."""

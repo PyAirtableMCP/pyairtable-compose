@@ -12,7 +12,7 @@ services:
       - DB_USER=postgres
       - DB_PASSWORD=postgres
       - DB_NAME=user_service_db
-      - DB_SSL_MODE=disable
+      - DB_SSL_MODE=require
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - JWT_SECRET=your-secret-key

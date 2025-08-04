@@ -18,7 +18,7 @@ services:
       - LLM_ORCHESTRATOR_URL=http://llm-orchestrator:8003
       - MCP_SERVER_URL=http://mcp-server:8001
       - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
-      - PLATFORM_SERVICES_URL=http://platform-services-go:8081
+      - PLATFORM_SERVICE_URL=http://platform-service:8007
       - AUTOMATION_SERVICES_URL=http://automation-services-go:8082
       - PERMISSION_SERVICE_URL=http://permission-service:8085
       
@@ -44,6 +44,7 @@ services:
     depends_on:
       - redis
       - postgres
+      - platform-service
     restart: unless-stopped
     networks:
       - pyairtable-network
@@ -120,6 +121,42 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+
+  # Consolidated Platform Service - Users, Tenants, Workspaces, Notifications
+  platform-service:
+    build:
+      context: ./pyairtable-platform
+      dockerfile: Dockerfile
+    ports:
+      - "8007:8007"
+    environment:
+      # Server configuration
+      - PORT=8007
+      - ENVIRONMENT=development
+      
+      # Database
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      
+      # JWT
+      - JWT_SECRET=${JWT_SECRET:-default-jwt-secret-change-in-production}
+      
+      # Redis
+      - REDIS_URL=redis://redis:6379
+      
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8007/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # Go Automation Services - File processing + Workflows
   automation-services-go:
@@ -376,36 +413,15 @@ services:
       - pyairtable-network
 
   # Monitoring and observability
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus-data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--web.enable-lifecycle'
-    restart: unless-stopped
-    networks:
-      - pyairtable-network
-
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3001:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
-      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
-    restart: unless-stopped
-    networks:
-      - pyairtable-network
+  # NOTE: Enhanced monitoring stack is now available in docker-compose.monitoring.yml
+  # Run: ./deploy-monitoring.sh to start comprehensive monitoring with:
+  # - Prometheus with advanced configuration
+  # - Grafana with pre-built dashboards
+  # - Node Exporter for system metrics
+  # - PostgreSQL and Redis exporters
+  # - cAdvisor for container metrics
+  # - Alertmanager for alert management
+  # - Blackbox exporter for service health checks
 
 networks:
   pyairtable-network:
@@ -418,7 +434,4 @@ volumes:
     driver: local
   file-uploads:
     driver: local
-  prometheus-data:
-    driver: local
-  grafana-data:
-    driver: local
+  # Monitoring volumes moved to docker-compose.monitoring.yml

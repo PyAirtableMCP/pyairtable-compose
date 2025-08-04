@@ -8,8 +8,10 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/prometheus/client_golang v1.16.0
 	github.com/redis/go-redis/v9 v9.11.0
+	github.com/sony/gobreaker v0.5.0
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.25.0
+	golang.org/x/time v0.3.0
 	gorm.io/driver/postgres v1.5.2
 	gorm.io/gorm v1.30.0
 )

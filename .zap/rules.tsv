@@ -1,0 +1,111 @@
+# ZAP Scan Rules Configuration
+# Format: rule_id	action	comment
+# Actions: IGNORE, FAIL, WARN, INFO
+
+# Critical Vulnerabilities (Fail the build)
+10011	FAIL	Cookie Poisoning
+10012	FAIL	Session ID in URL
+10015	FAIL	Incomplete or No Cache-control and Pragma HTTP Header Set
+10016	FAIL	Web Browser XSS Protection Not Enabled
+10017	FAIL	Cross-Domain JavaScript Source File Inclusion
+10019	FAIL	Content-Type Header Missing
+10020	FAIL	Anti-clickjacking Header
+10021	FAIL	X-Content-Type-Options Header Missing
+10023	FAIL	Information Disclosure - Debug Error Messages
+10024	FAIL	Information Disclosure - Sensitive Information in URL
+10025	FAIL	Information Disclosure - Sensitive Information in HTTP Referrer Header
+10026	FAIL	HTTP Parameter Override
+10027	FAIL	Information Disclosure - Suspicious Comments
+10028	FAIL	Open Redirect
+10029	FAIL	Cookie Poisoning
+10030	FAIL	User Controllable Charset
+10031	FAIL	User Controllable HTML Element Attribute (Potential XSS)
+10032	FAIL	Viewstate Scanner
+10033	FAIL	Directory Browsing
+10034	FAIL	Heartbleed OpenSSL Vulnerability
+10035	FAIL	Strict-Transport-Security Header
+10036	FAIL	HTTP Server Response Header
+10037	FAIL	Server Leaks Information via "X-Powered-By" HTTP Response Header Field(s)
+10038	FAIL	Content Security Policy (CSP) Header Not Set
+10039	FAIL	X-Backend-Server Header Information Leak
+10040	FAIL	Secure Pages Include Mixed Content
+10041	FAIL	HTTP to HTTPS Insecure Transition in Form Post
+10042	FAIL	HTTPS to HTTP Insecure Transition in Form Post
+10043	FAIL	User Controllable JavaScript Event (XSS)
+10044	FAIL	Big Redirect Detected (Potential Sensitive Information Leak)
+10045	FAIL	Source Code Disclosure - /WEB-INF folder
+10046	FAIL	Charset Mismatch
+10047	FAIL	HTTPS Content Available via HTTP
+10048	FAIL	Remote Code Execution - Shell Shock
+10049	FAIL	Content Cacheability
+10050	FAIL	Retrieved from Cache
+10051	FAIL	Relative Path Confusion
+10052	FAIL	X-ChromeLogger-Data (XCOLD) Header Information Leak
+10053	FAIL	Apache Range Header DoS (CVE-2011-3192)
+10054	FAIL	Cookie Without SameSite Attribute
+10055	FAIL	CSP Scanner
+10056	FAIL	X-Debug-Token Information Leak
+10057	FAIL	Username Hash Found
+10058	FAIL	GET for POST
+10059	FAIL	X-AspNet-Version Response Header
+10060	FAIL	Cross-Domain Misconfiguration
+10061	FAIL	X-AspNetMvc-Version Response Header
+10062	FAIL	PII Disclosure
+10063	FAIL	Feature Policy Header Not Set
+10064	FAIL	Timestamp Disclosure
+10065	FAIL	Information Disclosure - Sensitive Information in HTTP Referrer Header
+10066	FAIL	HTTP Parameter Pollution
+10067	FAIL	Cross Site Request Forgery
+10068	FAIL	HttpOnly Cookie
+10069	FAIL	Secure Cookie
+10070	FAIL	CSRF Countermeasures
+10071	FAIL	Cookie Slack Detector
+10072	FAIL	Application Error Disclosure
+10073	FAIL	XML Entity Expansion
+10074	FAIL	HTTP Only Site
+10075	FAIL	Cookie Poisoning
+10076	FAIL	Information Disclosure - Suspicious Comments
+10077	FAIL	Absence of Anti-CSRF Tokens
+10078	FAIL	CSRF Countermeasures
+10079	FAIL	Clickjacking Protection
+10080	FAIL	Cross-Site Request Forgery (CSRF)
+10081	FAIL	HTTP Parameter Override
+10082	FAIL	Cross Site Request Forgery
+10083	FAIL	Clickjacking Protection
+10084	FAIL	Cross-Origin Resource Sharing
+
+# High Severity Vulnerabilities (Warn but don't fail)
+20012	WARN	Anti CSRF Tokens Scanner
+20014	WARN	HTTP Parameter Pollution
+20015	WARN	Heartbleed OpenSSL Vulnerability (Indicative)
+20016	WARN	Cross-Domain Misconfiguration
+20017	WARN	Source Code Disclosure - CVE-2012-1823
+20018	WARN	Remote Code Execution - CVE-2012-1823
+20019	WARN	External Redirect
+
+# Medium Severity (Info level)
+30001	INFO	Buffer Overflow
+30002	INFO	Format String Error
+30003	INFO	Integer Overflow Error
+
+# Low Severity (Ignore for now)
+40001	IGNORE	Missing Anti-clickjacking Header
+40003	IGNORE	Insecure JSF ViewState
+40008	IGNORE	Parameter Tampering
+40009	IGNORE	Server Side Include
+40012	IGNORE	Cross Site Scripting (Reflected)
+40013	IGNORE	Session Fixation
+40014	IGNORE	Cross Site Scripting (Persistent)
+40016	IGNORE	Cross Site Scripting (Persistent) - Prime
+40017	IGNORE	Cross Site Scripting (Persistent) - Spider
+40018	IGNORE	SQL Injection
+40019	IGNORE	SQL Injection - MySQL
+40020	IGNORE	SQL Injection - Hypersonic SQL
+40021	IGNORE	SQL Injection - Oracle
+40022	IGNORE	SQL Injection - PostgreSQL
+40023	IGNORE	Possible Username Enumeration
+40024	IGNORE	SQL Injection - SQLite
+40025	IGNORE	Proxy Disclosure
+40026	IGNORE	Cross Site Scripting (DOM Based)
+40027	IGNORE	SQL Injection - MsSQL
+40028	IGNORE	CRLF Injection

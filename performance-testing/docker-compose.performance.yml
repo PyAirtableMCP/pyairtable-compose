@@ -1,0 +1,205 @@
+version: '3.8'
+
+services:
+  # K6 Load Testing
+  k6:
+    image: grafana/k6:latest
+    networks:
+      - pyairtable-network
+    volumes:
+      - ./k6-load-tests.js:/scripts/load-tests.js
+      - ./test-data:/scripts/test-data
+      - ./reports:/reports
+    environment:
+      - BASE_URL=http://api-gateway:8000
+      - WS_URL=ws://api-gateway:8000
+      - API_KEY=${API_KEY}
+      - ENVIRONMENT=test
+    command: run /scripts/load-tests.js --out json=/reports/k6-results.json
+    depends_on:
+      - api-gateway
+      - influxdb
+
+  # InfluxDB for K6 metrics storage
+  influxdb:
+    image: influxdb:2.0
+    networks:
+      - pyairtable-network
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=performance123
+      - DOCKER_INFLUXDB_INIT_ORG=pyairtable
+      - DOCKER_INFLUXDB_INIT_BUCKET=k6-metrics
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=k6-performance-token
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+
+  # Grafana for K6 metrics visualization
+  k6-grafana:
+    image: grafana/grafana:latest
+    networks:
+      - pyairtable-network
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=performance123
+      - GF_INSTALL_PLUGINS=grafana-influxdb-08-datasource
+    volumes:
+      - ./grafana/k6-dashboard.json:/var/lib/grafana/dashboards/k6-dashboard.json
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - k6-grafana-data:/var/lib/grafana
+    depends_on:
+      - influxdb
+
+  # JMeter for additional load testing
+  jmeter:
+    image: justb4/jmeter:latest
+    networks:
+      - pyairtable-network
+    volumes:
+      - ./jmeter:/tests
+      - ./reports:/reports
+    environment:
+      - TARGET_HOST=api-gateway
+      - TARGET_PORT=8000
+      - NUM_THREADS=50
+      - RAMP_TIME=300
+      - DURATION=600
+    command: |
+      -n -t /tests/pyairtable-load-test.jmx 
+      -l /reports/jmeter-results.jtl 
+      -e -o /reports/jmeter-report
+      -Jthreads=${NUM_THREADS} 
+      -Jramptime=${RAMP_TIME} 
+      -Jduration=${DURATION}
+      -Jhost=${TARGET_HOST} 
+      -Jport=${TARGET_PORT}
+
+  # Locust for Python-based load testing
+  locust-master:
+    image: locustio/locust:latest
+    networks:
+      - pyairtable-network
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./locust:/mnt/locust
+    environment:
+      - LOCUST_MODE=master
+      - LOCUST_HOST=http://api-gateway:8000
+    command: -f /mnt/locust/locustfile.py --master
+    depends_on:
+      - api-gateway
+
+  locust-worker:
+    image: locustio/locust:latest
+    networks:
+      - pyairtable-network
+    volumes:
+      - ./locust:/mnt/locust
+    environment:
+      - LOCUST_MODE=worker
+      - LOCUST_MASTER=locust-master
+      - LOCUST_HOST=http://api-gateway:8000
+    command: -f /mnt/locust/locustfile.py --worker --master-host=locust-master
+    depends_on:
+      - locust-master
+    deploy:
+      replicas: 3
+
+  # Artillery for quick load testing
+  artillery:
+    image: node:16-alpine
+    networks:
+      - pyairtable-network
+    volumes:
+      - ./artillery:/tests
+      - ./reports:/reports
+    working_dir: /tests
+    command: sh -c "npm install -g artillery && artillery run pyairtable-test.yml --output /reports/artillery-results.json"
+    depends_on:
+      - api-gateway
+
+  # Performance monitoring during tests
+  performance-monitor:
+    image: prom/node-exporter:latest
+    networks:
+      - pyairtable-network
+    ports:
+      - "9100:9100"
+    command:
+      - '--path.rootfs=/host'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /:/host:ro,rslave
+
+  # cAdvisor for container monitoring during tests
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    networks:
+      - pyairtable-network
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    privileged: true
+
+  # Load test orchestrator
+  test-orchestrator:
+    build:
+      context: ./orchestrator
+      dockerfile: Dockerfile
+    networks:
+      - pyairtable-network
+    volumes:
+      - ./orchestrator:/app
+      - ./reports:/reports
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DOCKER_API_VERSION=1.41
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=k6-performance-token
+      - GRAFANA_URL=http://k6-grafana:3000
+      - GRAFANA_API_KEY=performance-dashboard-key
+    command: python /app/orchestrator.py
+    depends_on:
+      - influxdb
+      - k6-grafana
+
+  # Continuous performance testing
+  performance-ci:
+    build:
+      context: ./ci
+      dockerfile: Dockerfile
+    networks:
+      - pyairtable-network
+    volumes:
+      - ./ci:/app
+      - ./reports:/reports
+      - ./.git:/app/.git:ro
+    environment:
+      - CI=true
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - SLACK_WEBHOOK=${SLACK_WEBHOOK}
+      - PERFORMANCE_THRESHOLD_P95=2000
+      - PERFORMANCE_THRESHOLD_ERROR_RATE=0.05
+    command: python /app/ci-runner.py
+    depends_on:
+      - test-orchestrator
+
+networks:
+  pyairtable-network:
+    external: true
+
+volumes:
+  influxdb-data:
+  k6-grafana-data:

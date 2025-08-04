@@ -1,0 +1,291 @@
+# AlertManager Configuration for PyAirtable Platform
+# Cost-aware alerting with smart routing and suppression
+
+global:
+  # The smarthost and SMTP sender used for mail notifications.
+  smtp_smarthost: '${SMTP_HOST:localhost:587}'
+  smtp_from: '${ALERT_FROM_EMAIL:alerts@pyairtable.local}'
+  smtp_auth_username: '${SMTP_USERNAME:}'
+  smtp_auth_password: '${SMTP_PASSWORD:}'
+  smtp_require_tls: true
+
+  # Slack webhook URL
+  slack_api_url: '${SLACK_WEBHOOK_URL:}'
+
+  # PagerDuty integration key
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+
+  # Default resolution timeout
+  resolve_timeout: 5m
+
+# Templates for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree for alert routing
+route:
+  # Root route
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 12h
+  receiver: 'web.hook.default'
+  
+  # Child routes
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 5m
+      routes:
+        # Service down alerts
+        - match:
+            alertname: ServiceDown
+          receiver: 'service-down'
+          group_wait: 0s
+          repeat_interval: 2m
+        
+        # Database issues
+        - match_re:
+            alertname: 'PostgreSQL.*|Redis.*Memory'
+          receiver: 'database-critical'
+          
+        # Security incidents
+        - match:
+            tier: security
+          receiver: 'security-critical'
+
+    # Cost optimization alerts
+    - match:
+        cost_impact: high
+      receiver: 'cost-optimization'
+      group_interval: 30m
+      repeat_interval: 24h
+      
+    - match:
+        cost_impact: medium
+      receiver: 'cost-optimization'
+      group_interval: 1h
+      repeat_interval: 24h
+
+    # AI/ML specific alerts
+    - match:
+        tier: ai-ml
+      receiver: 'ai-ml-alerts'
+      group_interval: 10m
+      repeat_interval: 2h
+
+    # Performance alerts
+    - match_re:
+        alertname: 'High.*Usage|.*SlowQueries'
+      receiver: 'performance-alerts'
+      group_interval: 15m
+      repeat_interval: 4h
+
+    # Business metrics
+    - match:
+        tier: business
+      receiver: 'business-alerts'
+      group_interval: 1h
+      repeat_interval: 12h
+
+    # Development environment (suppress most alerts)
+    - match:
+        environment: development
+      receiver: 'dev-alerts'
+      group_interval: 1h
+      repeat_interval: 24h
+
+# Inhibition rules to suppress redundant alerts
+inhibit_rules:
+  # If service is down, don't alert on high error rates for that service
+  - source_match:
+      alertname: ServiceDown
+    target_match_re:
+      alertname: 'HighErrorRate|HighResponseTime'
+    equal: ['service']
+
+  # If there's a critical alert, suppress warning alerts for same service
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal: ['service']
+
+  # If cluster is having issues, suppress individual service alerts
+  - source_match_re:
+      alertname: 'HighCPUUsage|HighMemoryUsage'
+    target_match_re:
+      alertname: 'Service.*'
+    equal: ['cluster']
+
+# Receiver definitions
+receivers:
+  # Default webhook (for testing)
+  - name: 'web.hook.default'
+    webhook_configs:
+      - url: 'http://webhook-service:8080/alerts'
+        send_resolved: true
+        http_config:
+          basic_auth:
+            username: '${WEBHOOK_USERNAME:admin}'
+            password: '${WEBHOOK_PASSWORD:password}'
+
+  # Critical alerts - multiple channels
+  - name: 'critical-alerts'
+    email_configs:
+      - to: '${CRITICAL_EMAIL:ops@pyairtable.local}'
+        subject: '[CRITICAL] PyAirtable Platform Alert'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Environment: {{ .Labels.environment }}
+          Severity: {{ .Labels.severity }}
+          {{ end }}
+        headers:
+          Priority: 'high'
+          
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-critical'
+        title: 'Critical Alert - PyAirtable Platform'
+        text: |
+          {{ range .Alerts }}
+          🔴 *{{ .Annotations.summary }}*
+          Service: {{ .Labels.service }}
+          Environment: {{ .Labels.environment }}
+          {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+        
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY}'
+        description: 'PyAirtable Platform Critical Alert'
+        details:
+          environment: '{{ .GroupLabels.environment }}'
+          service: '{{ .GroupLabels.service }}'
+          
+  # Service down - immediate escalation
+  - name: 'service-down'
+    email_configs:
+      - to: '${ONCALL_EMAIL:oncall@pyairtable.local}'
+        subject: '[SERVICE DOWN] {{ .GroupLabels.service }} is unavailable'
+        body: |
+          🚨 SERVICE DOWN ALERT 🚨
+          
+          Service: {{ .GroupLabels.service }}
+          Environment: {{ .GroupLabels.environment }}
+          Time: {{ .Alerts.0.StartsAt }}
+          
+          Immediate action required!
+          
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#incidents'
+        title: '🚨 SERVICE DOWN'
+        text: |
+          Service {{ .GroupLabels.service }} is DOWN in {{ .GroupLabels.environment }}
+          @channel - Immediate response required!
+        send_resolved: true
+
+  # Database critical issues
+  - name: 'database-critical'
+    email_configs:
+      - to: '${DBA_EMAIL:dba@pyairtable.local}'
+        subject: '[DATABASE] Critical Issue - {{ .GroupLabels.service }}'
+        
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#database-alerts'
+        title: 'Database Critical Alert'
+
+  # Security incidents
+  - name: 'security-critical'
+    email_configs:
+      - to: '${SECURITY_EMAIL:security@pyairtable.local}'
+        subject: '[SECURITY] Incident Detected'
+        headers:
+          Priority: 'urgent'
+          
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#security-alerts'
+        title: '🔒 Security Incident'
+
+  # Cost optimization alerts
+  - name: 'cost-optimization'
+    email_configs:
+      - to: '${FINOPS_EMAIL:finops@pyairtable.local}'
+        subject: '[COST] Optimization Opportunity - {{ .GroupLabels.service }}'
+        body: |
+          Cost optimization alert for PyAirtable Platform:
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Service: {{ .Labels.service }}
+          Cost Impact: {{ .Labels.cost_impact }}
+          Description: {{ .Annotations.description }}
+          {{ end }}
+          
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#cost-optimization'
+        title: '💰 Cost Optimization Alert'
+        text: |
+          {{ range .Alerts }}
+          💰 {{ .Annotations.summary }}
+          Service: {{ .Labels.service }}
+          Impact: {{ .Labels.cost_impact }}
+          {{ end }}
+
+  # AI/ML alerts
+  - name: 'ai-ml-alerts'
+    email_configs:
+      - to: '${AI_TEAM_EMAIL:ai-team@pyairtable.local}'
+        subject: '[AI/ML] Alert - {{ .GroupLabels.service }}'
+        
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ai-ml-alerts'
+        title: '🤖 AI/ML Service Alert'
+
+  # Performance alerts
+  - name: 'performance-alerts'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#performance-alerts'
+        title: '📊 Performance Alert'
+        text: |
+          {{ range .Alerts }}
+          📊 {{ .Annotations.summary }}
+          Service: {{ .Labels.service }}
+          Details: {{ .Annotations.description }}
+          {{ end }}
+
+  # Business metrics alerts
+  - name: 'business-alerts'
+    email_configs:
+      - to: '${BUSINESS_EMAIL:business@pyairtable.local}'
+        subject: '[BUSINESS] Metric Alert - {{ .GroupLabels.service }}'
+        
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#business-metrics'
+        title: '📈 Business Metric Alert'
+
+  # Development environment (minimal alerts)
+  - name: 'dev-alerts'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#dev-alerts'
+        title: '🔧 Development Alert'
+        text: |
+          Development environment alert (non-critical):
+          {{ range .Alerts }}
+          {{ .Annotations.summary }}
+          {{ end }}

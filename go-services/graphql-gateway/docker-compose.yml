@@ -1,0 +1,258 @@
+version: '3.8'
+
+services:
+  # GraphQL Gateway
+  graphql-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+      - PORT=4000
+      - JWT_SECRET=dev-secret-key
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - USERS_SUBGRAPH_URL=http://user-service:8001/graphql
+      - WORKSPACES_SUBGRAPH_URL=http://workspace-service:8002/graphql
+      - AIRTABLE_SUBGRAPH_URL=http://airtable-service:8003/graphql
+      - FILES_SUBGRAPH_URL=http://file-service:8004/graphql
+      - PERMISSIONS_SUBGRAPH_URL=http://permission-service:8005/graphql
+      - NOTIFICATIONS_SUBGRAPH_URL=http://notification-service:8006/graphql
+      - ANALYTICS_SUBGRAPH_URL=http://analytics-service:8007/graphql
+      - AI_SUBGRAPH_URL=http://ai-service:8008/graphql
+      - ENABLE_INTROSPECTION=true
+      - ENABLE_PLAYGROUND=true
+      - LOG_LEVEL=debug
+    depends_on:
+      - redis
+      - user-service
+      - workspace-service
+      - airtable-service
+      - file-service
+    volumes:
+      - ./src:/app/src
+      - ./examples:/app/examples
+    networks:
+      - pyairtable-federation
+
+  # User Service
+  user-service:
+    build:
+      context: ../user-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - GRAPHQL_PORT=8001
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=pyairtable_users
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - pyairtable-federation
+
+  # Workspace Service
+  workspace-service:
+    build:
+      context: ../workspace-service
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - GRAPHQL_PORT=8002
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=pyairtable_workspaces
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - pyairtable-federation
+
+  # Airtable Service (Python)
+  airtable-service:
+    build:
+      context: ../../python-services/airtable-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - PORT=8003
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/pyairtable_airtable
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - pyairtable-federation
+
+  # File Service
+  file-service:
+    build:
+      context: ../file-service
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      - GRAPHQL_PORT=8004
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=pyairtable_files
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - STORAGE_PROVIDER=LOCAL
+      - STORAGE_PATH=/app/uploads
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - file-uploads:/app/uploads
+    networks:
+      - pyairtable-federation
+
+  # Permission Service
+  permission-service:
+    build:
+      context: ../permission-service
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8005"
+    environment:
+      - GRAPHQL_PORT=8005
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=pyairtable_permissions
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - pyairtable-federation
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ../notification-service
+      dockerfile: Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      - GRAPHQL_PORT=8006
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=pyairtable_notifications
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - pyairtable-federation
+
+  # Analytics Service (Python)
+  analytics-service:
+    build:
+      context: ../../python-services/analytics-service
+      dockerfile: Dockerfile
+    ports:
+      - "8007:8007"
+    environment:
+      - PORT=8007
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/pyairtable_analytics
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - pyairtable-federation
+
+  # AI Service (Python)
+  ai-service:
+    build:
+      context: ../../python-services/ai-service
+      dockerfile: Dockerfile
+    ports:
+      - "8008:8008"
+    environment:
+      - PORT=8008
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/pyairtable_ai
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - pyairtable-federation
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
+    networks:
+      - pyairtable-federation
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - pyairtable-federation
+
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - pyairtable-federation
+
+  # GraphQL Playground (standalone)
+  graphql-playground:
+    image: prlnx/graphql-playground
+    ports:
+      - "3000:3000"
+    environment:
+      - GRAPHQL_ENDPOINT=http://localhost:4000/graphql
+    networks:
+      - pyairtable-federation
+
+volumes:
+  postgres-data:
+  redis-data:
+  file-uploads:
+
+networks:
+  pyairtable-federation:
+    driver: bridge

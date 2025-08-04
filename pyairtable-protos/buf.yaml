@@ -1,0 +1,18 @@
+version: v1
+deps:
+  - buf.build/googleapis/googleapis
+name: buf.build/pyairtable/protos
+breaking:
+  use:
+    - FILE
+lint:
+  use:
+    - DEFAULT
+  except:
+    - UNARY_RPC
+  ignore_only:
+    RPC_REQUEST_RESPONSE_UNIQUE:
+      - proto/pyairtable/gateway/v1/gateway.proto
+build:
+  excludes:
+    - proto/google

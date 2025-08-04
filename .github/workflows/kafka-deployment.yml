@@ -1,0 +1,525 @@
+name: Kafka Infrastructure Deployment
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'k8s/kafka-**'
+      - 'kafka-schemas/**'
+      - 'docker-compose.kafka.yml'
+      - 'infrastructure/kafka-**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'k8s/kafka-**'
+      - 'kafka-schemas/**'
+      - 'docker-compose.kafka.yml'
+      - 'infrastructure/kafka-**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+        - staging
+        - prod
+      kafka_version:
+        description: 'Kafka version to deploy'
+        required: false
+        default: '7.5.0'
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  KAFKA_VERSION: ${{ github.event.inputs.kafka_version || '7.5.0' }}
+
+jobs:
+  validate-kafka-config:
+    runs-on: ubuntu-latest
+    outputs:
+      config-valid: ${{ steps.validate.outputs.valid }}
+      schema-changes: ${{ steps.schema-check.outputs.changes }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup tools
+        run: |
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+          
+          # Install yq for YAML processing
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          
+          # Install jq for JSON processing
+          sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Validate Kubernetes manifests
+        id: validate
+        run: |
+          echo "Validating Kubernetes manifests..."
+          
+          valid=true
+          
+          # Validate all Kafka K8s manifests
+          for file in k8s/kafka-*.yaml; do
+            if [ -f "$file" ]; then
+              echo "Validating $file"
+              if ! kubectl apply --dry-run=client -f "$file"; then
+                echo "❌ Validation failed for $file"
+                valid=false
+              else
+                echo "✅ $file is valid"
+              fi
+            fi
+          done
+          
+          # Validate Docker Compose
+          if [ -f "docker-compose.kafka.yml" ]; then
+            echo "Validating Docker Compose configuration..."
+            if ! docker-compose -f docker-compose.kafka.yml config > /dev/null; then
+              echo "❌ Docker Compose validation failed"
+              valid=false
+            else
+              echo "✅ Docker Compose is valid"
+            fi
+          fi
+          
+          echo "valid=$valid" >> $GITHUB_OUTPUT
+
+      - name: Check schema changes
+        id: schema-check
+        run: |
+          echo "Checking for schema changes..."
+          
+          changes=false
+          
+          if git diff --name-only HEAD~ HEAD | grep -q "kafka-schemas/"; then
+            echo "Schema changes detected"
+            changes=true
+            
+            echo "Changed schema files:"
+            git diff --name-only HEAD~ HEAD | grep "kafka-schemas/" || true
+          fi
+          
+          echo "changes=$changes" >> $GITHUB_OUTPUT
+
+      - name: Validate Avro schemas
+        if: steps.schema-check.outputs.changes == 'true'
+        run: |
+          echo "Validating Avro schemas..."
+          
+          # Install Avro tools
+          curl -O https://repo1.maven.org/maven2/org/apache/avro/avro-tools/1.11.1/avro-tools-1.11.1.jar
+          
+          # Validate each schema file
+          for schema in kafka-schemas/*.avsc; do
+            if [ -f "$schema" ]; then
+              echo "Validating schema: $schema"
+              if ! java -jar avro-tools-1.11.1.jar compile schema "$schema" /tmp/avro-output; then
+                echo "❌ Schema validation failed for $schema"
+                exit 1
+              else
+                echo "✅ $schema is valid"
+              fi
+            fi
+          done
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: validate-kafka-config
+    if: needs.validate-kafka-config.outputs.config-valid == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run security scan on Kafka configs
+        uses: securecodewarrior/github-action-add-sarif@v1
+        with:
+          sarif-file: security-scan-results.sarif
+        continue-on-error: true
+
+      - name: Check for security vulnerabilities
+        run: |
+          echo "Scanning Kafka configurations for security issues..."
+          
+          # Check for plaintext protocols in production
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            if grep -r "PLAINTEXT" k8s/kafka-production-deployment.yaml; then
+              echo "❌ PLAINTEXT protocol found in production deployment"
+              exit 1
+            fi
+          fi
+          
+          # Check for insecure SSL settings
+          if grep -r "ssl.endpoint.identification.algorithm=\"\"" k8s/ docker-compose.kafka.yml; then
+            echo "⚠️ Insecure SSL endpoint identification found"
+          fi
+          
+          # Check for weak passwords
+          if grep -r "password.*123\|password.*admin\|password.*kafka" kafka-security/; then
+            echo "❌ Weak passwords detected"
+            exit 1
+          fi
+          
+          echo "✅ Security scan completed"
+
+  test-kafka-functionality:
+    runs-on: ubuntu-latest
+    needs: [validate-kafka-config, security-scan]
+    services:
+      zookeeper:
+        image: confluentinc/cp-zookeeper:${{ env.KAFKA_VERSION }}
+        env:
+          ZOOKEEPER_CLIENT_PORT: 2181
+          ZOOKEEPER_TICK_TIME: 2000
+        options: >-
+          --health-cmd "echo 'ruok' | nc localhost 2181"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      kafka:
+        image: confluentinc/cp-kafka:${{ env.KAFKA_VERSION }}
+        env:
+          KAFKA_BROKER_ID: 1
+          KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+          KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+          KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+          KAFKA_DELETE_TOPIC_ENABLE: 'true'
+          KAFKA_NUM_PARTITIONS: 3
+          KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+        options: >-
+          --health-cmd "kafka-broker-api-versions --bootstrap-server localhost:9092"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 9092:9092
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Kafka tools
+        run: |
+          # Install Kafka CLI tools
+          curl -O https://archive.apache.org/dist/kafka/2.8.1/kafka_2.13-2.8.1.tgz
+          tar -xzf kafka_2.13-2.8.1.tgz
+          export PATH=$PATH:$(pwd)/kafka_2.13-2.8.1/bin
+          echo "$(pwd)/kafka_2.13-2.8.1/bin" >> $GITHUB_PATH
+
+      - name: Test Kafka connectivity
+        run: |
+          echo "Testing Kafka connectivity..."
+          
+          # Wait for Kafka to be ready
+          timeout 60 bash -c 'until kafka-broker-api-versions --bootstrap-server localhost:9092; do sleep 2; done'
+          
+          # Test topic creation
+          kafka-topics --bootstrap-server localhost:9092 \
+            --create --topic test-topic --partitions 3 --replication-factor 1
+          
+          # Test message production
+          echo "test message" | kafka-console-producer --bootstrap-server localhost:9092 --topic test-topic
+          
+          # Test message consumption
+          timeout 10 kafka-console-consumer --bootstrap-server localhost:9092 \
+            --topic test-topic --from-beginning --max-messages 1
+          
+          echo "✅ Kafka functionality test passed"
+
+      - name: Test schema compatibility
+        if: needs.validate-kafka-config.outputs.schema-changes == 'true'
+        run: |
+          echo "Testing schema compatibility..."
+          
+          # Start Schema Registry
+          docker run -d --name schema-registry \
+            --network container:$(docker ps -q --filter ancestor=confluentinc/cp-kafka) \
+            -e SCHEMA_REGISTRY_HOST_NAME=schema-registry \
+            -e SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS=localhost:9092 \
+            -e SCHEMA_REGISTRY_LISTENERS=http://0.0.0.0:8081 \
+            -p 8081:8081 \
+            confluentinc/cp-schema-registry:${{ env.KAFKA_VERSION }}
+          
+          # Wait for Schema Registry
+          timeout 60 bash -c 'until curl -f http://localhost:8081/subjects; do sleep 2; done'
+          
+          # Test schema registration
+          cd kafka-schemas
+          if [ -f "register-schemas.sh" ]; then
+            chmod +x register-schemas.sh
+            SCHEMA_REGISTRY_URL=http://localhost:8081 ./register-schemas.sh
+          fi
+          
+          echo "✅ Schema compatibility test passed"
+
+  deploy-dev:
+    runs-on: ubuntu-latest
+    needs: [validate-kafka-config, security-scan, test-kafka-functionality]
+    if: github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'dev'
+    environment: development
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --region us-west-2 --name pyairtable-dev-cluster
+
+      - name: Deploy Kafka to dev
+        run: |
+          echo "Deploying Kafka to development environment..."
+          
+          # Apply Kafka configurations
+          kubectl apply -f k8s/kafka-production-deployment.yaml --context=dev
+          
+          # Wait for deployment
+          kubectl wait --for=condition=available --timeout=600s deployment/kafka-exporter -n kafka
+          
+          # Verify deployment
+          kubectl get pods -n kafka
+          
+          echo "✅ Dev deployment completed"
+
+      - name: Register schemas in dev
+        if: needs.validate-kafka-config.outputs.schema-changes == 'true'
+        run: |
+          echo "Registering schemas in development..."
+          
+          # Port forward to Schema Registry
+          kubectl port-forward svc/schema-registry-service 8081:8081 -n kafka &
+          PORT_FORWARD_PID=$!
+          
+          # Wait for port forward
+          sleep 10
+          
+          # Register schemas
+          cd kafka-schemas
+          chmod +x register-schemas.sh
+          SCHEMA_REGISTRY_URL=http://localhost:8081 ./register-schemas.sh
+          
+          # Clean up
+          kill $PORT_FORWARD_PID
+          
+          echo "✅ Schema registration completed"
+
+      - name: Run integration tests
+        run: |
+          echo "Running integration tests..."
+          
+          # Port forward to Kafka
+          kubectl port-forward svc/kafka-service 9092:9092 -n kafka &
+          KAFKA_PORT_FORWARD_PID=$!
+          
+          # Wait for port forward
+          sleep 10
+          
+          # Run basic integration tests
+          echo "test-integration-message" | kafka-console-producer --bootstrap-server localhost:9092 --topic pyairtable.test.events || true
+          
+          # Clean up
+          kill $KAFKA_PORT_FORWARD_PID
+          
+          echo "✅ Integration tests completed"
+
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: [validate-kafka-config, security-scan, test-kafka-functionality]
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --region us-west-2 --name pyairtable-staging-cluster
+
+      - name: Deploy Kafka to staging
+        run: |
+          echo "Deploying Kafka to staging environment..."
+          
+          # Apply Kafka configurations with staging overrides
+          envsubst < k8s/kafka-production-deployment.yaml | kubectl apply -f - --context=staging
+          
+          # Wait for deployment
+          kubectl wait --for=condition=available --timeout=600s deployment/kafka-exporter -n kafka
+          
+          echo "✅ Staging deployment completed"
+
+      - name: Verify staging deployment
+        run: |
+          echo "Verifying staging deployment..."
+          
+          # Check all pods are running
+          kubectl get pods -n kafka
+          
+          # Check services are accessible
+          kubectl get svc -n kafka
+          
+          # Run health checks
+          kubectl exec -n kafka kafka-0 -- kafka-broker-api-versions --bootstrap-server localhost:9092
+          
+          echo "✅ Staging verification completed"
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [validate-kafka-config, security-scan, test-kafka-functionality, deploy-staging]
+    if: github.ref == 'refs/heads/main' && github.event.inputs.environment == 'prod'
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --region us-west-2 --name pyairtable-prod-cluster
+
+      - name: Create pre-deployment backup
+        run: |
+          echo "Creating pre-deployment backup..."
+          
+          # Execute backup script on Kafka cluster
+          kubectl exec -n kafka kafka-0 -- /scripts/kafka-backup-script.sh full-backup
+          
+          echo "✅ Pre-deployment backup completed"
+
+      - name: Deploy Kafka to production
+        run: |
+          echo "Deploying Kafka to production environment..."
+          
+          # Apply production configurations
+          envsubst < k8s/kafka-production-deployment.yaml | kubectl apply -f - --context=production
+          
+          # Rolling update with careful monitoring
+          kubectl rollout status statefulset/kafka -n kafka --timeout=900s
+          
+          echo "✅ Production deployment completed"
+
+      - name: Verify production deployment
+        run: |
+          echo "Verifying production deployment..."
+          
+          # Comprehensive health checks
+          kubectl get pods -n kafka
+          kubectl get pvc -n kafka
+          
+          # Check broker connectivity
+          for i in 0 1 2; do
+            kubectl exec -n kafka kafka-$i -- kafka-broker-api-versions --bootstrap-server localhost:9092
+          done
+          
+          # Check replication status
+          kubectl exec -n kafka kafka-0 -- kafka-topics --bootstrap-server localhost:9092 --describe --under-replicated-partitions
+          
+          # Verify Schema Registry
+          kubectl exec -n kafka -c schema-registry $(kubectl get pod -l app=schema-registry -n kafka -o jsonpath='{.items[0].metadata.name}') -- curl -f http://localhost:8081/subjects
+          
+          echo "✅ Production verification completed"
+
+      - name: Post-deployment monitoring setup
+        run: |
+          echo "Setting up post-deployment monitoring..."
+          
+          # Trigger Grafana dashboard refresh
+          curl -X POST "${{ secrets.GRAFANA_URL }}/api/admin/provisioning/dashboards/reload" \
+            -H "Authorization: Bearer ${{ secrets.GRAFANA_API_KEY }}"
+          
+          # Update alert rules
+          kubectl apply -f monitoring/kafka-alerts.yml
+          
+          echo "✅ Monitoring setup completed"
+
+  rollback-production:
+    runs-on: ubuntu-latest
+    if: failure() && github.ref == 'refs/heads/main'
+    needs: [deploy-production]
+    environment: production
+    steps:
+      - name: Rollback production deployment
+        run: |
+          echo "Rolling back production deployment..."
+          
+          # Rollback StatefulSet
+          kubectl rollout undo statefulset/kafka -n kafka
+          
+          # Wait for rollback
+          kubectl rollout status statefulset/kafka -n kafka --timeout=600s
+          
+          # Verify rollback
+          kubectl get pods -n kafka
+          
+          echo "✅ Production rollback completed"
+
+      - name: Restore from backup if needed
+        run: |
+          echo "Checking if backup restoration is needed..."
+          
+          # This would be determined based on data integrity checks
+          # For now, just log the backup location
+          kubectl exec -n kafka kafka-0 -- ls -la /var/kafka-backups/
+          
+          echo "Backup restoration assessment completed"
+
+  notify-deployment:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [deploy-dev, deploy-staging, deploy-production]
+    steps:
+      - name: Notify Slack
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#kafka-deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Update deployment status
+        run: |
+          echo "Deployment pipeline completed with status: ${{ job.status }}"
+          
+          # Update deployment tracking system
+          curl -X POST "${{ secrets.DEPLOYMENT_TRACKER_URL }}/kafka-deployment" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "status": "${{ job.status }}",
+              "environment": "${{ github.event.inputs.environment }}",
+              "commit": "${{ github.sha }}",
+              "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+            }'

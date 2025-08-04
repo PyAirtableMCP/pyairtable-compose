@@ -1,0 +1,232 @@
+# Enhanced Prometheus Configuration for Detailed Resource Metrics Collection
+# Task: immediate-3 - Configure Prometheus to collect detailed resource metrics for 2-week baseline
+
+global:
+  scrape_interval: 10s # Increased frequency for detailed metrics
+  evaluation_interval: 10s
+  external_labels:
+    cluster: 'pyairtable-platform'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Load rules for resource optimization
+rule_files:
+  - "alert_rules.yml"
+  - "resource_optimization_rules.yml"
+
+# Enhanced scrape configuration for resource analysis
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 5s
+
+  # Kubernetes API Server metrics
+  - job_name: 'kubernetes-apiservers'
+    kubernetes_sd_configs:
+    - role: endpoints
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+    - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+      action: keep
+      regex: default;kubernetes;https
+
+  # Kubelet metrics for detailed node and pod resource usage
+  - job_name: 'kubernetes-nodes'
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    kubernetes_sd_configs:
+    - role: node
+    relabel_configs:
+    - action: labelmap
+      regex: __meta_kubernetes_node_label_(.+)
+    - target_label: __address__
+      replacement: kubernetes.default.svc:443
+    - source_labels: [__meta_kubernetes_node_name]
+      regex: (.+)
+      target_label: __metrics_path__
+      replacement: /api/v1/nodes/${1}/proxy/metrics
+    scrape_interval: 5s
+
+  # cAdvisor for container-level resource metrics
+  - job_name: 'kubernetes-cadvisor'
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    kubernetes_sd_configs:
+    - role: node
+    relabel_configs:
+    - action: labelmap
+      regex: __meta_kubernetes_node_label_(.+)
+    - target_label: __address__
+      replacement: kubernetes.default.svc:443
+    - source_labels: [__meta_kubernetes_node_name]
+      regex: (.+)
+      target_label: __metrics_path__
+      replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+    scrape_interval: 5s
+    metric_relabel_configs:
+    # Save only container metrics for our services
+    - source_labels: [__name__]
+      regex: container_(cpu|memory|network|fs).*
+      action: keep
+    - source_labels: [container_label_io_kubernetes_pod_namespace]
+      regex: pyairtable
+      action: keep
+
+  # Pod-level metrics for detailed resource analysis
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+    - role: pod
+    relabel_configs:
+    - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+      action: keep
+      regex: true
+    - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+      action: replace
+      target_label: __metrics_path__
+      regex: (.+)
+    - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+      action: replace
+      regex: ([^:]+)(?::\d+)?;(\d+)
+      replacement: $1:$2
+      target_label: __address__
+    - action: labelmap
+      regex: __meta_kubernetes_pod_label_(.+)
+    - source_labels: [__meta_kubernetes_namespace]
+      action: replace
+      target_label: kubernetes_namespace
+    - source_labels: [__meta_kubernetes_pod_name]
+      action: replace
+      target_label: kubernetes_pod_name
+    scrape_interval: 5s
+
+  # API Gateway (Enhanced monitoring)
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+    scrape_timeout: 3s
+    metric_relabel_configs:
+    - source_labels: [__name__]
+      regex: (go_memstats_.*|process_.*|http_.*|fiber_.*|pyairtable_.*)
+      action: keep
+
+  # Auth Service (Go) - Detailed metrics
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:8001']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+    metric_relabel_configs:
+    - source_labels: [__name__]
+      regex: (go_memstats_.*|process_.*|http_.*|auth_.*|jwt_.*)
+      action: keep
+
+  # Platform Services (Python) - Enhanced metrics
+  - job_name: 'platform-services'
+    static_configs:
+      - targets: ['platform-services:8007']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+    metric_relabel_configs:
+    - source_labels: [__name__]
+      regex: (python_.*|process_.*|http_.*|fastapi_.*|database_.*|redis_.*)
+      action: keep
+
+  # LLM Orchestrator - Memory intensive service monitoring
+  - job_name: 'llm-orchestrator'
+    static_configs:
+      - targets: ['llm-orchestrator:8003']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+    metric_relabel_configs:
+    - source_labels: [__name__]
+      regex: (python_.*|process_.*|llm_.*|gemini_.*|memory_.*|gpu_.*)
+      action: keep
+
+  # MCP Server
+  - job_name: 'mcp-server'
+    static_configs:
+      - targets: ['mcp-server:8001']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # Airtable Gateway
+  - job_name: 'airtable-gateway'
+    static_configs:
+      - targets: ['airtable-gateway:8002']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # Automation Services
+  - job_name: 'automation-services'
+    static_configs:
+      - targets: ['automation-services:8006']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # PostgreSQL detailed monitoring
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metric_relabel_configs:
+    - source_labels: [__name__]
+      regex: (pg_.*|postgres_.*)
+      action: keep
+
+  # Redis detailed monitoring
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 15s
+    metric_relabel_configs:
+    - source_labels: [__name__]
+      regex: (redis_.*)
+      action: keep
+
+  # Node Exporter for host-level metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+    metric_relabel_configs:
+    - source_labels: [__name__]
+      regex: (node_cpu.*|node_memory.*|node_filesystem.*|node_network.*|node_load.*)
+      action: keep
+
+  # VPA Metrics for recommendation analysis
+  - job_name: 'vpa-recommender'
+    static_configs:
+      - targets: ['vpa-recommender:8942']
+    scrape_interval: 30s
+    metric_relabel_configs:
+    - source_labels: [__name__]
+      regex: (vpa_.*|recommender_.*)
+      action: keep
+
+  # Kube-state-metrics for cluster resource analysis
+  - job_name: 'kube-state-metrics'
+    static_configs:
+      - targets: ['kube-state-metrics:8080']
+    scrape_interval: 15s
+    metric_relabel_configs:
+    - source_labels: [__name__]
+      regex: (kube_pod_container_resource.*|kube_node.*|kube_deployment.*|kube_replicaset.*)
+      action: keep

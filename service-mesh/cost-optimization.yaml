@@ -1,0 +1,539 @@
+# Cost Optimization Configuration for PyAirtable Istio Service Mesh
+# Reduces resource usage while maintaining security and reliability
+
+---
+# Optimized Istio Control Plane Configuration
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: pyairtable-istio-cost-optimized
+  namespace: istio-system
+spec:
+  values:
+    pilot:
+      # Reduced resource requirements for development/small production
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+      # Optimized settings
+      traceSampling: 0.1  # Reduced sampling to save resources
+    global:
+      proxy:
+        # Minimized sidecar resources
+        resources:
+          requests:
+            cpu: 5m
+            memory: 32Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi
+        # Reduced concurrency for smaller workloads
+        concurrency: 1
+      # Reduced log levels to save I/O
+      logging:
+        level: "default:warn,ads:error,wle:error"
+  components:
+    pilot:
+      k8s:
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        # Reduced replicas for non-HA environments
+        replicaCount: 1
+        env:
+          # Performance optimizations
+          - name: PILOT_PUSH_THROTTLE
+            value: "50"
+          - name: PILOT_MAX_REQUESTS_PER_SECOND
+            value: "500"
+    ingressGateways:
+    - name: istio-ingressgateway
+      enabled: true
+      k8s:
+        # Reduced resources for development
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        # Single replica for cost savings
+        replicaCount: 1
+        # Horizontal Pod Autoscaler for automatic scaling
+        hpaSpec:
+          minReplicas: 1
+          maxReplicas: 3
+          metrics:
+          - type: Resource
+            resource:
+              name: cpu
+              target:
+                type: Utilization
+                averageUtilization: 70
+          - type: Resource
+            resource:
+              name: memory
+              target:
+                type: Utilization
+                averageUtilization: 70
+    egressGateways:
+    - name: istio-egressgateway
+      # Disable egress gateway to save resources (optional)
+      enabled: false
+
+---
+# Cost-Optimized Telemetry Configuration
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: cost-optimized-telemetry
+  namespace: pyairtable
+spec:
+  # Reduced metrics collection
+  metrics:
+  - providers:
+    - name: prometheus
+  - overrides:
+    - match:
+        metric: ALL_METRICS
+      disabled: false
+      tagOverrides:
+        # Only essential tags for cost optimization
+        source_app:
+          operation: UPSERT
+          value: "%{SOURCE_APP}"
+        destination_service_name:
+          operation: UPSERT
+          value: "%{DESTINATION_SERVICE_NAME}"
+        response_code:
+          operation: UPSERT
+          value: "%{RESPONSE_CODE}"
+  # Reduced access logging (only errors and slow requests)
+  accessLogging:
+  - providers:
+    - name: otel
+    filter:
+      expression: |
+        response.code >= 400 || duration > 2000
+  # Reduced tracing sampling
+  tracing:
+  - providers:
+    - name: jaeger
+    randomSamplingPercentage: 1.0  # Only 1% sampling for cost savings
+
+---
+# Optimized Resource Quotas
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: pyairtable-mesh-quota
+  namespace: pyairtable
+spec:
+  hard:
+    # CPU limits
+    requests.cpu: "2"
+    limits.cpu: "4"
+    # Memory limits
+    requests.memory: "2Gi"
+    limits.memory: "4Gi"
+    # Object limits
+    pods: "20"
+    services: "10"
+    persistentvolumeclaims: "5"
+    # Istio-specific limits
+    gateways.networking.istio.io: "2"
+    virtualservices.networking.istio.io: "10"
+    destinationrules.networking.istio.io: "10"
+
+---
+# Pod Disruption Budget for Cost-Effective Availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pyairtable-mesh-pdb
+  namespace: pyairtable
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: pyairtable
+
+---
+# Horizontal Pod Autoscaler for Efficient Scaling
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway-hpa
+  namespace: pyairtable
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+
+---
+# Vertical Pod Autoscaler for Right-Sizing
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: istio-proxy-vpa
+  namespace: pyairtable
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: istio-proxy
+      controlledResources: ["cpu", "memory"]
+      minAllowed:
+        cpu: 5m
+        memory: 32Mi
+      maxAllowed:
+        cpu: 100m
+        memory: 128Mi
+
+---
+# Cost-Optimized DestinationRule with Reduced Connection Pools
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: cost-optimized-defaults
+  namespace: pyairtable
+spec:
+  host: "*.pyairtable.svc.cluster.local"
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 10
+        connectTimeout: 10s
+      http:
+        http1MaxPendingRequests: 5
+        http2MaxRequests: 10
+        maxRequestsPerConnection: 2
+        maxRetries: 2
+        consecutiveGatewayErrors: 3
+    loadBalancer:
+      simple: ROUND_ROBIN
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+
+---
+# Cost-Optimized Service Entry with Connection Limits
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: external-apis-cost-optimized
+  namespace: pyairtable
+spec:
+  host: "*.googleapis.com"
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 5
+        connectTimeout: 30s
+      http:
+        http1MaxPendingRequests: 3
+        maxRequestsPerConnection: 1
+        maxRetries: 2
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      consecutive5xxErrors: 5
+      interval: 60s
+      baseEjectionTime: 120s
+
+---
+# Simplified WASM Plugin Configuration (Essential Features Only)
+apiVersion: extensions.istio.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: essential-security-headers
+  namespace: pyairtable
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: api-gateway
+  url: oci://ghcr.io/pyairtable/minimal-security-headers-wasm:latest
+  phase: AUTHN
+  pluginConfig:
+    headers:
+      response:
+        add:
+          "X-Frame-Options": "DENY"
+          "X-Content-Type-Options": "nosniff"
+          "Strict-Transport-Security": "max-age=31536000"
+
+---
+# Cost-Aware Envoy Filter for Minimal Logging
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: cost-optimized-logging
+  namespace: pyairtable
+spec:
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+    patch:
+      operation: MERGE
+      value:
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          access_log:
+          - name: envoy.access_loggers.file
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+              path: "/dev/stdout"
+              # Simplified log format for cost savings
+              format: '[%START_TIME%] "%REQ(:METHOD)% %REQ(:PATH)%" %RESPONSE_CODE% %DURATION%ms\n'
+            filter:
+              # Only log errors and slow requests
+              runtime_filter:
+                runtime_key: "access_log_enabled"
+                percent_sampled:
+                  numerator: 10
+                  denominator: HUNDRED
+
+---
+# Node Affinity for Cost Optimization (Prefer Spot Instances)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cost-optimization-config
+  namespace: pyairtable
+data:
+  node-affinity.yaml: |
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+            - key: node.kubernetes.io/instance-type
+              operator: In
+              values: ["t3.medium", "t3.large", "t4g.medium", "t4g.large"]
+        - weight: 80
+          preference:
+            matchExpressions:
+            - key: kubernetes.io/arch
+              operator: In
+              values: ["arm64"]  # ARM instances are typically cheaper
+        - weight: 60
+          preference:
+            matchExpressions:
+            - key: karpenter.sh/capacity-type
+              operator: In
+              values: ["spot"]  # Prefer spot instances
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 50
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+              - key: app.kubernetes.io/part-of
+                operator: In
+                values: ["pyairtable"]
+            topologyKey: kubernetes.io/hostname
+
+---
+# Cost Monitoring and Alerting
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pyairtable-cost-alerts
+  namespace: pyairtable
+spec:
+  groups:
+  - name: pyairtable.cost.rules
+    rules:
+    # High resource usage alert
+    - alert: PyAirtableHighResourceUsage
+      expr: |
+        (
+          sum(rate(container_cpu_usage_seconds_total{namespace="pyairtable"}[5m])) /
+          sum(kube_pod_container_resource_limits{namespace="pyairtable",resource="cpu"})
+        ) > 0.8
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High CPU usage in PyAirtable namespace"
+        description: "CPU usage is {{ $value | humanizePercentage }} of limits"
+
+    # Memory usage alert
+    - alert: PyAirtableHighMemoryUsage
+      expr: |
+        (
+          sum(container_memory_working_set_bytes{namespace="pyairtable"}) /
+          sum(kube_pod_container_resource_limits{namespace="pyairtable",resource="memory"})
+        ) > 0.8
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High memory usage in PyAirtable namespace"
+        description: "Memory usage is {{ $value | humanizePercentage }} of limits"
+
+    # Unused resources alert
+    - alert: PyAirtableUnderUtilizedResources
+      expr: |
+        (
+          sum(rate(container_cpu_usage_seconds_total{namespace="pyairtable"}[30m])) /
+          sum(kube_pod_container_resource_requests{namespace="pyairtable",resource="cpu"})
+        ) < 0.2
+      for: 30m
+      labels:
+        severity: info
+      annotations:
+        summary: "Underutilized CPU resources in PyAirtable"
+        description: "CPU usage is only {{ $value | humanizePercentage }} of requests"
+
+---
+# Cost Optimization Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pyairtable-cost-dashboard
+  namespace: pyairtable
+  labels:
+    grafana_dashboard: "1"
+data:
+  cost-optimization.json: |
+    {
+      "dashboard": {
+        "title": "PyAirtable Cost Optimization",
+        "panels": [
+          {
+            "title": "Resource Utilization",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"pyairtable\"}[5m])) / sum(kube_pod_container_resource_limits{namespace=\"pyairtable\",resource=\"cpu\"}) * 100",
+                "legendFormat": "CPU Utilization %"
+              },
+              {
+                "expr": "sum(container_memory_working_set_bytes{namespace=\"pyairtable\"}) / sum(kube_pod_container_resource_limits{namespace=\"pyairtable\",resource=\"memory\"}) * 100",
+                "legendFormat": "Memory Utilization %"
+              }
+            ]
+          },
+          {
+            "title": "Cost Efficiency Metrics",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"pyairtable\"}[5m])) / sum by (pod) (kube_pod_container_resource_requests{namespace=\"pyairtable\",resource=\"cpu\"})",
+                "legendFormat": "CPU Efficiency"
+              }
+            ]
+          }
+        ]
+      }
+    }
+
+---
+# Monthly Cost Estimation ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cost-estimation
+  namespace: pyairtable
+data:
+  monthly-costs.yaml: |
+    # Estimated monthly costs for PyAirtable Istio Service Mesh
+    # Based on AWS pricing (adjust for your cloud provider)
+    
+    compute_costs:
+      # Control plane (single replica)
+      istiod:
+        cpu: "200m"
+        memory: "256Mi"
+        estimated_monthly_cost: "$15"
+      
+      # Ingress gateway (single replica)
+      ingress_gateway:
+        cpu: "500m"
+        memory: "256Mi"
+        estimated_monthly_cost: "$25"
+      
+      # Sidecar proxies (per pod)
+      istio_proxy_per_pod:
+        cpu: "50m"
+        memory: "64Mi"
+        estimated_monthly_cost: "$5"
+      
+      # Total for 5 application pods
+      total_sidecars:
+        estimated_monthly_cost: "$25"
+    
+    storage_costs:
+      # Metrics storage (7 days retention)
+      prometheus_storage:
+        size: "10Gi"
+        estimated_monthly_cost: "$2"
+      
+      # Trace storage (3 days retention)
+      jaeger_storage:
+        size: "5Gi"
+        estimated_monthly_cost: "$1"
+    
+    network_costs:
+      # Ingress data transfer
+      estimated_monthly_cost: "$5"
+    
+    total_estimated_monthly_cost: "$73"
+    
+    cost_optimization_savings:
+      - "Using ARM-based instances: 20% savings ($15/month)"
+      - "Using spot instances: 50-70% savings ($25-50/month)"
+      - "Right-sizing with VPA: 15% savings ($10/month)"
+      - "Reduced telemetry sampling: 10% savings ($7/month)"

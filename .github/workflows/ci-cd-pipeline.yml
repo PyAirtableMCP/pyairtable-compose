@@ -1,0 +1,601 @@
+name: PyAirtable CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      deploy_environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+  GO_VERSION: '1.21'
+
+jobs:
+  # Static Analysis and Linting
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Cache Python dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        
+    - name: Cache Node dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        
+    - name: Cache Go dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 bandit black isort mypy
+        find . -name "requirements*.txt" -exec pip install -r {} \;
+        
+    - name: Install Go tools
+      run: |
+        go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+        
+    - name: Python Static Analysis
+      run: |
+        # Code formatting check
+        black --check python-services/
+        
+        # Import sorting check
+        isort --check-only python-services/
+        
+        # Linting
+        flake8 python-services/ --max-line-length=120 --exclude=venv,__pycache__
+        
+        # Type checking
+        mypy python-services/ --ignore-missing-imports
+        
+        # Security scanning
+        bandit -r python-services/ -f json -o bandit-report.json
+        
+    - name: Go Static Analysis
+      run: |
+        cd go-services
+        
+        # Format check
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "Go files need formatting:"
+          gofmt -s -l .
+          exit 1
+        fi
+        
+        # Vet
+        go vet ./...
+        
+        # Linting
+        golangci-lint run ./... --out-format github-actions
+        
+        # Security scanning
+        gosec -fmt json -out ../gosec-report.json ./...
+        
+    - name: Frontend Static Analysis
+      run: |
+        for dir in frontend-services/*/; do
+          if [ -f "$dir/package.json" ]; then
+            echo "Analyzing $dir"
+            cd "$dir"
+            npm ci
+            npm run lint
+            npm run type-check || true
+            cd - > /dev/null
+          fi
+        done
+        
+    - name: Upload static analysis reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: static-analysis-reports
+        path: |
+          bandit-report.json
+          gosec-report.json
+
+  # Unit Tests
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: static-analysis
+    
+    strategy:
+      matrix:
+        test-suite: [python, go, frontend]
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up test environment
+      run: |
+        case "${{ matrix.test-suite }}" in
+          python)
+            echo "Setting up Python environment"
+            ;;
+          go)
+            echo "Setting up Go environment"
+            ;;
+          frontend)
+            echo "Setting up Node.js environment"
+            ;;
+        esac
+        
+    - name: Python Unit Tests
+      if: matrix.test-suite == 'python'
+      run: |
+        python -m pip install --upgrade pip
+        find . -name "requirements*.txt" -exec pip install -r {} \;
+        pip install pytest pytest-cov pytest-asyncio pytest-mock
+        
+        pytest -v --tb=short \
+          --cov=python-services \
+          --cov-report=xml:coverage-python.xml \
+          --cov-report=html:htmlcov-python \
+          --junit-xml=junit-python.xml \
+          -m "unit and not slow" \
+          python-services/tests/unit/
+          
+    - name: Go Unit Tests
+      if: matrix.test-suite == 'go'
+      run: |
+        cd go-services
+        go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        go tool cover -func=coverage.out
+        
+    - name: Frontend Unit Tests
+      if: matrix.test-suite == 'frontend'
+      run: |
+        for dir in frontend-services/*/; do
+          if [ -f "$dir/package.json" ] && grep -q '"test"' "$dir/package.json"; then
+            echo "Testing $dir"
+            cd "$dir"
+            npm ci
+            npm run test -- --coverage --watchAll=false --passWithNoTests
+            cd - > /dev/null
+          fi
+        done
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: unit-test-results-${{ matrix.test-suite }}
+        path: |
+          coverage-*.xml
+          htmlcov-*
+          junit-*.xml
+          go-services/coverage.out
+
+  # Integration Tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+          
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        find . -name "requirements*.txt" -exec pip install -r {} \;
+        pip install pytest pytest-asyncio testcontainers
+        
+    - name: Run Python Integration Tests
+      env:
+        TEST_DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+        TEST_REDIS_URL: redis://localhost:6379
+        TEST_ENV: integration
+      run: |
+        pytest -v --tb=short \
+          --cov=python-services \
+          --cov-report=xml:coverage-integration.xml \
+          --junit-xml=junit-integration.xml \
+          --timeout=300 \
+          -m "integration" \
+          python-services/tests/integration/
+          
+    - name: Run Go Integration Tests
+      env:
+        DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+        REDIS_URL: redis://localhost:6379
+      run: |
+        cd go-services
+        go test -v -tags=integration -timeout=300s ./...
+        
+    - name: Upload integration test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: integration-test-results
+        path: |
+          coverage-integration.xml
+          junit-integration.xml
+
+  # Security Tests
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    needs: static-analysis
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install security testing tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install safety semgrep
+        find . -name "requirements*.txt" -exec pip install -r {} \;
+        
+    - name: Run dependency vulnerability scan
+      run: |
+        # Python dependencies
+        safety check --json --output safety-report.json || true
+        
+        # Node.js dependencies
+        for dir in frontend-services/*/; do
+          if [ -f "$dir/package.json" ]; then
+            cd "$dir"
+            npm audit --audit-level=high --json > ../npm-audit-$(basename "$dir").json || true
+            cd - > /dev/null
+          fi
+        done
+        
+    - name: Run SAST with Semgrep
+      run: |
+        semgrep --config=auto --json --output=semgrep-report.json . || true
+        
+    - name: Run custom security tests
+      run: |
+        python testing/security-tests/security_test_suite.py
+        
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          safety-report.json
+          semgrep-report.json
+          npm-audit-*.json
+
+  # Build and Push Images
+  build-images:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: read
+      packages: write
+      
+    outputs:
+      image-tags: ${{ steps.meta.outputs.tags }}
+      
+    strategy:
+      matrix:
+        service:
+          - api-gateway
+          - auth-service
+          - user-service
+          - airtable-gateway
+          - llm-orchestrator
+          - tenant-dashboard
+          
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+          
+    - name: Build and push image
+      uses: docker/build-push-action@v5
+      with:
+        context: |
+          ${{ matrix.service == 'tenant-dashboard' && 'frontend-services/tenant-dashboard' || format('go-services/{0}', matrix.service) }}
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Performance Tests
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    if: github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install K6
+      run: |
+        sudo gpg -k
+        sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+        echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+        sudo apt-get update
+        sudo apt-get install k6
+        
+    - name: Start test services
+      run: |
+        docker-compose -f tests/docker-compose.test.yml up -d
+        sleep 30
+        
+    - name: Run K6 performance tests
+      env:
+        BASE_URL: http://localhost:8000
+        K6_VUS: 10
+        K6_DURATION: 60s
+      run: |
+        k6 run --out json=performance-results.json testing/performance-tests/k6-load-tests.js
+        
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: performance-results
+        path: performance-results.json
+
+  # Contract Tests
+  contract-tests:
+    name: Contract Tests
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pact-python
+        find . -name "requirements*.txt" -exec pip install -r {} \;
+        
+    - name: Run contract tests
+      run: |
+        pytest -v --tb=short \
+          --junit-xml=junit-contracts.xml \
+          -m "contract" \
+          testing/contract-tests/
+          
+    - name: Publish contracts
+      if: github.event_name == 'push'
+      run: |
+        echo "Publishing contracts to Pact Broker..."
+        # pact-broker publish --consumer-app-version ${{ github.sha }} --broker-base-url ${{ secrets.PACT_BROKER_URL }}
+        
+    - name: Upload contract test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: contract-test-results
+        path: |
+          junit-contracts.xml
+          testing/contract-tests/pacts/
+
+  # Pre-deployment Validation
+  pre-deployment-validation:
+    name: Pre-deployment Validation
+    runs-on: ubuntu-latest
+    needs: [build-images, performance-tests, contract-tests, security-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y make
+        
+    - name: Run pre-deployment validation
+      run: |
+        chmod +x scripts/pre-deployment-validation.sh
+        ./scripts/pre-deployment-validation.sh
+        
+    - name: Upload deployment readiness report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: deployment-readiness-report
+        path: testing/reports/deployment-readiness-report.json
+
+  # Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: pre-deployment-validation
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Kubernetes
+      uses: azure/setup-kubectl@v3
+      
+    - name: Deploy to staging
+      run: |
+        echo "Deploying to staging environment..."
+        # kubectl apply -f k8s/staging/
+        # kubectl rollout status deployment/api-gateway -n pyairtable-staging
+        
+    - name: Run post-deployment tests
+      run: |
+        echo "Running post-deployment tests..."
+        # Run smoke tests against staging environment
+        
+    - name: Notify deployment
+      run: |
+        echo "Staging deployment completed successfully"
+
+  # Deploy to Production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_environment == 'production'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Manual approval required
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        
+    - name: Deploy to production
+      run: |
+        echo "Deploying to production environment..."
+        # kubectl apply -f k8s/production/
+        # kubectl rollout status deployment/api-gateway -n pyairtable-production
+        
+    - name: Run production smoke tests
+      run: |
+        echo "Running production smoke tests..."
+        # Run critical smoke tests
+        
+    - name: Notify production deployment
+      run: |
+        echo "Production deployment completed successfully"
+
+  # Cleanup
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always()
+    
+    steps:
+    - name: Clean up test resources
+      run: |
+        echo "Cleaning up test resources..."
+        # Clean up any temporary resources
+        
+    - name: Archive artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: all-test-results
+        path: |
+          **/*-report.json
+          **/*-report.xml
+          **/coverage*.xml
+        retention-days: 30

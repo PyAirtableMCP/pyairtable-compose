@@ -1,14 +1,26 @@
-module github.com/Reg-Kris/pyairtable-permission-service
+module github.com/pyairtable/pyairtable-permission-service
 
 go 1.21
 
 require (
 	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/golang-jwt/jwt/v5 v5.0.0
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.1
 	github.com/prometheus/client_golang v1.16.0
+	github.com/pyairtable/pyairtable-protos v0.0.0
 	github.com/redis/go-redis/v9 v9.11.0
 	github.com/stretchr/testify v1.9.0
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.47.0
+	go.opentelemetry.io/otel v1.22.0
+	go.opentelemetry.io/otel/exporters/prometheus v0.44.0
+	go.opentelemetry.io/otel/metric v1.22.0
+	go.opentelemetry.io/otel/sdk v1.22.0
+	go.opentelemetry.io/otel/sdk/metric v1.22.0
+	go.opentelemetry.io/otel/trace v1.22.0
 	go.uber.org/zap v1.25.0
+	google.golang.org/genproto/googleapis/api v0.0.0-20240125205218-1f4bbc51befe
+	google.golang.org/grpc v1.60.1
+	google.golang.org/protobuf v1.32.0
 	gorm.io/driver/postgres v1.5.2
 	gorm.io/gorm v1.30.0
 )
@@ -79,8 +91,9 @@ require (
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/text v0.20.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/pyairtable/pyairtable-protos => ../../pyairtable-protos
 

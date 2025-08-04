@@ -1,0 +1,281 @@
+version: '3.8'
+
+# Enhanced Monitoring Stack for PyAirtable Go Services
+# Includes Prometheus, Grafana, Node Exporter, and specialized exporters
+# for comprehensive observability of microservices architecture
+
+services:
+  # Prometheus - Metrics Collection and Storage
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: pyairtable-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=10GB'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+      - '--log.level=info'
+    restart: unless-stopped
+    networks:
+      - monitoring-network
+      - pyairtable-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9090/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # Grafana - Visualization and Dashboards
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: pyairtable-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      # Security
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_SECRET_KEY=pyairtable-monitoring-secret
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      
+      # Server
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+      - GF_SERVER_SERVE_FROM_SUB_PATH=false
+      
+      # Database (using SQLite for simplicity)
+      - GF_DATABASE_TYPE=sqlite3
+      - GF_DATABASE_PATH=/var/lib/grafana/grafana.db
+      
+      # Users and organizations
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_USERS_ALLOW_ORG_CREATE=false
+      - GF_USERS_AUTO_ASSIGN_ORG=true
+      - GF_USERS_AUTO_ASSIGN_ORG_ID=1
+      - GF_USERS_AUTO_ASSIGN_ORG_ROLE=Viewer
+      
+      # Auth
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
+      
+      # Alerting
+      - GF_ALERTING_ENABLED=true
+      - GF_UNIFIED_ALERTING_ENABLED=true
+      
+      # Feature toggles
+      - GF_FEATURE_TOGGLES_ENABLE=ngalert
+      
+      # Logging
+      - GF_LOG_LEVEL=info
+      - GF_LOG_MODE=console file
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    restart: unless-stopped
+    networks:
+      - monitoring-network
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Node Exporter - System Metrics
+  node-exporter:
+    image: prom/node-exporter:v1.6.1
+    container_name: pyairtable-node-exporter
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+      - /etc/hostname:/etc/nodename:ro
+      - /etc/localtime:/etc/localtime:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--collector.textfile.directory=/etc/node-exporter'
+      - '--collector.processes'
+      - '--collector.systemd'
+      - '--collector.tcpstat'
+      - '--web.listen-address=:9100'
+      - '--web.telemetry-path=/metrics'
+    restart: unless-stopped
+    networks:
+      - monitoring-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9100/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL Exporter - Database Metrics
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: pyairtable-postgres-exporter
+    ports:
+      - "9187:9187"
+    environment:
+      # Connection to main PostgreSQL database
+      - DATA_SOURCE_NAME=postgresql://postgres:postgres_dev_password@postgres:5432/pyairtable?sslmode=disable
+      - PG_EXPORTER_WEB_LISTEN_ADDRESS=:9187
+      - PG_EXPORTER_WEB_TELEMETRY_PATH=/metrics
+      - PG_EXPORTER_DISABLE_DEFAULT_METRICS=false
+      - PG_EXPORTER_DISABLE_SETTINGS_METRICS=false
+      - PG_EXPORTER_AUTO_DISCOVER_DATABASES=true
+      - PG_EXPORTER_EXCLUDE_DATABASES=template0,template1
+    restart: unless-stopped
+    networks:
+      - monitoring-network
+      - pyairtable-network
+    depends_on:
+      - postgres
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9187/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Exporter - Cache Metrics
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.55.0
+    container_name: pyairtable-redis-exporter
+    ports:
+      - "9121:9121"
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+      - REDIS_PASSWORD=redis_dev_password
+      - REDIS_EXPORTER_WEB_LISTEN_ADDRESS=:9121
+      - REDIS_EXPORTER_WEB_TELEMETRY_PATH=/metrics
+      - REDIS_EXPORTER_LOG_FORMAT=txt
+      - REDIS_EXPORTER_DEBUG=false
+      - REDIS_EXPORTER_CHECK_KEYS=*
+      - REDIS_EXPORTER_CHECK_KEY_GROUPS=db0=*
+    restart: unless-stopped
+    networks:
+      - monitoring-network
+      - pyairtable-network
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9121/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # cAdvisor - Container Metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: pyairtable-cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    command:
+      - '--port=8080'
+      - '--housekeeping_interval=30s'
+      - '--max_housekeeping_interval=35s'
+      - '--machine_id_file=/rootfs/etc/machine-id'
+      - '--allow_dynamic_housekeeping=true'
+      - '--global_housekeeping_interval=30s'
+      - '--event_storage_event_limit=default=0'
+      - '--event_storage_age_limit=default=0'
+      - '--disable_metrics=percpu,sched,tcp,udp,disk,diskIO,accelerator,hugetlb,referenced_memory,cpu_topology,resctrl'
+      - '--store_container_labels=false'
+      - '--whitelisted_container_labels=io.kubernetes.container.name,io.kubernetes.pod.name,io.kubernetes.pod.namespace'
+    restart: unless-stopped
+    networks:
+      - monitoring-network
+    privileged: true
+    devices:
+      - /dev/kmsg
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Alertmanager - Alert Management
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: pyairtable-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+      - '--web.route-prefix=/'
+      - '--cluster.listen-address='
+      - '--log.level=info'
+    restart: unless-stopped
+    networks:
+      - monitoring-network
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9093/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Blackbox Exporter - External Service Monitoring
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.24.0
+    container_name: pyairtable-blackbox-exporter
+    ports:
+      - "9115:9115"
+    volumes:
+      - ./monitoring/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    command:
+      - '--config.file=/etc/blackbox_exporter/config.yml'
+      - '--web.listen-address=:9115'
+    restart: unless-stopped
+    networks:
+      - monitoring-network
+      - pyairtable-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9115/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  monitoring-network:
+    driver: bridge
+    name: pyairtable-monitoring
+  pyairtable-network:
+    external: true
+    name: go-services_pyairtable-network
+
+volumes:
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  alertmanager-data:
+    driver: local

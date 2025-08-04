@@ -1,0 +1,322 @@
+{
+  "type": "record",
+  "name": "UserRegisteredEvent",
+  "namespace": "io.pyairtable.events.auth",
+  "doc": "Event emitted when a new user registers in the system",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "doc": "Unique identifier for this event instance"
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "user.registered",
+      "doc": "Type of the event"
+    },
+    {
+      "name": "aggregate_id",
+      "type": "string",
+      "doc": "User ID"
+    },
+    {
+      "name": "aggregate_type",
+      "type": "string",
+      "default": "User",
+      "doc": "Type of the aggregate"
+    },
+    {
+      "name": "version",
+      "type": "long",
+      "doc": "Version of the user aggregate"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "logicalType": "timestamp-millis",
+      "doc": "When the user was registered"
+    },
+    {
+      "name": "tenant_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Tenant identifier"
+    },
+    {
+      "name": "correlation_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Correlation identifier"
+    },
+    {
+      "name": "causation_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Causation identifier"
+    },
+    {
+      "name": "user_data",
+      "type": {
+        "type": "record",
+        "name": "UserData",
+        "fields": [
+          {
+            "name": "email",
+            "type": "string",
+            "doc": "User's email address"
+          },
+          {
+            "name": "first_name",
+            "type": ["null", "string"],
+            "default": null,
+            "doc": "User's first name"
+          },
+          {
+            "name": "last_name",
+            "type": ["null", "string"],
+            "default": null,
+            "doc": "User's last name"
+          },
+          {
+            "name": "role",
+            "type": "string",
+            "default": "user",
+            "doc": "User's role in the system"
+          },
+          {
+            "name": "registration_source",
+            "type": "string",
+            "default": "web",
+            "doc": "Source of registration (web, api, mobile)"
+          }
+        ]
+      },
+      "doc": "User registration data"
+    },
+    {
+      "name": "metadata",
+      "type": {
+        "type": "map",
+        "values": "string"
+      },
+      "default": {},
+      "doc": "Additional metadata"
+    }
+  ]
+}
+
+{
+  "type": "record",
+  "name": "UserAuthenticatedEvent",
+  "namespace": "io.pyairtable.events.auth",
+  "doc": "Event emitted when a user successfully authenticates",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "doc": "Unique identifier for this event instance"
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "user.authenticated",
+      "doc": "Type of the event"
+    },
+    {
+      "name": "aggregate_id",
+      "type": "string",
+      "doc": "User ID"
+    },
+    {
+      "name": "aggregate_type",
+      "type": "string",
+      "default": "User",
+      "doc": "Type of the aggregate"
+    },
+    {
+      "name": "version",
+      "type": "long",
+      "doc": "Version of the user aggregate"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "logicalType": "timestamp-millis",
+      "doc": "When the authentication occurred"
+    },
+    {
+      "name": "tenant_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Tenant identifier"
+    },
+    {
+      "name": "correlation_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Correlation identifier"
+    },
+    {
+      "name": "causation_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Causation identifier"
+    },
+    {
+      "name": "auth_data",
+      "type": {
+        "type": "record",
+        "name": "AuthData",
+        "fields": [
+          {
+            "name": "session_id",
+            "type": "string",
+            "doc": "Authentication session identifier"
+          },
+          {
+            "name": "auth_method",
+            "type": "string",
+            "doc": "Authentication method used (password, oauth, sso)"
+          },
+          {
+            "name": "client_ip",
+            "type": ["null", "string"],
+            "default": null,
+            "doc": "Client IP address"
+          },
+          {
+            "name": "user_agent",
+            "type": ["null", "string"],
+            "default": null,
+            "doc": "Client user agent"
+          },
+          {
+            "name": "device_fingerprint",
+            "type": ["null", "string"],
+            "default": null,
+            "doc": "Device fingerprint for security"
+          }
+        ]
+      },
+      "doc": "Authentication context data"
+    },
+    {
+      "name": "metadata",
+      "type": {
+        "type": "map",
+        "values": "string"
+      },
+      "default": {},
+      "doc": "Additional metadata"
+    }
+  ]
+}
+
+{
+  "type": "record",
+  "name": "UserPermissionsChangedEvent",
+  "namespace": "io.pyairtable.events.auth",
+  "doc": "Event emitted when user permissions are modified",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "doc": "Unique identifier for this event instance"
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "user.permissions.changed",
+      "doc": "Type of the event"
+    },
+    {
+      "name": "aggregate_id",
+      "type": "string",
+      "doc": "User ID"
+    },
+    {
+      "name": "aggregate_type",
+      "type": "string",
+      "default": "User",
+      "doc": "Type of the aggregate"
+    },
+    {
+      "name": "version",
+      "type": "long",
+      "doc": "Version of the user aggregate"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "logicalType": "timestamp-millis",
+      "doc": "When the permissions were changed"
+    },
+    {
+      "name": "tenant_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Tenant identifier"
+    },
+    {
+      "name": "correlation_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Correlation identifier"
+    },
+    {
+      "name": "causation_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Causation identifier"
+    },
+    {
+      "name": "permission_changes",
+      "type": {
+        "type": "record",
+        "name": "PermissionChanges",
+        "fields": [
+          {
+            "name": "granted_permissions",
+            "type": {
+              "type": "array",
+              "items": "string"
+            },
+            "default": [],
+            "doc": "List of permissions granted to the user"
+          },
+          {
+            "name": "revoked_permissions",
+            "type": {
+              "type": "array",
+              "items": "string"
+            },
+            "default": [],
+            "doc": "List of permissions revoked from the user"
+          },
+          {
+            "name": "changed_by",
+            "type": "string",
+            "doc": "ID of the user who made the changes"
+          },
+          {
+            "name": "reason",
+            "type": ["null", "string"],
+            "default": null,
+            "doc": "Reason for the permission change"
+          }
+        ]
+      },
+      "doc": "Details of permission changes"
+    },
+    {
+      "name": "metadata",
+      "type": {
+        "type": "map",
+        "values": "string"
+      },
+      "default": {},
+      "doc": "Additional metadata"
+    }
+  ]
+}

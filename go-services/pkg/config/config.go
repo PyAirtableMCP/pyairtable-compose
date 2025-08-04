@@ -13,22 +13,38 @@ type Config struct {
 	}
 
 	Database struct {
-		URL             string `env:"DATABASE_URL" envDefault:"postgres://user:password@localhost/pyairtable?sslmode=disable"`
-		MaxOpenConns    int    `env:"DB_MAX_OPEN_CONNS" envDefault:"25"`
-		MaxIdleConns    int    `env:"DB_MAX_IDLE_CONNS" envDefault:"5"`
-		ConnMaxLifetime int    `env:"DB_CONN_MAX_LIFETIME" envDefault:"300"` // seconds
+		URL                string `env:"DATABASE_URL" envDefault:"postgres://user:password@localhost/pyairtable?sslmode=require"`
+		MaxOpenConns       int    `env:"DB_MAX_OPEN_CONNS" envDefault:"25"`
+		MaxIdleConns       int    `env:"DB_MAX_IDLE_CONNS" envDefault:"5"`
+		ConnMaxLifetime    int    `env:"DB_CONN_MAX_LIFETIME" envDefault:"300"` // seconds
+		ConnMaxIdleTime    int    `env:"DB_CONN_MAX_IDLE_TIME" envDefault:"60"` // seconds
+		RetryAttempts      int    `env:"DB_RETRY_ATTEMPTS" envDefault:"3"`
+		RetryBackoff       int    `env:"DB_RETRY_BACKOFF" envDefault:"1"` // seconds
+		HealthCheckInterval int    `env:"DB_HEALTH_CHECK_INTERVAL" envDefault:"30"` // seconds
+		SSLMode            string `env:"DB_SSL_MODE" envDefault:"require"`
+		SSLCert            string `env:"DB_SSL_CERT"`
+		SSLKey             string `env:"DB_SSL_KEY"`
+		SSLRootCert        string `env:"DB_SSL_ROOT_CERT"`
 	}
 
 	Redis struct {
-		URL      string `env:"REDIS_URL" envDefault:"redis://localhost:6379"`
-		Password string `env:"REDIS_PASSWORD"`
-		DB       int    `env:"REDIS_DB" envDefault:"0"`
+		URL         string `env:"REDIS_URL" envDefault:"redis://localhost:6379"`
+		Password    string `env:"REDIS_PASSWORD"`
+		DB          int    `env:"REDIS_DB" envDefault:"0"`
+		TLSEnabled  bool   `env:"REDIS_TLS_ENABLED" envDefault:"false"`
+		TLSCert     string `env:"REDIS_TLS_CERT"`
+		TLSKey      string `env:"REDIS_TLS_KEY"`
+		TLSCACert   string `env:"REDIS_TLS_CA_CERT"`
+		PoolSize    int    `env:"REDIS_POOL_SIZE" envDefault:"10"`
+		RetryAttempts int  `env:"REDIS_RETRY_ATTEMPTS" envDefault:"3"`
 	}
 
 	JWT struct {
-		Secret    string `env:"JWT_SECRET" envDefault:"default-secret-change-in-production"`
-		Issuer    string `env:"JWT_ISSUER" envDefault:"pyairtable"`
-		ExpiresIn int    `env:"JWT_EXPIRES_IN" envDefault:"86400"` // seconds (24 hours)
+		Secret           string `env:"JWT_SECRET" envDefault:"default-secret-change-in-production"`
+		Issuer           string `env:"JWT_ISSUER" envDefault:"pyairtable"`
+		ExpiresIn        int    `env:"JWT_EXPIRES_IN" envDefault:"900"` // seconds (15 minutes)
+		RefreshExpiresIn int    `env:"JWT_REFRESH_EXPIRES_IN" envDefault:"604800"` // seconds (7 days)
+		RefreshSecret    string `env:"JWT_REFRESH_SECRET" envDefault:"default-refresh-secret-change-in-production"`
 	}
 
 	Auth struct {
@@ -83,6 +99,26 @@ type Config struct {
 	RateLimit struct {
 		RequestsPerMinute int `env:"RATE_LIMIT_RPM" envDefault:"100"`
 		BurstSize         int `env:"RATE_LIMIT_BURST" envDefault:"10"`
+	}
+
+	Audit struct {
+		Enabled       bool   `env:"AUDIT_ENABLED" envDefault:"true"`
+		SecretKey     string `env:"AUDIT_SECRET_KEY" envDefault:"default-audit-secret-change-in-production"`
+		BufferSize    int    `env:"AUDIT_BUFFER_SIZE" envDefault:"100"`
+		FlushInterval int    `env:"AUDIT_FLUSH_INTERVAL" envDefault:"10"` // seconds
+	}
+
+	SIEM struct {
+		Type          string `env:"SIEM_TYPE" envDefault:""`                        // elasticsearch, splunk, sumo, custom
+		URL           string `env:"SIEM_URL"`                                       // SIEM endpoint URL
+		APIKey        string `env:"SIEM_API_KEY"`                                   // API key for authentication
+		Username      string `env:"SIEM_USERNAME"`                                  // Username for basic auth
+		Password      string `env:"SIEM_PASSWORD"`                                  // Password for basic auth
+		Index         string `env:"SIEM_INDEX" envDefault:"pyairtable-audit"`       // Index/collection name
+		BatchSize     int    `env:"SIEM_BATCH_SIZE" envDefault:"100"`               // Batch size for bulk operations
+		FlushInterval int    `env:"SIEM_FLUSH_INTERVAL" envDefault:"30"`            // Flush interval in seconds
+		TLSEnabled    bool   `env:"SIEM_TLS_ENABLED" envDefault:"true"`             // Enable TLS
+		TLSSkipVerify bool   `env:"SIEM_TLS_SKIP_VERIFY" envDefault:"false"`        // Skip TLS verification
 	}
 }
 
