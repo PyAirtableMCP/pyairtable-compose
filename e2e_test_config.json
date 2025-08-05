@@ -1,0 +1,11 @@
+{
+  "api_gateway_url": "http://localhost:8000",
+  "llm_orchestrator_url": "http://localhost:8003",
+  "mcp_server_url": "http://localhost:8001",
+  "airtable_gateway_url": "http://localhost:8002",
+  "airtable_base": "appVLUAubH5cFWhMV",
+  "airtable_api_key": "pya_d7f8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6",
+  "timeout": 60,
+  "retry_attempts": 3,
+  "retry_delay": 2.0
+}

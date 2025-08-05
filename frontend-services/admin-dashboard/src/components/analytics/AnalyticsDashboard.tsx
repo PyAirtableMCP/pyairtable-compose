@@ -3,10 +3,9 @@
 import React from 'react'
 import { useAnalytics } from '@/hooks/useApi'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { UsageChart, RevenueChart, StorageChart, PerformanceChart } from '@/components/charts/MetricsChart'
-import { formatNumber, formatCurrency, formatBytes, calculatePercentageChange } from '@/lib/utils'
+import { formatNumber, formatCurrency, formatBytes } from '@/lib/utils'
 import {
   TrendingUp,
   TrendingDown,
@@ -15,18 +14,14 @@ import {
   Database,
   Activity,
   Download,
-  Calendar,
-  Filter,
 } from 'lucide-react'
 
 export function AnalyticsDashboard() {
   const [timeRange, setTimeRange] = React.useState('24h')
-  const [selectedMetric, setSelectedMetric] = React.useState('overview')
-
-  const { data: usageData, isLoading: usageLoading } = useAnalytics('usage', timeRange)
-  const { data: revenueData, isLoading: revenueLoading } = useAnalytics('revenue', timeRange)
-  const { data: performanceData, isLoading: performanceLoading } = useAnalytics('performance', timeRange)
-  const { data: storageData, isLoading: storageLoading } = useAnalytics('storage', timeRange)
+  const { isLoading: usageLoading } = useAnalytics('usage', timeRange)
+  const { isLoading: revenueLoading } = useAnalytics('revenue', timeRange)
+  const { isLoading: performanceLoading } = useAnalytics('performance', timeRange)
+  const { isLoading: storageLoading } = useAnalytics('storage', timeRange)
 
   // Mock data for demonstration - replace with real data
   const mockKPIs = {

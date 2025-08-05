@@ -55,7 +55,7 @@ export default function LoginPage() {
         toast.success("Welcome back!")
         
         // Refresh session to get updated data
-        const session = await getSession()
+        await getSession()
         
         // Redirect to dashboard
         router.push("/")

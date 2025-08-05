@@ -122,7 +122,55 @@ services:
           memory: 128M
           cpus: '0.15'
 
-  # === LOGGING STACK (ELK) ===
+  # === LOGGING STACK ===
+  
+  # Loki - Lightweight log aggregation (Alternative to ELK)
+  loki:
+    image: grafana/loki:2.9.2
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    networks:
+      - observability
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.4'
+        reservations:
+          memory: 256M
+          cpus: '0.2'
+
+  # Promtail - Log shipper for Loki
+  promtail:
+    image: grafana/promtail:2.9.2
+    container_name: promtail
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - observability
+      - pyairtable-network
+    restart: unless-stopped
+    depends_on:
+      - loki
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.2'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+
+  # === ELK STACK (Optional - for comprehensive logging) ===
   
   # Elasticsearch - Log storage and search
   elasticsearch:
@@ -147,6 +195,8 @@ services:
     networks:
       - observability
     restart: unless-stopped
+    profiles:
+      - elk
     deploy:
       resources:
         limits:
@@ -173,6 +223,8 @@ services:
     restart: unless-stopped
     depends_on:
       - elasticsearch
+    profiles:
+      - elk
     deploy:
       resources:
         limits:
@@ -198,6 +250,8 @@ services:
     restart: unless-stopped
     depends_on:
       - elasticsearch
+    profiles:
+      - elk
     deploy:
       resources:
         limits:
@@ -222,6 +276,8 @@ services:
     restart: unless-stopped
     depends_on:
       - logstash
+    profiles:
+      - elk
     deploy:
       resources:
         limits:
@@ -368,6 +424,8 @@ volumes:
   prometheus-data:
     driver: local
   grafana-data:
+    driver: local
+  loki-data:
     driver: local
   elasticsearch-data:
     driver: local

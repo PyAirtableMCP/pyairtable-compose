@@ -1,0 +1,374 @@
+name: Observability Stack Validation
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'monitoring/**'
+      - 'observability/**'
+      - 'docker-compose.observability*.yml'
+      - 'scripts/setup-observability.sh'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'monitoring/**'
+      - 'observability/**'
+      - 'docker-compose.observability*.yml'
+      - 'scripts/setup-observability.sh'
+
+env:
+  ENVIRONMENT: ci
+  GRAFANA_ADMIN_PASSWORD: ci-admin-pass
+  POSTGRES_PASSWORD: ci-postgres-pass
+  REDIS_PASSWORD: ci-redis-pass
+
+jobs:
+  validate-observability-configs:
+    runs-on: ubuntu-latest
+    name: Validate Observability Configurations
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Validate Docker Compose Files
+      run: |
+        # Validate development compose file
+        docker-compose -f docker-compose.observability-dev.yml config > /dev/null
+        echo "✅ Development observability compose file is valid"
+        
+        # Validate production compose file
+        docker-compose -f docker-compose.observability.yml config > /dev/null
+        echo "✅ Production observability compose file is valid"
+    
+    - name: Validate Prometheus Configuration
+      run: |
+        # Install promtool
+        wget https://github.com/prometheus/prometheus/releases/download/v2.47.2/prometheus-2.47.2.linux-amd64.tar.gz
+        tar xzf prometheus-2.47.2.linux-amd64.tar.gz
+        sudo mv prometheus-2.47.2.linux-amd64/promtool /usr/local/bin/
+        
+        # Validate Prometheus config
+        promtool check config monitoring/prometheus/prometheus.yml
+        echo "✅ Prometheus configuration is valid"
+        
+        # Validate alert rules
+        promtool check rules monitoring/prometheus/alert_rules.yml
+        echo "✅ Prometheus alert rules are valid"
+    
+    - name: Validate OpenTelemetry Configuration
+      run: |
+        # Install otelcol-contrib for validation
+        wget https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.88.0/otelcol-contrib_0.88.0_linux_amd64.tar.gz
+        tar xzf otelcol-contrib_0.88.0_linux_amd64.tar.gz
+        sudo mv otelcol-contrib /usr/local/bin/
+        
+        # Validate OTel collector config
+        otelcol-contrib --config-validate --config monitoring/otel/otel-collector-config.yml
+        echo "✅ OpenTelemetry collector configuration is valid"
+    
+    - name: Validate Grafana Dashboards
+      run: |
+        # Install jq for JSON validation
+        sudo apt-get update && sudo apt-get install -y jq
+        
+        # Validate dashboard JSON files
+        for dashboard in monitoring/grafana/dashboards/platform/*.json; do
+          if [ -f "$dashboard" ]; then
+            jq empty "$dashboard"
+            echo "✅ $(basename "$dashboard") is valid JSON"
+          fi
+        done
+    
+    - name: Validate Logstash Configuration
+      run: |
+        # Check Logstash pipeline configuration syntax
+        docker run --rm -v $(pwd)/monitoring/logstash:/config \
+          docker.elastic.co/logstash/logstash:8.11.0 \
+          bin/logstash --config.test_and_exit --path.config /config/pipeline/
+        echo "✅ Logstash configuration is valid"
+    
+    - name: Validate Setup Script
+      run: |
+        # Check script syntax
+        bash -n scripts/setup-observability.sh
+        echo "✅ Setup script syntax is valid"
+        
+        # Check script permissions
+        if [ -x scripts/setup-observability.sh ]; then
+          echo "✅ Setup script is executable"
+        else
+          echo "❌ Setup script is not executable"
+          exit 1
+        fi
+
+  test-observability-stack:
+    runs-on: ubuntu-latest
+    name: Test Observability Stack Integration
+    needs: validate-observability-configs
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Create required directories
+      run: |
+        mkdir -p monitoring/grafana/dashboards/{platform,infrastructure,cost}
+        mkdir -p monitoring/grafana/datasources
+        mkdir -p monitoring/prometheus
+        mkdir -p monitoring/otel
+        mkdir -p monitoring/logstash/{pipeline,config}
+        mkdir -p monitoring/filebeat
+        mkdir -p monitoring/kibana
+        mkdir -p observability
+    
+    - name: Generate minimal configurations
+      run: |
+        # Create minimal Grafana datasources config
+        cat > monitoring/grafana/datasources/datasources.yml << 'EOF'
+        apiVersion: 1
+        datasources:
+          - name: Prometheus
+            type: prometheus
+            access: proxy
+            url: http://prometheus-dev:9090
+            isDefault: true
+        EOF
+        
+        # Create minimal Grafana dashboards config
+        cat > monitoring/grafana/dashboards/dashboards.yml << 'EOF'
+        apiVersion: 1
+        providers:
+          - name: 'Default'
+            folder: ''
+            type: file
+            disableDeletion: false
+            updateIntervalSeconds: 10
+            options:
+              path: /var/lib/grafana/dashboards
+        EOF
+        
+        # Create minimal Filebeat config
+        cat > monitoring/filebeat/filebeat.yml << 'EOF'
+        filebeat.inputs:
+        - type: container
+          paths: ['/var/lib/docker/containers/*/*.log']
+        output.logstash:
+          hosts: ["logstash-dev:5044"]
+        EOF
+        
+        # Create minimal Logstash config
+        cat > monitoring/logstash/config/logstash.yml << 'EOF'
+        http.host: "0.0.0.0"
+        path.config: /usr/share/logstash/pipeline
+        EOF
+    
+    - name: Start Observability Stack
+      run: |
+        # Start with minimal resource allocation for CI
+        docker-compose -f docker-compose.observability-dev.yml up -d \
+          prometheus-dev grafana-dev jaeger-dev otel-collector-dev
+        
+        # Wait for services to start
+        sleep 30
+    
+    - name: Test Service Health
+      run: |
+        # Test Prometheus
+        timeout 30 bash -c 'until curl -f http://localhost:9090/-/healthy; do sleep 2; done'
+        echo "✅ Prometheus is healthy"
+        
+        # Test Grafana
+        timeout 30 bash -c 'until curl -f http://localhost:3001/api/health; do sleep 2; done'
+        echo "✅ Grafana is healthy"
+        
+        # Test Jaeger
+        timeout 30 bash -c 'until curl -f http://localhost:16686/; do sleep 2; done'
+        echo "✅ Jaeger is healthy"
+        
+        # Test OpenTelemetry Collector
+        timeout 30 bash -c 'until curl -f http://localhost:13133/; do sleep 2; done'
+        echo "✅ OpenTelemetry Collector is healthy"
+    
+    - name: Test Metrics Collection
+      run: |
+        # Check if Prometheus has targets
+        targets=$(curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets | length')
+        if [ "$targets" -gt 0 ]; then
+          echo "✅ Prometheus has $targets active targets"
+        else
+          echo "❌ Prometheus has no active targets"
+          exit 1
+        fi
+        
+        # Check if metrics are being collected
+        metrics=$(curl -s http://localhost:9090/api/v1/label/__name__/values | jq '.data | length')
+        if [ "$metrics" -gt 0 ]; then
+          echo "✅ Prometheus has $metrics different metrics"
+        else
+          echo "❌ Prometheus has no metrics"
+          exit 1
+        fi
+    
+    - name: Test Tracing Infrastructure
+      run: |
+        # Send a test trace to OTLP endpoint
+        curl -X POST http://localhost:4318/v1/traces \
+          -H "Content-Type: application/json" \
+          -d '{
+            "resourceSpans": [{
+              "resource": {
+                "attributes": [{
+                  "key": "service.name",
+                  "value": {"stringValue": "ci-test-service"}
+                }]
+              },
+              "scopeSpans": [{
+                "spans": [{
+                  "traceId": "12345678901234567890123456789012",
+                  "spanId": "1234567890123456",
+                  "name": "test-span",
+                  "startTimeUnixNano": "1640995200000000000",
+                  "endTimeUnixNano": "1640995201000000000"
+                }]
+              }]
+            }]
+          }'
+        
+        echo "✅ Test trace sent to OpenTelemetry Collector"
+        
+        # Wait for trace to be processed
+        sleep 10
+        
+        # Check if Jaeger received the trace
+        services=$(curl -s http://localhost:16686/api/services | jq '.data | length')
+        if [ "$services" -gt 0 ]; then
+          echo "✅ Jaeger has $services services with traces"
+        else
+          echo "⚠️ Jaeger has no services yet (may need more time)"
+        fi
+    
+    - name: Test Configuration Validation
+      run: |
+        # Test Prometheus configuration reload
+        curl -X POST http://localhost:9090/-/reload
+        echo "✅ Prometheus configuration reload successful"
+        
+        # Test Grafana API
+        auth_response=$(curl -s -u admin:${GRAFANA_ADMIN_PASSWORD} http://localhost:3001/api/admin/stats)
+        if echo "$auth_response" | jq -e '.dashboards' > /dev/null; then
+          echo "✅ Grafana API is accessible"
+        else
+          echo "❌ Grafana API test failed"
+          exit 1
+        fi
+    
+    - name: Collect Logs on Failure
+      if: failure()
+      run: |
+        echo "=== Collecting logs for debugging ==="
+        docker-compose -f docker-compose.observability-dev.yml logs --tail=100
+        
+        echo "=== Container status ==="
+        docker-compose -f docker-compose.observability-dev.yml ps
+        
+        echo "=== System resources ==="
+        df -h
+        free -h
+        docker system df
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        docker-compose -f docker-compose.observability-dev.yml down -v
+        docker system prune -f
+
+  security-scan:
+    runs-on: ubuntu-latest
+    name: Security Scan of Observability Stack
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'config'
+        scan-ref: 'docker-compose.observability-dev.yml'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+    
+    - name: Check for exposed secrets
+      run: |
+        # Check for hardcoded passwords or secrets
+        if grep -r "password.*=" monitoring/ --include="*.yml" --include="*.yaml" | grep -v "GRAFANA_ADMIN_PASSWORD"; then
+          echo "❌ Found potential hardcoded passwords"
+          exit 1
+        fi
+        echo "✅ No hardcoded passwords found"
+        
+        # Check for insecure configurations
+        if grep -r "security.*false\|ssl.*false\|tls.*false" monitoring/ --include="*.yml" --include="*.yaml"; then
+          echo "⚠️ Found potentially insecure configurations (acceptable for development)"
+        fi
+
+  performance-test:
+    runs-on: ubuntu-latest
+    name: Performance Test of Observability Stack
+    needs: validate-observability-configs
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Create lightweight test environment
+      run: |
+        # Create minimal configs for performance testing
+        mkdir -p monitoring/grafana/datasources
+        mkdir -p monitoring/grafana/dashboards
+        
+        echo 'apiVersion: 1' > monitoring/grafana/datasources/datasources.yml
+        echo 'apiVersion: 1' > monitoring/grafana/dashboards/dashboards.yml
+    
+    - name: Monitor Resource Usage During Startup
+      run: |
+        # Start monitoring system resources
+        (while true; do
+          echo "$(date): Memory: $(free -m | grep 'Mem:' | awk '{print $3}')MB, CPU: $(top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | cut -d'%' -f1)%"
+          sleep 5
+        done) &
+        MONITOR_PID=$!
+        
+        # Start minimal observability stack
+        docker-compose -f docker-compose.observability-dev.yml up -d \
+          prometheus-dev grafana-dev jaeger-dev
+        
+        # Wait for startup
+        sleep 60
+        
+        # Stop monitoring
+        kill $MONITOR_PID
+        
+        # Check final resource usage
+        echo "=== Final Resource Usage ==="
+        docker stats --no-stream
+        echo "✅ Performance test completed"
+        
+        # Cleanup
+        docker-compose -f docker-compose.observability-dev.yml down

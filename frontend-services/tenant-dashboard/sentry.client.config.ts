@@ -57,14 +57,14 @@ Sentry.init({
       errorSampleRate: process.env.NODE_ENV === "production" ? 1.0 : 1.0,
     }),
     new Sentry.BrowserTracing({
-      // Performance monitoring for React Router
-      routingInstrumentation: Sentry.reactRouterV6Instrumentation(
-        React.useEffect,
-        useLocation,
-        useNavigationType,
-        createRoutesFromChildren,
-        matchRoutes
-      ),
+      // Performance monitoring disabled for Next.js
+      // routingInstrumentation: Sentry.reactRouterV6Instrumentation(
+      //   React.useEffect,
+      //   useLocation,
+      //   useNavigationType,
+      //   createRoutesFromChildren,
+      //   matchRoutes
+      // ),
     }),
   ],
   
@@ -77,4 +77,4 @@ Sentry.init({
 
 // Import React Router dependencies
 import React, { useEffect } from "react"
-import { useLocation, useNavigationType, createRoutesFromChildren, matchRoutes } from "react-router-dom"
+// import { useLocation, useNavigationType, createRoutesFromChildren, matchRoutes } from "react-router-dom"

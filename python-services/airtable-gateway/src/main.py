@@ -2,11 +2,36 @@
 airtable-gateway - Airtable API integration gateway
 """
 import os
+import sys
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
+
+# Initialize OpenTelemetry before importing other modules
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'shared'))
+try:
+    from telemetry import initialize_telemetry
+    
+    # Initialize telemetry for Airtable Gateway (Port 8002)
+    tracer = initialize_telemetry(
+        service_name="airtable-gateway",
+        service_version="1.0.0",
+        service_tier="integration",
+        otlp_endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317"),
+        resource_attributes={
+            "service.port": "8002",
+            "service.type": "airtable-gateway",
+            "service.layer": "api-integration"
+        }
+    )
+    
+    logging.info("OpenTelemetry initialized for airtable-gateway")
+except ImportError as e:
+    logging.warning(f"OpenTelemetry initialization failed: {e}")
+    tracer = None
 
 from routes import health
 

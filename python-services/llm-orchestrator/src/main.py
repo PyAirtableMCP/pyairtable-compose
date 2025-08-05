@@ -2,11 +2,36 @@
 llm-orchestrator - LLM orchestration with Gemini integration
 """
 import os
+import sys
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
+
+# Initialize OpenTelemetry before importing other modules
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'shared'))
+try:
+    from telemetry import initialize_telemetry
+    
+    # Initialize telemetry for LLM Orchestrator (Port 8003)
+    tracer = initialize_telemetry(
+        service_name="llm-orchestrator",
+        service_version="1.0.0",
+        service_tier="ai-ml",
+        otlp_endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317"),
+        resource_attributes={
+            "service.port": "8003",
+            "service.type": "llm-orchestrator",
+            "service.layer": "ai-processing"
+        }
+    )
+    
+    logging.info("OpenTelemetry initialized for llm-orchestrator")
+except ImportError as e:
+    logging.warning(f"OpenTelemetry initialization failed: {e}")
+    tracer = None
 
 from routes import health
 
@@ -53,6 +78,10 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(health.router, tags=["health"])
 from routes.chat import router as chat_router
 app.include_router(chat_router)
+from routes.table_analysis import router as analysis_router
+app.include_router(analysis_router)
+from routes.workflow import router as workflow_router
+app.include_router(workflow_router)
 
 # Root endpoint
 @app.get("/")
@@ -79,7 +108,10 @@ async def info():
             "Streaming responses",
             "Session management",
             "Token counting",
-            "Cost tracking"
+            "Cost tracking",
+            "Table analysis",
+            "Batch processing",
+            "Optimization recommendations"
         ]
     }
 

@@ -18,6 +18,11 @@ services:
       - SAGA_ORCHESTRATOR_URL=http://saga-orchestrator:8008
       - API_KEY=${API_KEY}
       - LOG_LEVEL=${LOG_LEVEL}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - CORS_METHODS=${CORS_METHODS}
+      - CORS_HEADERS=${CORS_HEADERS}
+      - CORS_CREDENTIALS=${CORS_CREDENTIALS}
+      - CORS_MAX_AGE=${CORS_MAX_AGE}
     depends_on:
       - airtable-gateway
       - mcp-server
@@ -41,6 +46,9 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - MCP_SERVER_HTTP_URL=http://mcp-server:8001
       - USE_HTTP_MCP=true
+      # Airtable configuration
+      - AIRTABLE_BASE=${AIRTABLE_BASE}
+      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
       # Redis session storage
       - REDIS_URL=redis://redis:6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
@@ -70,6 +78,9 @@ services:
       - AIRTABLE_GATEWAY_API_KEY=${API_KEY}
       - MCP_SERVER_MODE=http
       - MCP_SERVER_PORT=8001
+      # Airtable configuration
+      - AIRTABLE_BASE=${AIRTABLE_BASE}
+      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
       - LOG_LEVEL=${LOG_LEVEL}
     depends_on:
       - airtable-gateway
@@ -87,6 +98,7 @@ services:
       - "8002:8002"
     environment:
       - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
+      - AIRTABLE_PAT=${AIRTABLE_TOKEN}
       - AIRTABLE_BASE=${AIRTABLE_BASE}
       - API_KEY=${API_KEY}
       - LOG_LEVEL=${LOG_LEVEL}
@@ -249,7 +261,9 @@ services:
       - redis-data:/data
     restart: unless-stopped
     networks:
-      - pyairtable-network
+      pyairtable-network:
+        aliases:
+          - redis
 
   # PostgreSQL - Database for sessions and metadata
   postgres:
@@ -267,7 +281,10 @@ services:
       - ./migrations:/docker-entrypoint-initdb.d/migrations:ro
     restart: unless-stopped
     networks:
-      - pyairtable-network
+      pyairtable-network:
+        aliases:
+          - postgres
+          - db
 
   # Next.js Frontend - Web interface
   frontend:
@@ -275,7 +292,6 @@ services:
     build:
       context: ../pyairtable-frontend
       dockerfile: Dockerfile
-      target: development
     ports:
       - "3000:3000"
     environment:

@@ -1,0 +1,733 @@
+version: '3.8'
+
+# Performance-Optimized Docker Compose Configuration for PyAirtable
+# Optimized for MacBook Air M2 with targets:
+# - <200ms API response time
+# - <3s frontend load time  
+# - Support for 1000 concurrent users
+# - Efficient resource utilization
+
+services:
+  # API Gateway - Optimized for high throughput
+  api-gateway:
+    image: ghcr.io/reg-kris/pyairtable-api-gateway:latest
+    build:
+      context: ../pyairtable-api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # Performance Configuration
+      - GOMAXPROCS=4  # Optimize for M2 CPU cores
+      - GOGC=100      # Garbage collection tuning
+      - GOMEMLIMIT=512MiB
+      
+      # Connection Settings
+      - MAX_IDLE_CONNS=100
+      - MAX_OPEN_CONNS=200
+      - CONN_MAX_LIFETIME=300s
+      - CONN_MAX_IDLE_TIME=60s
+      
+      # HTTP Server Settings
+      - READ_TIMEOUT=30s
+      - WRITE_TIMEOUT=30s
+      - IDLE_TIMEOUT=120s
+      - MAX_HEADER_BYTES=1048576  # 1MB
+      
+      # Rate Limiting
+      - RATE_LIMIT_RPS=1000
+      - RATE_LIMIT_BURST=2000
+      
+      # Caching
+      - ENABLE_RESPONSE_CACHE=true
+      - CACHE_TTL=300s
+      - CACHE_MAX_SIZE=100MB
+      
+      # Service URLs
+      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
+      - MCP_SERVER_URL=http://mcp-server:8001
+      - LLM_ORCHESTRATOR_URL=http://llm-orchestrator:8003
+      - PLATFORM_SERVICES_URL=http://platform-services:8007
+      - AUTOMATION_SERVICES_URL=http://automation-services:8006
+      - SAGA_ORCHESTRATOR_URL=http://saga-orchestrator:8008
+      
+      # Security & API
+      - API_KEY=${API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - CORS_METHODS=${CORS_METHODS}
+      - CORS_HEADERS=${CORS_HEADERS}
+      - CORS_CREDENTIALS=${CORS_CREDENTIALS}
+      - CORS_MAX_AGE=${CORS_MAX_AGE}
+    depends_on:
+      - airtable-gateway
+      - mcp-server
+      - llm-orchestrator
+      - platform-services
+      - automation-services
+      - saga-orchestrator
+      - redis
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  # LLM Orchestrator - Python performance optimized
+  llm-orchestrator:
+    image: ghcr.io/reg-kris/llm-orchestrator-py:latest
+    build:
+      context: ../llm-orchestrator-py
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      # Python Performance
+      - PYTHONOPTIMIZE=2
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      
+      # FastAPI/Uvicorn Performance
+      - WORKERS=4
+      - MAX_WORKERS=8
+      - WORKER_CLASS=uvicorn.workers.UvicornWorker
+      - WORKER_CONNECTIONS=1000
+      - KEEPALIVE_TIMEOUT=65
+      - MAX_REQUESTS=10000
+      - MAX_REQUESTS_JITTER=1000
+      
+      # Connection Pooling
+      - AIOHTTP_CONNECTOR_LIMIT=100
+      - AIOHTTP_CONNECTOR_LIMIT_PER_HOST=30
+      - AIOHTTP_TIMEOUT_TOTAL=30
+      - AIOHTTP_TIMEOUT_CONNECT=10
+      
+      # Caching Configuration
+      - ENABLE_RESPONSE_CACHE=true
+      - CACHE_TTL=300
+      - CACHE_MAX_SIZE=200MB
+      - ENABLE_QUERY_CACHE=true
+      
+      # LLM Optimization
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - LLM_TIMEOUT=30
+      - LLM_MAX_RETRIES=3
+      - LLM_BATCH_SIZE=10
+      - ENABLE_LLM_CACHE=true
+      
+      # Service Configuration
+      - MCP_SERVER_HTTP_URL=http://mcp-server:8001
+      - USE_HTTP_MCP=true
+      - THINKING_BUDGET=${THINKING_BUDGET}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      
+      # Airtable configuration
+      - AIRTABLE_BASE=${AIRTABLE_BASE}
+      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
+      
+      # Redis Performance
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - USE_REDIS_SESSIONS=true
+      - REDIS_MAX_CONNECTIONS=50
+      - REDIS_CONNECTION_POOL_SIZE=20
+    depends_on:
+      - mcp-server
+      - redis
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.5'
+        reservations:
+          memory: 512M
+          cpus: '0.75'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8003/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # MCP Server - High-performance Python service
+  mcp-server:
+    image: ghcr.io/reg-kris/mcp-server-py:latest
+    build:
+      context: ../mcp-server-py
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      # Python Performance
+      - PYTHONOPTIMIZE=2
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      
+      # Server Performance
+      - WORKERS=4
+      - MAX_WORKERS=6
+      - WORKER_CONNECTIONS=500
+      - KEEPALIVE_TIMEOUT=65
+      - MAX_REQUESTS=5000
+      
+      # MCP Configuration
+      - MCP_SERVER_MODE=http
+      - MCP_SERVER_PORT=8001
+      - MCP_BATCH_SIZE=50
+      - MCP_TIMEOUT=30
+      
+      # Caching
+      - ENABLE_METHOD_CACHE=true
+      - CACHE_TTL=600
+      - CACHE_MAX_SIZE=100MB
+      
+      # Airtable Gateway
+      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
+      - AIRTABLE_GATEWAY_API_KEY=${API_KEY}
+      - AIRTABLE_BASE=${AIRTABLE_BASE}
+      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      - airtable-gateway
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # Airtable Gateway - Optimized API proxy
+  airtable-gateway:
+    image: ghcr.io/reg-kris/airtable-gateway-py:latest
+    build:
+      context: ../airtable-gateway-py
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      # Python Performance
+      - PYTHONOPTIMIZE=2
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      
+      # Server Performance
+      - WORKERS=4
+      - MAX_WORKERS=6
+      - WORKER_CONNECTIONS=500
+      - KEEPALIVE_TIMEOUT=65
+      
+      # Airtable API Optimization
+      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
+      - AIRTABLE_PAT=${AIRTABLE_TOKEN}
+      - AIRTABLE_BASE=${AIRTABLE_BASE}
+      - AIRTABLE_RATE_LIMIT=5  # requests per second
+      - AIRTABLE_TIMEOUT=30
+      - AIRTABLE_MAX_RETRIES=3
+      - AIRTABLE_BATCH_SIZE=10
+      
+      # Caching Strategy
+      - ENABLE_API_CACHE=true
+      - CACHE_TTL=300
+      - CACHE_MAX_SIZE=200MB
+      - ENABLE_RESULT_CACHE=true
+      - RESULT_CACHE_TTL=600
+      
+      # Connection Pooling
+      - MAX_CONNECTIONS=50
+      - MAX_CONNECTIONS_PER_HOST=20
+      - CONNECTION_TIMEOUT=30
+      
+      # Service Configuration
+      - API_KEY=${API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8002/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # Platform Services - Go service optimized
+  platform-services:
+    image: ghcr.io/reg-kris/pyairtable-platform-services:latest
+    build:
+      context: ../pyairtable-platform-services
+      dockerfile: Dockerfile
+    ports:
+      - "8007:8007"
+    environment:
+      # Go Performance
+      - GOMAXPROCS=4
+      - GOGC=80
+      - GOMEMLIMIT=512MiB
+      
+      # Database Performance
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - DB_MAX_OPEN_CONNS=50
+      - DB_MAX_IDLE_CONNS=25
+      - DB_CONN_MAX_LIFETIME=300s
+      - DB_CONN_MAX_IDLE_TIME=60s
+      
+      # Redis Performance
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_MAX_IDLE=20
+      - REDIS_MAX_ACTIVE=50
+      - REDIS_IDLE_TIMEOUT=300s
+      
+      # HTTP Server Settings
+      - READ_TIMEOUT=30s
+      - WRITE_TIMEOUT=30s
+      - IDLE_TIMEOUT=120s
+      - MAX_HEADER_BYTES=1048576
+      
+      # Caching
+      - ENABLE_QUERY_CACHE=true
+      - CACHE_TTL=300s
+      - CACHE_MAX_SIZE=100MB
+      
+      # Service Configuration
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - API_KEY=${API_KEY}
+      - REQUIRE_API_KEY=${REQUIRE_API_KEY:-true}
+      
+      # JWT Configuration
+      - JWT_SECRET=${JWT_SECRET:-default-jwt-secret-change-in-production}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
+      
+      # Auth Settings
+      - PASSWORD_MIN_LENGTH=${PASSWORD_MIN_LENGTH:-8}
+      - PASSWORD_HASH_ROUNDS=${PASSWORD_HASH_ROUNDS:-12}
+      
+      # Analytics Settings
+      - ANALYTICS_RETENTION_DAYS=${ANALYTICS_RETENTION_DAYS:-90}
+      - METRICS_BATCH_SIZE=${METRICS_BATCH_SIZE:-100}
+      
+      # CORS
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8007/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # Automation Services - Python service optimized
+  automation-services:
+    image: ghcr.io/reg-kris/pyairtable-automation-services:latest
+    build:
+      context: ../pyairtable-automation-services
+      dockerfile: Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      # Python Performance
+      - PYTHONOPTIMIZE=2
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      
+      # Server Performance
+      - WORKERS=4
+      - MAX_WORKERS=6
+      - WORKER_CONNECTIONS=500
+      - KEEPALIVE_TIMEOUT=65
+      
+      # Database Performance
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - DB_POOL_SIZE=20
+      - DB_MAX_OVERFLOW=30
+      - DB_POOL_TIMEOUT=30
+      - DB_POOL_RECYCLE=3600
+      
+      # Redis Performance
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_MAX_CONNECTIONS=30
+      - REDIS_CONNECTION_POOL_SIZE=15
+      
+      # Task Queue Optimization
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - CELERY_WORKER_CONCURRENCY=4
+      - CELERY_TASK_SOFT_TIME_LIMIT=300
+      - CELERY_TASK_TIME_LIMIT=600
+      
+      # File Processing
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-10MB}
+      - UPLOAD_DIR=${UPLOAD_DIR:-/tmp/uploads}
+      - ALLOWED_EXTENSIONS=${ALLOWED_EXTENSIONS:-pdf,doc,docx,txt,csv,xlsx}
+      - ENABLE_FILE_CACHE=true
+      
+      # Workflow Optimization
+      - DEFAULT_WORKFLOW_TIMEOUT=${DEFAULT_WORKFLOW_TIMEOUT:-300}
+      - MAX_WORKFLOW_RETRIES=${MAX_WORKFLOW_RETRIES:-3}
+      - SCHEDULER_CHECK_interval=${SCHEDULER_CHECK_INTERVAL:-30}
+      - ENABLE_WORKFLOW_CACHE=true
+      
+      # Service URLs
+      - MCP_SERVER_URL=http://mcp-server:8001
+      - PLATFORM_SERVICES_URL=http://platform-services:8007
+      - API_KEY=${API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL}
+    depends_on:
+      - mcp-server
+      - platform-services
+      - redis
+      - postgres
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    volumes:
+      - file-uploads:/tmp/uploads
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: '1.5'
+        reservations:
+          memory: 384M
+          cpus: '0.75'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8006/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # SAGA Orchestrator - Optimized for distributed transactions
+  saga-orchestrator:
+    image: ghcr.io/reg-kris/pyairtable-saga-orchestrator:latest
+    build:
+      context: ./saga-orchestrator
+      dockerfile: Dockerfile
+    ports:
+      - "8008:8008"
+    environment:
+      # Python Performance
+      - PYTHONOPTIMIZE=2
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      
+      # Server Performance
+      - WORKERS=4
+      - MAX_WORKERS=6
+      - WORKER_CONNECTIONS=500
+      
+      # Database Performance
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - DB_POOL_SIZE=25
+      - DB_MAX_OVERFLOW=35
+      - DB_POOL_TIMEOUT=30
+      
+      # Redis Event Bus Performance
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - USE_REDIS_EVENT_BUS=true
+      - REDIS_MAX_CONNECTIONS=30
+      - EVENT_BUS_BATCH_SIZE=100
+      
+      # SAGA Performance Optimization
+      - SAGA_TIMEOUT_SECONDS=${SAGA_TIMEOUT_SECONDS:-3600}
+      - SAGA_RETRY_ATTEMPTS=${SAGA_RETRY_ATTEMPTS:-3}
+      - SAGA_STEP_TIMEOUT_SECONDS=${SAGA_STEP_TIMEOUT_SECONDS:-300}
+      - SAGA_CONCURRENT_STEPS=10
+      - ENABLE_SAGA_CACHE=true
+      
+      # Service Configuration
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - API_KEY=${API_KEY}
+      - REQUIRE_API_KEY=${REQUIRE_API_KEY:-true}
+      
+      # Service URLs
+      - AUTH_SERVICE_URL=http://platform-services:8007
+      - USER_SERVICE_URL=http://platform-services:8007
+      - PERMISSION_SERVICE_URL=http://platform-services:8007
+      - NOTIFICATION_SERVICE_URL=http://automation-services:8006
+      - AIRTABLE_CONNECTOR_URL=http://airtable-gateway:8002
+      - SCHEMA_SERVICE_URL=http://platform-services:8007
+      - WEBHOOK_SERVICE_URL=http://automation-services:8006
+      - DATA_SYNC_SERVICE_URL=http://automation-services:8006
+      
+      # Monitoring
+      - ENABLE_METRICS=${ENABLE_METRICS:-true}
+      - METRICS_PORT=9090
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+    depends_on:
+      - redis
+      - postgres
+      - platform-services
+      - automation-services
+      - airtable-gateway
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8008/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis - Performance optimized
+  redis:
+    image: redis:7-alpine
+    command: |
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --tcp-keepalive 300
+      --timeout 0
+      --tcp-backlog 511
+      --databases 16
+      --maxclients 10000
+      --hz 10
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    sysctls:
+      - net.core.somaxconn=65535
+    ulimits:
+      memlock: -1
+
+  # PostgreSQL - Performance optimized for M2
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      
+      # Performance Tuning
+      - POSTGRES_SHARED_BUFFERS=256MB
+      - POSTGRES_EFFECTIVE_CACHE_SIZE=1GB
+      - POSTGRES_MAINTENANCE_WORK_MEM=64MB
+      - POSTGRES_CHECKPOINT_COMPLETION_TARGET=0.9
+      - POSTGRES_WAL_BUFFERS=16MB
+      - POSTGRES_DEFAULT_STATISTICS_TARGET=100
+      - POSTGRES_RANDOM_PAGE_COST=1.1
+      - POSTGRES_EFFECTIVE_IO_CONCURRENCY=200
+      - POSTGRES_WORK_MEM=4MB
+      - POSTGRES_MIN_WAL_SIZE=1GB
+      - POSTGRES_MAX_WAL_SIZE=4GB
+    command: |
+      postgres
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+      -c max_connections=200
+      -c max_worker_processes=8
+      -c max_parallel_workers_per_gather=4
+      -c max_parallel_workers=8
+      -c max_parallel_maintenance_workers=4
+      -c log_statement=none
+      -c log_duration=off
+      -c log_min_duration_statement=1000
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      - ./migrations:/docker-entrypoint-initdb.d/migrations:ro
+      - ./performance-optimization/postgresql-performance.conf:/etc/postgresql/postgresql.conf:ro
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Next.js Frontend - Performance optimized
+  frontend:
+    image: ghcr.io/reg-kris/pyairtable-frontend:latest
+    build:
+      context: ../pyairtable-frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        - NODE_ENV=production
+        - NEXT_TELEMETRY_DISABLED=1
+    ports:
+      - "3000:3000"
+    environment:
+      # Next.js Performance
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+      - NODE_OPTIONS="--max-old-space-size=512 --optimize-for-size"
+      
+      # API Configuration
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_GATEWAY_URL=http://api-gateway:8000
+      
+      # Internal service URLs (for SSR/API routes)
+      - LLM_ORCHESTRATOR_URL=http://llm-orchestrator:8003
+      - MCP_SERVER_URL=http://mcp-server:8001
+      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
+      - PLATFORM_SERVICES_URL=http://platform-services:8007
+      - AUTOMATION_SERVICES_URL=http://automation-services:8006
+      - SAGA_ORCHESTRATOR_URL=http://saga-orchestrator:8008
+      
+      # Performance Optimization
+      - NEXT_PUBLIC_ENABLE_SW=true
+      - NEXT_PUBLIC_ENABLE_PREFETCH=true
+      - NEXT_PUBLIC_IMAGE_OPTIMIZATION=true
+      - NEXT_PUBLIC_BUNDLE_ANALYZER=false
+      
+      # Caching
+      - NEXT_PUBLIC_CACHE_TTL=300
+      - NEXT_PUBLIC_ENABLE_SWR=true
+      - NEXT_PUBLIC_SWR_DEDUPE_INTERVAL=2000
+      
+      # Authentication and security
+      - API_KEY=${API_KEY}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-default-secret-change-in-production}
+      - NEXTAUTH_URL=http://localhost:3000
+      
+      # Feature flags
+      - NEXT_PUBLIC_ENABLE_DEBUG=${ENABLE_DEBUG:-false}
+      - NEXT_PUBLIC_SHOW_COST_TRACKING=${SHOW_COST_TRACKING:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      - api-gateway
+      - llm-orchestrator
+      - mcp-server
+      - airtable-gateway
+      - platform-services
+      - automation-services
+      - saga-orchestrator
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  pyairtable-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.default_bridge: "false"
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.bridge.host_binding_ipv4: "0.0.0.0"
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local
+  file-uploads:
+    driver: local

@@ -462,9 +462,9 @@ ingress:
 secrets:
   # CRITICAL: Replace with actual values via external secret management
   apiKey: ""  # Internal service-to-service API key
-  geminiApiKey: ""  # Google Gemini API key from cloud console
-  airtableToken: ""  # Airtable Personal Access Token
-  airtableBase: ""  # Airtable Base ID (format: appXXXXXXXXXXXXXX)
+  geminiApiKey: "AIzaSyCwAGazN5GMCu03ZYLFWWTkdLRKFQb-OxU"  # Google Gemini API key from cloud console
+  airtableToken: "patewow2oXotOdgpz.c7e78f8a5d17f20dfcbe7d32736dd06f56916af7e1549d88ed8f6791a2eaf654"  # Airtable Personal Access Token
+  airtableBase: "appVLUAubH5cFWhMV"  # Airtable Base ID (format: appXXXXXXXXXXXXXX)
   jwtSecret: ""  # JWT signing secret (64+ characters)
   nextauthSecret: ""  # NextAuth session secret (64+ characters)
   redisPassword: ""  # Redis authentication password

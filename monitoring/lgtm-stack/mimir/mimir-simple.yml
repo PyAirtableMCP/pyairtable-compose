@@ -1,0 +1,85 @@
+# Simplified Mimir Configuration for PyAirtable LGTM Stack - v2.10.3 Compatible
+target: all
+
+server:
+  http_listen_port: 8080
+  grpc_listen_port: 9095
+  log_level: info
+
+common:
+  storage:
+    backend: s3
+    s3:
+      endpoint: minio:9000
+      bucket_name: mimir-blocks
+      access_key_id: minioadmin
+      secret_access_key: minioadmin123
+      insecure: true
+
+blocks_storage:
+  backend: s3
+  s3:
+    endpoint: minio:9000
+    bucket_name: mimir-blocks
+    access_key_id: minioadmin
+    secret_access_key: minioadmin123
+    insecure: true
+  
+  tsdb:
+    dir: /data/tsdb
+    block_ranges_period: ["2h", "12h"]
+    retention_period: 12h
+
+distributor:
+  pool:
+    health_check_ingesters: true
+  ring:
+    kvstore:
+      store: inmemory
+
+ingester:
+  ring:
+    kvstore:
+      store: inmemory
+    replication_factor: 1
+
+compactor:
+  data_dir: /data/compactor
+  sharding_ring:
+    kvstore:
+      store: inmemory
+
+store_gateway:
+  sharding_ring:
+    kvstore:
+      store: inmemory
+
+ruler_storage:
+  backend: s3
+  s3:
+    endpoint: minio:9000
+    bucket_name: mimir-ruler
+    access_key_id: minioadmin
+    secret_access_key: minioadmin123
+    insecure: true
+
+alertmanager_storage:
+  backend: s3
+  s3:
+    endpoint: minio:9000
+    bucket_name: mimir-alertmanager
+    access_key_id: minioadmin
+    secret_access_key: minioadmin123
+    insecure: true
+
+limits:
+  ingestion_rate: 5000
+  ingestion_burst_size: 100000
+  max_global_series_per_user: 500000
+
+memberlist:
+  abort_if_cluster_join_fails: false
+  bind_port: 7946
+  join_members: []
+
+multitenancy_enabled: false

@@ -4,7 +4,7 @@
 # Secure generation, rotation, backup, and management of secrets for Minikube deployment
 # Author: Claude Deployment Engineer - Enhanced with enterprise security features
 
-set -euo pipefail
+set -eo pipefail
 
 # Color codes
 readonly RED='\033[0;31m'
@@ -164,10 +164,12 @@ load_env_file() {
     
     print_info "Loading environment from: $env_file"
     
-    # Export variables from env file (excluding comments and empty lines)
-    set -a
-    source <(grep -v '^#' "$env_file" | grep -v '^$')
-    set +a
+    # Export variables from env file safely (excluding comments and empty lines)
+    while IFS='=' read -r key value; do
+        if [[ $key && $value && ! $key =~ ^# ]]; then
+            export "$key"="$value"
+        fi
+    done < <(grep -v '^#' "$env_file" | grep -v '^$')
     
     return 0
 }

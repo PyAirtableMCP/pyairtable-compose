@@ -1,0 +1,138 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Workflow
+metadata:
+  name: pyairtable-resilience-test
+  namespace: chaos-engineering
+spec:
+  entry: entry
+  templates:
+    - name: entry
+      templateType: Serial
+      deadline: 30m
+      children:
+        - pre-chaos-check
+        - chaos-experiments
+        - post-chaos-recovery
+    
+    - name: pre-chaos-check
+      templateType: Task
+      deadline: 5m
+      task:
+        container:
+          name: pre-check
+          image: curlimages/curl:latest
+          command: ["/bin/sh"]
+          args:
+            - -c
+            - |
+              echo "🔍 Pre-chaos health check"
+              # Check API Gateway
+              curl -f http://api-gateway.pyairtable.svc.cluster.local:8080/health || exit 1
+              # Check Auth Service
+              curl -f http://auth-service.pyairtable.svc.cluster.local:8081/health || exit 1
+              # Check Platform Services
+              curl -f http://platform-services.pyairtable.svc.cluster.local:8000/health || exit 1
+              echo "✅ All services healthy before chaos"
+    
+    - name: chaos-experiments
+      templateType: Parallel
+      deadline: 20m
+      children:
+        - pod-failure-experiment
+        - network-delay-experiment
+        - cpu-stress-experiment
+    
+    - name: pod-failure-experiment
+      templateType: Task
+      deadline: 10m
+      task:
+        podChaos:
+          action: pod-kill
+          mode: one
+          selector:
+            namespaces:
+              - pyairtable
+            labelSelectors:
+              "app": "api-gateway"
+          duration: "30s"
+    
+    - name: network-delay-experiment
+      templateType: Task
+      deadline: 10m
+      task:
+        networkChaos:
+          action: delay
+          mode: one
+          selector:
+            namespaces:
+              - pyairtable
+            labelSelectors:
+              "app": "auth-service"
+          delay:
+            latency: "100ms"
+            correlation: "100"
+            jitter: "0ms"
+          duration: "2m"
+    
+    - name: cpu-stress-experiment
+      templateType: Task
+      deadline: 10m
+      task:
+        stressChaos:
+          mode: one
+          selector:
+            namespaces:
+              - pyairtable
+            labelSelectors:
+              "app": "platform-services"
+          stressors:
+            cpu:
+              workers: 2
+              load: 80
+          duration: "3m"
+    
+    - name: post-chaos-recovery
+      templateType: Task
+      deadline: 5m
+      task:
+        container:
+          name: post-check
+          image: curlimages/curl:latest
+          command: ["/bin/sh"]
+          args:
+            - -c
+            - |
+              echo "🔄 Post-chaos recovery check"
+              sleep 30  # Allow time for recovery
+              
+              echo "Checking API Gateway recovery..."
+              for i in {1..12}; do
+                if curl -f http://api-gateway.pyairtable.svc.cluster.local:8080/health; then
+                  echo "✅ API Gateway recovered"
+                  break
+                fi
+                echo "⏳ Waiting for API Gateway recovery... ($i/12)"
+                sleep 10
+              done
+              
+              echo "Checking Auth Service recovery..."
+              for i in {1..12}; do
+                if curl -f http://auth-service.pyairtable.svc.cluster.local:8081/health; then
+                  echo "✅ Auth Service recovered"
+                  break
+                fi
+                echo "⏳ Waiting for Auth Service recovery... ($i/12)"
+                sleep 10
+              done
+              
+              echo "Checking Platform Services recovery..."
+              for i in {1..12}; do
+                if curl -f http://platform-services.pyairtable.svc.cluster.local:8000/health; then
+                  echo "✅ Platform Services recovered"
+                  break
+                fi
+                echo "⏳ Waiting for Platform Services recovery... ($i/12)"
+                sleep 10
+              done
+              
+              echo "🎉 Recovery validation completed"

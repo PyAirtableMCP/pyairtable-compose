@@ -1,11 +1,37 @@
 """Gemini LLM service"""
 import os
+import sys
 import time
 import json
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from datetime import datetime
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
+
+# Import OpenTelemetry instrumentation
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'shared'))
+try:
+    from opentelemetry import trace
+    from telemetry import trace_function, add_ai_attributes, TraceContext
+    tracer = trace.get_tracer(__name__)
+except ImportError:
+    # Fallback if telemetry is not available
+    def trace_function(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
+    
+    class TraceContext:
+        def __init__(self, *args, **kwargs):
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def set_attribute(self, *args):
+            pass
+    
+    tracer = None
 
 from ..config import get_settings
 from ..models.chat import Message, MessageRole, ChatRequest, ChatResponse, TokenUsage
@@ -97,51 +123,89 @@ class GeminiService:
         return round(input_cost + output_cost, 6)
     
     async def complete(self, request: ChatRequest) -> ChatResponse:
-        """Generate chat completion"""
-        model = self._get_model(request.model)
-        
-        # Update generation config with request parameters
-        if request.temperature is not None:
-            model._generation_config.temperature = request.temperature
-        if request.max_tokens is not None:
-            model._generation_config.max_output_tokens = request.max_tokens
-        if request.thinking_budget is not None and "flash" in model.model_name:
-            model._generation_config.thinking_budget = request.thinking_budget
-        
-        # Convert messages
-        gemini_messages = self._convert_messages(request.messages)
-        
-        # Generate response
-        chat = model.start_chat(history=gemini_messages[:-1] if len(gemini_messages) > 1 else [])
-        response = chat.send_message(gemini_messages[-1]["parts"][0])
-        
-        # Extract token usage
-        usage_metadata = response.usage_metadata
-        usage = {
-            "prompt_tokens": usage_metadata.prompt_token_count,
-            "completion_tokens": usage_metadata.candidates_token_count,
-            "total_tokens": usage_metadata.total_token_count,
-        }
-        
-        # Calculate cost
-        cost = self._calculate_cost(usage, model.model_name)
-        
-        # Format response
-        return ChatResponse(
-            id=f"chat-{int(time.time())}",
-            model=model.model_name,
-            choices=[{
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": response.text
-                },
-                "finish_reason": "stop"
-            }],
-            usage={**usage, "cost": cost},
-            created=int(time.time()),
-            session_id=request.session_id
-        )
+        """Generate chat completion with OpenTelemetry instrumentation"""
+        with TraceContext(
+            name="gemini.chat_completion",
+            attributes={
+                "ai.operation": "chat_completion",
+                "ai.provider": "google",
+                "ai.model": request.model or self.settings.gemini_model,
+                "ai.temperature": request.temperature or self.settings.temperature,
+                "ai.max_tokens": request.max_tokens or self.settings.max_tokens,
+                "session.id": request.session_id,
+                "message.count": len(request.messages)
+            }
+        ) as span:
+            try:
+                model = self._get_model(request.model)
+                
+                # Update generation config with request parameters
+                if request.temperature is not None:
+                    model._generation_config.temperature = request.temperature
+                if request.max_tokens is not None:
+                    model._generation_config.max_output_tokens = request.max_tokens
+                if request.thinking_budget is not None and "flash" in model.model_name:
+                    model._generation_config.thinking_budget = request.thinking_budget
+                
+                # Convert messages
+                gemini_messages = self._convert_messages(request.messages)
+                
+                # Record start time for cost tracking
+                start_time = time.time()
+                
+                # Generate response
+                chat = model.start_chat(history=gemini_messages[:-1] if len(gemini_messages) > 1 else [])
+                response = chat.send_message(gemini_messages[-1]["parts"][0])
+                
+                # Calculate completion time
+                completion_time = time.time() - start_time
+                
+                # Extract token usage
+                usage_metadata = response.usage_metadata
+                usage = {
+                    "prompt_tokens": usage_metadata.prompt_token_count,
+                    "completion_tokens": usage_metadata.candidates_token_count,
+                    "total_tokens": usage_metadata.total_token_count,
+                }
+                
+                # Calculate cost
+                cost = self._calculate_cost(usage, model.model_name)
+                
+                # Add AI attributes to span for cost tracking
+                if tracer:
+                    add_ai_attributes(
+                        span,
+                        provider="google",
+                        model=model.model_name,
+                        input_tokens=usage["prompt_tokens"],
+                        output_tokens=usage["completion_tokens"],
+                        cost_usd=cost
+                    )
+                    span.set_attribute("ai.completion_time_s", completion_time)
+                    span.set_attribute("ai.characters_generated", len(response.text))
+                
+                # Format response
+                return ChatResponse(
+                    id=f"chat-{int(time.time())}",
+                    model=model.model_name,
+                    choices=[{
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": response.text
+                        },
+                        "finish_reason": "stop"
+                    }],
+                    usage={**usage, "cost": cost},
+                    created=int(time.time()),
+                    session_id=request.session_id
+                )
+                
+            except Exception as e:
+                if tracer:
+                    span.record_exception(e)
+                    span.set_attribute("error.type", type(e).__name__)
+                raise
     
     async def stream_complete(self, request: ChatRequest) -> AsyncGenerator[str, None]:
         """Stream chat completion"""

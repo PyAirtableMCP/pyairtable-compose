@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import Image from 'next/image'
 import { useUsers, useSuspendUser, useReactivateUser, useRoles } from '@/hooks/useApi'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatRelativeTime, getStatusColor } from '@/lib/utils'
-import { Search, Filter, MoreHorizontal, Users, UserCheck, UserX, Shield, Mail, Calendar } from 'lucide-react'
+import { Search, MoreHorizontal, Users, UserCheck, UserX, Shield, Mail, Calendar } from 'lucide-react'
 import { User, FilterOptions } from '@/types'
 
 export function UserList() {
@@ -173,7 +174,7 @@ export function UserList() {
               className="px-3 py-2 border rounded-md bg-background"
             >
               <option value="">All Roles</option>
-              {roles?.map((role: any) => (
+              {(Array.isArray(roles) ? roles : []).map((role: any) => (
                 <option key={role.id} value={role.name}>
                   {role.name}
                 </option>
@@ -234,9 +235,11 @@ export function UserList() {
                         <div className="flex items-center space-x-3">
                           <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                             {user.avatar ? (
-                              <img
+                              <Image
                                 src={user.avatar}
                                 alt={`${user.firstName} ${user.lastName}`}
+                                width={40}
+                                height={40}
                                 className="w-10 h-10 rounded-full"
                               />
                             ) : (

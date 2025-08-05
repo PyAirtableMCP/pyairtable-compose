@@ -3,11 +3,10 @@
 import React from "react";
 import { SessionProvider } from "next-auth/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+// import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { Toaster } from "react-hot-toast";
-import { PostHogProvider } from "./posthog-provider";
+// Temporarily disabled: import { PostHogProvider } from "./posthog-provider";
 import { ErrorBoundary } from "@/components/error-boundary";
-import * as Sentry from "@sentry/nextjs";
 import { handleAsyncError } from "@/components/error-boundary";
 import { PWAPrompts, ConnectionStatus } from "@/components/pwa/PWAPrompts";
 
@@ -60,7 +59,7 @@ export function Providers({ children }: ProvidersProps) {
       }}
     >
       <SessionProvider>
-        <PostHogProvider>
+        {/* Temporarily disabled: <PostHogProvider> */}
           <QueryClientProvider client={queryClient}>
             {children}
             <Toaster
@@ -87,14 +86,14 @@ export function Providers({ children }: ProvidersProps) {
               }}
             />
             {process.env.NODE_ENV === "development" && (
-              <ReactQueryDevtools initialIsOpen={false} />
+              {/* <ReactQueryDevtools initialIsOpen={false} /> */}
             )}
             
             {/* PWA Components */}
             <ConnectionStatus />
             <PWAPrompts showInstallBanner={true} autoShowInstallDialog={false} />
           </QueryClientProvider>
-        </PostHogProvider>
+        {/* Temporarily disabled: </PostHogProvider> */}
       </SessionProvider>
     </ErrorBoundary>
   );

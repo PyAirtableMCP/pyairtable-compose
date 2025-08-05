@@ -1,13 +1,8 @@
 import NextAuth from "next-auth"
-import { PrismaAdapter } from "@auth/prisma-adapter"
-import { PrismaClient } from "@prisma/client"
 import GoogleProvider from "next-auth/providers/google"
 import GitHubProvider from "next-auth/providers/github"
 import CredentialsProvider from "next-auth/providers/credentials"
-import bcrypt from "bcryptjs"
 import { z } from "zod"
-
-const prisma = new PrismaClient()
 
 // Validation schemas
 const loginSchema = z.object({
@@ -15,8 +10,10 @@ const loginSchema = z.object({
   password: z.string().min(8),
 })
 
+// Auth service base URL
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || "http://localhost:8007"
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
@@ -49,36 +46,34 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // Validate input
           const { email, password } = loginSchema.parse(credentials)
 
-          // Find user in database
-          const user = await prisma.user.findUnique({
-            where: { email },
-            select: {
-              id: true,
-              email: true,
-              name: true,
-              image: true,
-              password: true,
-              emailVerified: true,
+          // Call our auth service
+          const response = await fetch(`${AUTH_SERVICE_URL}/auth/login`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
             },
+            body: JSON.stringify({ email, password }),
           })
 
-          if (!user || !user.password) {
+          if (!response.ok) {
+            console.error("Auth service login failed:", response.status)
             return null
           }
 
-          // Verify password
-          const isValid = await bcrypt.compare(password, user.password)
-          if (!isValid) {
-            return null
-          }
+          const authResult = await response.json()
 
-          // Return user object (password excluded)
+          // Decode JWT to get user info
+          const jwtPayload = JSON.parse(Buffer.from(authResult.access_token.split('.')[1], 'base64').toString())
+
+          // Return user object with tokens
           return {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            image: user.image,
-            emailVerified: user.emailVerified,
+            id: jwtPayload.user_id,
+            email: jwtPayload.email,
+            name: jwtPayload.email.split('@')[0], // Fallback name
+            accessToken: authResult.access_token,
+            refreshToken: authResult.refresh_token,
+            role: jwtPayload.role,
+            tenantId: jwtPayload.tenant_id,
           }
         } catch (error) {
           console.error("Auth error:", error)
@@ -92,11 +87,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Persist the OAuth account info and user info to the token right after signin
       if (user) {
         token.id = user.id
-        token.emailVerified = user.emailVerified
+        token.email = user.email
+        token.name = user.name
+        token.role = user.role
+        token.tenantId = user.tenantId
+        token.accessToken = user.accessToken
+        token.refreshToken = user.refreshToken
       }
       
       if (account) {
-        token.accessToken = account.access_token
         token.provider = account.provider
       }
 
@@ -106,9 +105,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Send properties to the client
       if (token) {
         session.user.id = token.id as string
-        session.user.emailVerified = token.emailVerified as Date | null
+        session.user.email = token.email as string
+        session.user.name = token.name as string
         session.accessToken = token.accessToken as string
+        session.refreshToken = token.refreshToken as string
         session.provider = token.provider as string
+        session.user.role = token.role as string
+        session.user.tenantId = token.tenantId as string
       }
 
       return session
@@ -173,26 +176,35 @@ export async function getServerSession() {
 declare module "next-auth" {
   interface Session {
     accessToken?: string
+    refreshToken?: string
     provider?: string
     user: {
       id: string
       email: string
       name?: string | null
       image?: string | null
-      emailVerified?: Date | null
+      role?: string
+      tenantId?: string
     }
   }
 
   interface User {
-    emailVerified?: Date | null
+    accessToken?: string
+    refreshToken?: string  
+    role?: string
+    tenantId?: string
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
     id?: string
+    email?: string
+    name?: string
     accessToken?: string
+    refreshToken?: string
     provider?: string
-    emailVerified?: Date | null
+    role?: string
+    tenantId?: string
   }
 }

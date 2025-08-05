@@ -6,8 +6,7 @@ build-backend = "hatchling.build"
 name = "pyairtable-saga-orchestrator"
 version = "0.1.0"
 description = "SAGA Orchestrator Service for PyAirtable"
-readme = "README.md"
-license = {file = "LICENSE"}
+license = {text = "MIT"}
 authors = [
     {name = "PyAirtable Team", email = "team@pyairtable.com"},
 ]

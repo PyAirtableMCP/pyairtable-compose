@@ -11,17 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Users, 
   FolderOpen, 
-  Database, 
   Activity,
   CreditCard,
   Zap,
   HardDrive,
-  Globe,
   TrendingUp,
   Calendar,
-  AlertTriangle,
 } from "lucide-react";
-import { cn, formatCurrency, formatBytes, formatNumber } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { Tenant, ActivityLog } from "@/types";
 
 interface DashboardOverviewProps {
@@ -201,7 +198,7 @@ export function DashboardOverview({ tenant, className }: DashboardOverviewProps)
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Welcome back!</h1>
           <p className="text-muted-foreground">
-            Here's what's happening with {tenant.name} today.
+            Here&apos;s what&apos;s happening with {tenant.name} today.
           </p>
         </div>
         <div className="flex items-center space-x-2">

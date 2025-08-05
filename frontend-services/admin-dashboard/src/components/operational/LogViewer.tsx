@@ -6,8 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { formatRelativeTime, getSeverityColor } from '@/lib/utils'
-import { Search, Filter, Download, Refresh, Terminal, AlertTriangle, Info, Bug, Zap } from 'lucide-react'
+import { formatRelativeTime } from '@/lib/utils'
+import { Search, Download, RefreshCw, Terminal, AlertTriangle, Info, Bug } from 'lucide-react'
 import { LogEntry, LogQuery } from '@/types'
 
 export function LogViewer() {
@@ -20,7 +20,7 @@ export function LogViewer() {
 
   const searchLogs = useSearchLogs()
 
-  const logQuery: LogQuery = {
+  const logQuery: LogQuery = React.useMemo(() => ({
     query,
     level: selectedLevel ? [selectedLevel] : undefined,
     service: selectedService ? [selectedService] : undefined,
@@ -30,7 +30,7 @@ export function LogViewer() {
     },
     limit: 100,
     offset: 0,
-  }
+  }), [query, selectedLevel, selectedService, timeRange])
 
   function getTimeRangeMs(range: string): number {
     switch (range) {
@@ -43,9 +43,9 @@ export function LogViewer() {
     }
   }
 
-  const handleSearch = () => {
+  const handleSearch = React.useCallback(() => {
     searchLogs.mutate(logQuery)
-  }
+  }, [searchLogs, logQuery])
 
   const toggleExpanded = (logId: string) => {
     const newExpanded = new Set(expandedLogs)
@@ -97,7 +97,7 @@ export function LogViewer() {
       }, 5000)
       return () => clearInterval(interval)
     }
-  }, [autoRefresh, logQuery])
+  }, [autoRefresh, handleSearch])
 
   // Mock logs for demonstration
   const mockLogs: LogEntry[] = [
@@ -158,7 +158,7 @@ export function LogViewer() {
     }
   ]
 
-  const logs = searchLogs.data?.data || mockLogs
+  const logs: LogEntry[] = (searchLogs.data && typeof searchLogs.data === 'object' && searchLogs.data !== null && 'data' in searchLogs.data && Array.isArray((searchLogs.data as any).data)) ? (searchLogs.data as any).data : mockLogs
 
   return (
     <div className="space-y-6">
@@ -176,7 +176,7 @@ export function LogViewer() {
             size="sm"
             onClick={() => setAutoRefresh(!autoRefresh)}
           >
-            <Refresh className={`w-4 h-4 mr-2 ${autoRefresh ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 mr-2 ${autoRefresh ? 'animate-spin' : ''}`} />
             Auto Refresh
           </Button>
           <Button variant="outline" size="sm">

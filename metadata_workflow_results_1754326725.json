@@ -1,0 +1,55 @@
+{
+  "test_run_id": "metadata_workflow_1754326725",
+  "timestamp": "2025-08-04T19:58:45.706892",
+  "base_id": "appVLUAubH5cFWhMV",
+  "steps": {
+    "step_1_create_table": {
+      "status": "unclear",
+      "response": "I need your Airtable base ID to help you. Please provide your base ID (it looks like 'appXXXXXXXXXXXXXX')."
+    },
+    "step_2_get_tables": {
+      "status": "success",
+      "response": "I need your Airtable base ID to help you. Please provide your base ID (it looks like 'appXXXXXXXXXXXXXX').",
+      "tables": [
+        {
+          "name": "Facebook Posts"
+        },
+        {
+          "name": "Customers"
+        },
+        {
+          "name": "Orders"
+        },
+        {
+          "name": "Products"
+        },
+        {
+          "name": "Campaign Data"
+        }
+      ]
+    },
+    "step_3_populate": {
+      "status": "unclear",
+      "response": "I need your Airtable base ID to help you. Please provide your base ID (it looks like 'appXXXXXXXXXXXXXX')."
+    },
+    "step_4_add_column": {
+      "status": "unclear",
+      "response": "I need your Airtable base ID to help you. Please provide your base ID (it looks like 'appXXXXXXXXXXXXXX')."
+    },
+    "step_5_llm_analysis": {
+      "status": "unclear",
+      "response": "I need your Airtable base ID to help you. Please provide your base ID (it looks like 'appXXXXXXXXXXXXXX')."
+    },
+    "step_6_validation": {
+      "status": "success",
+      "response": "I need your Airtable base ID to help you. Please provide your base ID (it looks like 'appXXXXXXXXXXXXXX')."
+    }
+  },
+  "summary": {
+    "total_steps": 6,
+    "successful_steps": 2,
+    "unclear_steps": 4,
+    "failed_steps": 0,
+    "success_rate": 0.6666666666666666
+  }
+}

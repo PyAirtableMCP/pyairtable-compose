@@ -128,8 +128,8 @@ async def get_event_types() -> Dict[str, List[str]]:
 @router.post("/replay/{stream_id}")
 async def replay_events(
     stream_id: str,
-    from_version: int = Query(0, ge=0, description="Start replay from version"),
     app_request: Request,
+    from_version: int = Query(0, ge=0, description="Start replay from version"),
     event_store: EventStore = Depends(get_event_store)
 ) -> Dict[str, Any]:
     """Replay events from a stream to the event bus."""

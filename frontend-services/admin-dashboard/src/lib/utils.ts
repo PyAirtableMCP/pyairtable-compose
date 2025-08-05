@@ -100,7 +100,7 @@ export function debounce<T extends (...args: any[]) => any>(
   let timeout: NodeJS.Timeout
   return (...args: Parameters<T>) => {
     clearTimeout(timeout)
-    timeout = setTimeout(() => func.apply(null, args), wait)
+    timeout = setTimeout(() => func(...args), wait)
   }
 }
 
@@ -113,13 +113,13 @@ export function throttle<T extends (...args: any[]) => any>(
   let lastRan: number
   return (...args: Parameters<T>) => {
     if (!lastRan) {
-      func.apply(null, args)
+      func(...args)
       lastRan = Date.now()
     } else {
       clearTimeout(lastFunc)
       lastFunc = setTimeout(() => {
         if (Date.now() - lastRan >= limit) {
-          func.apply(null, args)
+          func(...args)
           lastRan = Date.now()
         }
       }, limit - (Date.now() - lastRan))

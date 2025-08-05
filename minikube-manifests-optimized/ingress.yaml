@@ -1,0 +1,330 @@
+# Service Discovery and Ingress Configuration for Local Development
+# Provides easy access to all services through a single entry point
+# Optimized for development workflow with debugging capabilities
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pyairtable-dev-ingress
+  namespace: pyairtable-dev
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: ingress
+    environment: development
+  annotations:
+    # Enable ingress controller (modern way is in spec.ingressClassName)
+    
+    # Development-specific annotations
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+    
+    # CORS for development
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    
+    # Increase timeouts for development
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    
+    # Enable WebSocket for live reload
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+
+spec:
+  ingressClassName: nginx
+  rules:
+  # Main development domain
+  - host: pyairtable.local
+    http:
+      paths:
+      # Main API routes
+      - path: /api/v1
+        pathType: Prefix
+        backend:
+          service:
+            name: platform-services
+            port:
+              number: 8007
+              
+      # Airtable Gateway
+      - path: /airtable
+        pathType: Prefix
+        backend:
+          service:
+            name: airtable-gateway
+            port:
+              number: 8002
+              
+      # MCP Server
+      - path: /mcp
+        pathType: Prefix
+        backend:
+          service:
+            name: mcp-server
+            port:
+              number: 8001
+              
+      # LLM Orchestrator
+      - path: /ai
+        pathType: Prefix
+        backend:
+          service:
+            name: llm-orchestrator
+            port:
+              number: 8003
+              
+      # Automation Services
+      - path: /automation
+        pathType: Prefix
+        backend:
+          service:
+            name: automation-services
+            port:
+              number: 8006
+              
+      # Development tools and debugging
+      - path: /debug/health
+        pathType: Exact
+        backend:
+          service:
+            name: dev-tools
+            port:
+              number: 8080
+              
+      # Fallback to platform services
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: platform-services
+            port:
+              number: 8007
+
+  # Service-specific subdomains for direct access
+  - host: airtable.pyairtable.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: airtable-gateway
+            port:
+              number: 8002
+              
+  - host: mcp.pyairtable.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mcp-server
+            port:
+              number: 8001
+              
+  - host: ai.pyairtable.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: llm-orchestrator
+            port:
+              number: 8003
+              
+  - host: platform.pyairtable.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: platform-services
+            port:
+              number: 8007
+              
+  - host: automation.pyairtable.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: automation-services
+            port:
+              number: 8006
+
+---
+# Service Discovery ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-discovery
+  namespace: pyairtable-dev
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: service-discovery
+    environment: development
+data:
+  # Internal service URLs for service-to-service communication
+  services.yaml: |
+    services:
+      postgres:
+        host: postgres
+        port: 5432
+        url: postgresql://postgres:5432
+        health: http://postgres:5432
+        
+      redis:
+        host: redis
+        port: 6379
+        url: redis://redis:6379
+        health: http://redis:6379
+        
+      airtable-gateway:
+        host: airtable-gateway
+        port: 8002
+        url: http://airtable-gateway:8002
+        health: http://airtable-gateway:8002/health
+        external: http://airtable.pyairtable.local
+        nodeport: http://localhost:30002
+        
+      mcp-server:
+        host: mcp-server
+        port: 8001
+        url: http://mcp-server:8001
+        health: http://mcp-server:8001/health
+        external: http://mcp.pyairtable.local
+        nodeport: http://localhost:30001
+        
+      llm-orchestrator:
+        host: llm-orchestrator
+        port: 8003
+        url: http://llm-orchestrator:8003
+        health: http://llm-orchestrator:8003/health
+        external: http://ai.pyairtable.local
+        nodeport: http://localhost:30003
+        
+      platform-services:
+        host: platform-services
+        port: 8007
+        url: http://platform-services:8007
+        health: http://platform-services:8007/health
+        external: http://platform.pyairtable.local
+        nodeport: http://localhost:30007
+        
+      automation-services:
+        host: automation-services
+        port: 8006
+        url: http://automation-services:8006
+        health: http://automation-services:8006/health
+        external: http://automation.pyairtable.local
+        nodeport: http://localhost:30006
+  
+  # Development access information
+  access-info.md: |
+    # PyAirtable Development Access
+    
+    ## Main Application
+    - Primary URL: http://pyairtable.local
+    - Development Dashboard: http://pyairtable.local/debug/health
+    
+    ## Individual Services
+    
+    ### Airtable Gateway
+    - Internal: http://airtable-gateway:8002
+    - External: http://airtable.pyairtable.local
+    - NodePort: http://localhost:30002
+    - Health: http://airtable-gateway:8002/health
+    
+    ### MCP Server
+    - Internal: http://mcp-server:8001
+    - External: http://mcp.pyairtable.local
+    - NodePort: http://localhost:30001
+    - Health: http://mcp-server:8001/health
+    
+    ### LLM Orchestrator
+    - Internal: http://llm-orchestrator:8003
+    - External: http://ai.pyairtable.local
+    - NodePort: http://localhost:30003
+    - Health: http://llm-orchestrator:8003/health
+    
+    ### Platform Services
+    - Internal: http://platform-services:8007
+    - External: http://platform.pyairtable.local
+    - NodePort: http://localhost:30007
+    - Health: http://platform-services:8007/health
+    
+    ### Automation Services
+    - Internal: http://automation-services:8006
+    - External: http://automation.pyairtable.local
+    - NodePort: http://localhost:30006
+    - Health: http://automation-services:8006/health
+    
+    ### Infrastructure
+    - PostgreSQL: postgres:5432
+    - Redis: redis:6379
+    
+    ## Development Tools
+    
+    ### Port Forwarding
+    ```bash
+    # Forward all services
+    kubectl port-forward -n pyairtable-dev service/airtable-gateway 8002:8002 &
+    kubectl port-forward -n pyairtable-dev service/mcp-server 8001:8001 &
+    kubectl port-forward -n pyairtable-dev service/llm-orchestrator 8003:8003 &
+    kubectl port-forward -n pyairtable-dev service/platform-services 8007:8007 &
+    kubectl port-forward -n pyairtable-dev service/automation-services 8006:8006 &
+    kubectl port-forward -n pyairtable-dev service/postgres 5432:5432 &
+    kubectl port-forward -n pyairtable-dev service/redis 6379:6379 &
+    ```
+    
+    ### Health Checks
+    ```bash
+    # Check all services
+    curl http://pyairtable.local/debug/health
+    
+    # Individual service health
+    curl http://airtable-gateway:8002/health
+    curl http://mcp-server:8001/health
+    curl http://llm-orchestrator:8003/health
+    curl http://platform-services:8007/health
+    curl http://automation-services:8006/health
+    ```
+    
+    ### Logs
+    ```bash
+    # View logs for all services
+    kubectl logs -n pyairtable-dev deployment/airtable-gateway
+    kubectl logs -n pyairtable-dev deployment/mcp-server
+    kubectl logs -n pyairtable-dev deployment/llm-orchestrator
+    kubectl logs -n pyairtable-dev deployment/platform-services
+    kubectl logs -n pyairtable-dev deployment/automation-services
+    ```
+  
+  # Environment configuration for applications
+  environment.env: |
+    # Internal service URLs for applications
+    AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
+    MCP_SERVER_URL=http://mcp-server:8001
+    LLM_ORCHESTRATOR_URL=http://llm-orchestrator:8003
+    PLATFORM_SERVICES_URL=http://platform-services:8007
+    AUTOMATION_SERVICES_URL=http://automation-services:8006
+    
+    # Database URLs
+    POSTGRES_URL=postgresql://postgres:5432
+    REDIS_URL=redis://redis:6379
+    
+    # Development settings
+    DEVELOPMENT_MODE=true
+    ENABLE_CORS=true
+    CORS_ORIGINS=*
+    LOG_LEVEL=debug
+    
+    # Health check endpoints
+    HEALTH_CHECK_INTERVAL=30
+    HEALTH_CHECK_TIMEOUT=5

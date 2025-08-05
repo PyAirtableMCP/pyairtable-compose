@@ -1,0 +1,62 @@
+# Simplified OpenTelemetry Collector Configuration for LGTM Stack Testing
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['localhost:8888']
+
+  hostmetrics:
+    collection_interval: 30s
+    scrapers:
+      cpu:
+      memory:
+      filesystem:
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+
+  batch:
+    timeout: 2s
+    send_batch_size: 1024
+
+exporters:
+  prometheusremotewrite/mimir:
+    endpoint: http://mimir:8080/api/v1/push
+    tls:
+      insecure: true
+    headers:
+      X-Scope-OrgID: "pyairtable"
+
+  logging:
+    loglevel: info
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  
+  pipelines:
+    metrics:
+      receivers: [prometheus, hostmetrics]
+      processors: [memory_limiter, batch]
+      exporters: [prometheusremotewrite/mimir, logging]
+
+  telemetry:
+    logs:
+      level: "info"
+    metrics:
+      address: 0.0.0.0:8888

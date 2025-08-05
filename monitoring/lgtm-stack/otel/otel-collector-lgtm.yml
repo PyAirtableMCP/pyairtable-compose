@@ -1,0 +1,389 @@
+# OpenTelemetry Collector Configuration for LGTM Stack
+# Optimized for resource efficiency and cost control
+
+receivers:
+  # OTLP receiver for application telemetry
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - "http://localhost:3000"
+            - "http://localhost:8000"
+            - "http://api-gateway:8000"
+            - "http://grafana:3000"
+
+  # Prometheus receiver for scraping existing metrics endpoints
+  prometheus:
+    config:
+      scrape_configs:
+        # Self-monitoring
+        - job_name: 'otel-collector'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['localhost:8888']
+        
+        # PyAirtable services scraping
+        - job_name: 'api-gateway'
+          scrape_interval: 15s
+          static_configs:
+            - targets: ['api-gateway:8080']
+          metrics_path: '/metrics'
+        
+        - job_name: 'platform-services'
+          scrape_interval: 15s
+          static_configs:
+            - targets: ['platform-services:8007']
+          metrics_path: '/metrics'
+        
+        - job_name: 'llm-orchestrator'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['llm-orchestrator:8003']
+          metrics_path: '/metrics'
+        
+        - job_name: 'airtable-gateway'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['airtable-gateway:8002']
+          metrics_path: '/metrics'
+        
+        - job_name: 'mcp-server'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['mcp-server:8001']
+          metrics_path: '/metrics'
+        
+        - job_name: 'automation-services'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['automation-services:8006']
+          metrics_path: '/metrics'
+
+  # Host metrics for infrastructure monitoring
+  hostmetrics:
+    collection_interval: 30s
+    scrapers:
+      cpu:
+        metrics:
+          system.cpu.utilization:
+            enabled: true
+          system.cpu.time:
+            enabled: false  # Reduce metric volume
+      memory:
+        metrics:
+          system.memory.utilization:
+            enabled: true
+          system.memory.usage:
+            enabled: true
+      disk:
+        metrics:
+          system.disk.io:
+            enabled: false  # Reduce metric volume
+      network:
+        metrics:
+          system.network.io:
+            enabled: true
+          system.network.packets:
+            enabled: false  # Reduce metric volume
+      filesystem:
+        metrics:
+          system.filesystem.utilization:
+            enabled: true
+          system.filesystem.usage:
+            enabled: false  # Reduce metric volume
+
+  # Docker stats for container monitoring
+  docker_stats:
+    endpoint: unix:///var/run/docker.sock
+    collection_interval: 30s
+    timeout: 20s
+    api_version: 1.24
+
+processors:
+  # Memory limiter - critical for resource management
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512  # 512MB limit
+    spike_limit_mib: 128  # 128MB spike limit
+
+  # Batch processor for efficient data handling
+  batch:
+    timeout: 2s
+    send_batch_size: 8192
+    send_batch_max_size: 16384
+
+  # Resource processor for consistent labeling
+  resource:
+    attributes:
+      - key: service.cluster
+        value: "pyairtable-platform"
+        action: upsert
+      - key: service.environment
+        from_attribute: deployment.environment
+        action: insert
+      - key: service.version
+        from_attribute: service.version
+        action: insert
+      - key: platform.name
+        value: "pyairtable"
+        action: insert
+
+  # Attributes processor for data sanitization and enhancement
+  attributes:
+    actions:
+      # Remove sensitive information
+      - key: http.request.header.authorization
+        action: delete
+      - key: http.request.header.x-api-key
+        action: delete
+      - key: http.request.header.cookie
+        action: delete
+      
+      # Sanitize database queries
+      - key: db.statement
+        action: update
+        from_attribute: db.statement
+        value: "REDACTED"
+      
+      # Add business context
+      - key: business.tenant_id
+        from_attribute: tenant.id
+        action: insert
+      - key: business.user_id
+        from_attribute: user.id
+        action: insert
+
+  # Probabilistic sampler for cost control
+  probabilistic_sampler:
+    sampling_percentage: 15.0  # Sample 15% of traces
+
+  # Tail sampling for intelligent trace selection
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 50000
+    expected_new_traces_per_sec: 50
+    policies:
+      # Always sample error traces
+      - name: error-traces
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      
+      # Always sample slow traces (>1s)
+      - name: slow-traces
+        type: latency
+        latency:
+          threshold_ms: 1000
+      
+      # Sample critical service traces at higher rate
+      - name: critical-services
+        type: string_attribute
+        string_attribute:
+          key: service.name
+          values:
+            - api-gateway
+            - platform-services
+            - llm-orchestrator
+          invert_match: false
+        # Higher sampling for critical services
+        probabilistic:
+          sampling_percentage: 25
+      
+      # Sample database operations
+      - name: database-operations
+        type: string_attribute
+        string_attribute:
+          key: db.operation
+          values:
+            - SELECT
+            - INSERT
+            - UPDATE
+            - DELETE
+        probabilistic:
+          sampling_percentage: 10
+      
+      # Default probabilistic sampling
+      - name: probabilistic-policy
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 5
+
+  # Transform processor for metric optimization
+  transform:
+    metric_statements:
+      # Reduce cardinality by removing high-cardinality labels
+      - context: metric
+        statements:
+          - delete_key(attributes, "http.request.header.user-agent") where name == "http_requests_total"
+          - delete_key(attributes, "http.url") where name == "http_requests_total"
+          # Keep only essential labels for cost optimization
+          - keep_keys(attributes, ["service.name", "http.method", "http.status_code", "http.route"]) where name == "http_requests_total"
+
+  # Filter processor to reduce noise
+  filter:
+    metrics:
+      # Remove noisy metrics to reduce costs
+      metric:
+        - 'name == "go_gc_duration_seconds"'
+        - 'name == "go_memstats_alloc_bytes_total"'
+        - 'name == "go_memstats_lookups_total"'
+        - 'name == "go_memstats_mallocs_total"'
+        - 'name == "go_memstats_frees_total"'
+    traces:
+      # Filter out health check traces
+      span:
+        - 'attributes["http.route"] == "/health"'
+        - 'attributes["http.route"] == "/healthz"'
+        - 'attributes["http.target"] == "/metrics"'
+    logs:
+      # Filter out verbose logs
+      log_record:
+        - 'body == "GET /health"'
+        - 'body == "GET /healthz"'
+        - 'severity_text == "DEBUG"'
+
+exporters:
+  # Tempo exporter for distributed tracing
+  otlp/tempo:
+    endpoint: http://tempo:4317
+    tls:
+      insecure: true
+    headers:
+      tenant-id: "pyairtable"
+
+  # Mimir exporter for long-term metrics
+  prometheusremotewrite/mimir:
+    endpoint: http://mimir:8081/api/v1/push
+    tls:
+      insecure: true
+    headers:
+      X-Scope-OrgID: "pyairtable"
+    # Resource optimization
+    resource_to_telemetry_conversion:
+      enabled: true
+    # Compression
+    compression: snappy
+    # Retry configuration
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+    # Queue configuration for memory management
+    sending_queue:
+      enabled: true
+      num_consumers: 10
+      queue_size: 5000
+
+  # Loki exporter for logs (via OTLP)
+  otlp/loki:
+    endpoint: http://loki:3100/otlp/v1/logs
+    tls:
+      insecure: true
+    headers:
+      X-Scope-OrgID: "pyairtable"
+
+  # Prometheus exporter for real-time metrics (optional)
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    const_labels:
+      cluster: "pyairtable-platform"
+      environment: "production"
+    # Reduce memory usage
+    enable_open_metrics: false
+    resource_to_telemetry_conversion:
+      enabled: true
+
+  # Debug exporters (can be disabled in production)
+  logging:
+    loglevel: info
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+  # File exporter for local debugging (optional)
+  file:
+    path: /tmp/otel-traces.json
+    rotation:
+      max_megabytes: 50
+      max_days: 1
+      max_backups: 2
+
+extensions:
+  # Health check extension
+  health_check:
+    endpoint: 0.0.0.0:13133
+    check_collector_pipeline:
+      enabled: true
+      interval: 5m
+      exporter_failure_threshold: 5
+
+  # Memory ballast for GC optimization
+  memory_ballast:
+    size_mib: 128
+
+  # pprof for performance debugging
+  pprof:
+    endpoint: 0.0.0.0:1777
+
+  # zpages for internal diagnostics
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+service:
+  extensions: [health_check, memory_ballast, pprof, zpages]
+  
+  pipelines:
+    # Traces pipeline
+    traces:
+      receivers: [otlp]
+      processors: [
+        memory_limiter,
+        resource,
+        attributes,
+        tail_sampling,
+        batch
+      ]
+      exporters: [otlp/tempo, logging]
+
+    # Metrics pipeline
+    metrics:
+      receivers: [otlp, prometheus, hostmetrics, docker_stats]
+      processors: [
+        memory_limiter,
+        resource,
+        transform,
+        filter,
+        batch
+      ]
+      exporters: [prometheusremotewrite/mimir, prometheus]
+
+    # Logs pipeline
+    logs:
+      receivers: [otlp]
+      processors: [
+        memory_limiter,
+        resource,
+        attributes,
+        filter,
+        batch
+      ]
+      exporters: [otlp/loki, logging]
+
+  # Telemetry configuration
+  telemetry:
+    logs:
+      level: "info"
+      development: false
+      sampling:
+        enabled: true
+        tick: 10s
+        initial: 5
+        thereafter: 200
+    metrics:
+      address: 0.0.0.0:8888
+      level: normal
+    traces:

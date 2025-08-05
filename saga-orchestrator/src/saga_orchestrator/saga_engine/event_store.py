@@ -26,7 +26,7 @@ class EventStoreModel(Base):
     version = Column(Integer, nullable=False)
     event_type = Column(String, nullable=False)
     event_data = Column(JSON, nullable=False)
-    metadata = Column(JSON, default={})
+    event_metadata = Column(JSON, default={})
     created_at = Column(DateTime, default=datetime.utcnow)
     correlation_id = Column(String, index=True)
 
@@ -115,7 +115,7 @@ class PostgreSQLEventStore(EventStore):
                     version=current_version + i + 1,
                     event_type=event.type.value,
                     event_data=event.to_dict(),
-                    metadata=event.metadata,
+                    event_metadata=event.metadata,
                     correlation_id=event.correlation_id
                 )
                 session.add(event_model)

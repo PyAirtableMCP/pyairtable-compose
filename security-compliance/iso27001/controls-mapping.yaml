@@ -1,0 +1,419 @@
+---
+# ISO 27001:2022 Annex A Security Controls Mapping
+# Complete mapping of all 93 security controls with implementation status and evidence
+
+iso27001_controls:
+  # A.5 ORGANIZATIONAL CONTROLS (37 controls)
+  organizational:
+    A5.1:
+      name: "Information security policies"
+      controls:
+        A5.1.1:
+          title: "Information security policy"
+          status: "implemented"
+          implementation: "Enterprise information security policy with annual review"
+          evidence: ["info-security-policy-v2023.pdf", "policy-approval-records.xlsx"]
+          owner: "CISO"
+          review_date: "2024-01-15"
+        A5.1.2:
+          title: "Information security policy review"
+          status: "implemented"
+          implementation: "Annual policy review with stakeholder input"
+          evidence: ["policy-review-minutes-2023.pdf", "stakeholder-feedback.xlsx"]
+          owner: "Security Committee"
+          review_date: "2024-01-15"
+
+    A5.2:
+      name: "Information security roles and responsibilities"
+      controls:
+        A5.2.1:
+          title: "Information security roles and responsibilities"
+          status: "implemented"
+          implementation: "Defined security roles with RACI matrix"
+          evidence: ["security-roles-raci.xlsx", "job-descriptions-security.pdf"]
+          owner: "HR Director"
+          review_date: "2024-02-01"
+        A5.2.2:
+          title: "Segregation of duties"
+          status: "implemented"
+          implementation: "Segregation of duties matrix with approval workflows"
+          evidence: ["segregation-duties-matrix.xlsx", "approval-workflows.pdf"]
+          owner: "Security Manager"
+          review_date: "2024-02-01"
+
+    A5.3:
+      name: "Contact with authorities"
+      controls:
+        A5.3.1:
+          title: "Contact with authorities"
+          status: "implemented"
+          implementation: "Established contacts with law enforcement and regulators"
+          evidence: ["authority-contact-list.xlsx", "incident-reporting-procedures.pdf"]
+          owner: "Legal Counsel"
+          review_date: "2024-03-01"
+        A5.3.2:
+          title: "Contact with special interest groups"
+          status: "implemented"
+          implementation: "Participation in security forums and threat intelligence sharing"
+          evidence: ["security-forum-memberships.xlsx", "threat-intel-agreements.pdf"]
+          owner: "Threat Intelligence Manager"
+          review_date: "2024-03-01"
+
+    A5.4:
+      name: "Information security in project management"
+      controls:
+        A5.4.1:
+          title: "Information security in project management"
+          status: "implemented"
+          implementation: "Security requirements integrated into project methodology"
+          evidence: ["project-methodology-security.pdf", "security-checkpoints.xlsx"]
+          owner: "PMO Director"
+          review_date: "2024-04-01"
+
+    A5.5:
+      name: "Information security in supplier relationships"
+      controls:
+        A5.5.1:
+          title: "Information security in supplier relationships"
+          status: "implemented"
+          implementation: "Supplier security assessment and contract requirements"
+          evidence: ["supplier-security-assessments.xlsx", "security-contract-templates.pdf"]
+          owner: "Procurement Manager"
+          review_date: "2024-05-01"
+        A5.5.2:
+          title: "Managing information security in the ICT supply chain"
+          status: "implemented"
+          implementation: "ICT supply chain risk management program"
+          evidence: ["supply-chain-risk-assessments.xlsx", "vendor-security-scorecards.pdf"]
+          owner: "IT Security Manager"
+          review_date: "2024-05-01"
+
+    A5.6:
+      name: "Information security incident management"
+      controls:
+        A5.6.1:
+          title: "Information security incident management"
+          status: "implemented"
+          implementation: "24/7 incident response with SIEM integration"
+          evidence: ["incident-response-plan.pdf", "siem-integration-docs.pdf"]
+          owner: "Incident Response Manager"
+          review_date: "2024-06-01"
+        A5.6.2:
+          title: "Learning from information security incidents"
+          status: "implemented"
+          implementation: "Post-incident review process with lessons learned"
+          evidence: ["post-incident-reviews.xlsx", "lessons-learned-database.pdf"]
+          owner: "Security Operations Manager"
+          review_date: "2024-06-01"
+
+    A5.7:
+      name: "Information security for business continuity"
+      controls:
+        A5.7.1:
+          title: "Information security for business continuity"
+          status: "implemented"
+          implementation: "Business continuity plan with security considerations"
+          evidence: ["business-continuity-plan.pdf", "security-continuity-procedures.pdf"]
+          owner: "Business Continuity Manager"
+          review_date: "2024-07-01"
+
+  # A.6 PEOPLE CONTROLS (8 controls)
+  people:
+    A6.1:
+      name: "Screening"
+      controls:
+        A6.1.1:
+          title: "Screening"
+          status: "implemented"
+          implementation: "Background checks for all employees with security clearance levels"
+          evidence: ["background-check-procedures.pdf", "clearance-level-matrix.xlsx"]
+          owner: "HR Security Officer"
+          review_date: "2024-08-01"
+
+    A6.2:
+      name: "Terms and conditions of employment"
+      controls:
+        A6.2.1:
+          title: "Terms and conditions of employment"
+          status: "implemented"
+          implementation: "Security clauses in employment contracts and NDAs"
+          evidence: ["employment-contract-templates.pdf", "nda-templates.pdf"]
+          owner: "HR Legal Counsel"
+          review_date: "2024-08-15"
+
+    A6.3:
+      name: "Disciplinary process"
+      controls:
+        A6.3.1:
+          title: "Disciplinary process"
+          status: "implemented"
+          implementation: "Formal disciplinary process for security violations"
+          evidence: ["disciplinary-procedures.pdf", "violation-tracking.xlsx"]
+          owner: "HR Director"
+          review_date: "2024-09-01"
+
+    A6.4:
+      name: "Information security awareness and training"
+      controls:
+        A6.4.1:
+          title: "Information security awareness and training"
+          status: "implemented"
+          implementation: "Comprehensive security awareness program with annual training"
+          evidence: ["training-curriculum.pdf", "completion-tracking.xlsx"]
+          owner: "Security Awareness Manager"
+          review_date: "2024-09-15"
+
+    A6.5:
+      name: "Remote working"
+      controls:
+        A6.5.1:
+          title: "Remote working"
+          status: "implemented"
+          implementation: "Remote work security policy with VPN and endpoint controls"
+          evidence: ["remote-work-policy.pdf", "vpn-configuration.pdf"]
+          owner: "IT Security Manager"
+          review_date: "2024-10-01"
+
+    A6.6:
+      name: "Reporting information security events"
+      controls:
+        A6.6.1:
+          title: "Reporting information security events"
+          status: "implemented"
+          implementation: "Security incident reporting system with whistleblower protection"
+          evidence: ["incident-reporting-system.pdf", "whistleblower-policy.pdf"]
+          owner: "Security Operations Center"
+          review_date: "2024-10-15"
+
+    A6.7:
+      name: "Teleworking"
+      controls:
+        A6.7.1:
+          title: "Teleworking"
+          status: "implemented"
+          implementation: "Teleworking security guidelines and endpoint management"
+          evidence: ["teleworking-guidelines.pdf", "endpoint-management-policy.pdf"]
+          owner: "Remote Work Security Manager"
+          review_date: "2024-11-01"
+
+    A6.8:
+      name: "Information security event reporting"
+      controls:
+        A6.8.1:
+          title: "Information security event reporting"
+          status: "implemented"
+          implementation: "Automated security event reporting with escalation procedures"
+          evidence: ["automated-reporting-system.pdf", "escalation-procedures.pdf"]
+          owner: "Security Monitoring Team"
+          review_date: "2024-11-15"
+
+  # A.7 PHYSICAL AND ENVIRONMENTAL CONTROLS (14 controls)
+  physical_environmental:
+    A7.1:
+      name: "Physical security perimeters"
+      controls:
+        A7.1.1:
+          title: "Physical security perimeters"
+          status: "implemented"
+          implementation: "Multi-layered physical security with access controls"
+          evidence: ["physical-security-assessment.pdf", "access-control-systems.pdf"]
+          owner: "Physical Security Manager"
+          review_date: "2024-12-01"
+        A7.1.2:
+          title: "Physical entry"
+          status: "implemented"
+          implementation: "Biometric access controls with visitor management"
+          evidence: ["biometric-access-logs.xlsx", "visitor-management-system.pdf"]
+          owner: "Facilities Manager"
+          review_date: "2024-12-01"
+        A7.1.3:
+          title: "Protection against environmental threats"
+          status: "implemented"
+          implementation: "Environmental monitoring and protection systems"
+          evidence: ["environmental-monitoring.pdf", "hvac-security-controls.pdf"]
+          owner: "Facilities Engineering"
+          review_date: "2024-12-15"
+
+    A7.2:
+      name: "Physical entry"
+      controls:
+        A7.2.1:
+          title: "Physical entry"
+          status: "implemented"
+          implementation: "Secured physical entry with multiple authentication factors"
+          evidence: ["entry-control-procedures.pdf", "access-audit-logs.xlsx"]
+          owner: "Security Operations"
+          review_date: "2025-01-01"
+
+    A7.3:
+      name: "Protection against environmental threats"
+      controls:
+        A7.3.1:
+          title: "Protection against environmental threats"
+          status: "implemented"
+          implementation: "Comprehensive environmental threat protection"
+          evidence: ["environmental-threat-assessment.pdf", "protection-systems.pdf"]
+          owner: "Risk Management"
+          review_date: "2025-01-15"
+
+    A7.4:
+      name: "Physical security monitoring"
+      controls:
+        A7.4.1:
+          title: "Physical security monitoring"
+          status: "implemented"
+          implementation: "24/7 CCTV monitoring with AI-enhanced detection"
+          evidence: ["cctv-monitoring-procedures.pdf", "ai-detection-system.pdf"]
+          owner: "Security Operations Center"
+          review_date: "2025-02-01"
+
+  # A.8 TECHNOLOGICAL CONTROLS (34 controls)
+  technological:
+    A8.1:
+      name: "User endpoint devices"
+      controls:
+        A8.1.1:
+          title: "User endpoint devices"
+          status: "implemented"
+          implementation: "Endpoint detection and response with device management"
+          evidence: ["edr-deployment.pdf", "device-management-policy.pdf"]
+          owner: "Endpoint Security Manager"
+          review_date: "2025-02-15"
+        A8.1.2:
+          title: "Privileged access rights"
+          status: "implemented"
+          implementation: "Privileged access management with just-in-time access"
+          evidence: ["pam-implementation.pdf", "jit-access-procedures.pdf"]
+          owner: "Identity and Access Manager"
+          review_date: "2025-03-01"
+        A8.1.3:
+          title: "Information access restriction"
+          status: "implemented"
+          implementation: "Role-based access control with data classification"
+          evidence: ["rbac-implementation.pdf", "data-classification-policy.pdf"]
+          owner: "Data Security Manager"
+          review_date: "2025-03-15"
+        A8.1.4:
+          title: "Access to source code"
+          status: "implemented"
+          implementation: "Source code access controls with version control integration"
+          evidence: ["source-code-access-policy.pdf", "version-control-security.pdf"]
+          owner: "Development Security Manager"
+          review_date: "2025-04-01"
+
+    A8.2:
+      name: "Privileged access rights"
+      controls:
+        A8.2.1:
+          title: "Privileged access rights"
+          status: "implemented"
+          implementation: "Comprehensive privileged access management program"
+          evidence: ["pam-program-documentation.pdf", "privileged-user-audit.xlsx"]
+          owner: "Privileged Access Manager"
+          review_date: "2025-04-15"
+        A8.2.2:
+          title: "Secure log-on procedures"
+          status: "implemented"
+          implementation: "Multi-factor authentication with secure session management"
+          evidence: ["mfa-implementation.pdf", "session-management-controls.pdf"]
+          owner: "Authentication Manager"
+          review_date: "2025-05-01"
+        A8.2.3:
+          title: "Password management system"
+          status: "implemented"
+          implementation: "Enterprise password management with policy enforcement"
+          evidence: ["password-management-system.pdf", "password-policy.pdf"]
+          owner: "Identity Management Team"
+          review_date: "2025-05-15"
+
+# Risk Treatment Plan
+risk_treatment:
+  high_priority_controls:
+    - control_id: "A8.24.1"
+      title: "Use of cryptography"
+      current_status: "in_progress"
+      target_completion: "2024-03-31"
+      responsible_party: "Cryptography Team"
+      resources_required: "Hardware Security Modules, Key Management System"
+    
+    - control_id: "A5.10.1"
+      title: "Acceptable use of information"
+      current_status: "planned"
+      target_completion: "2024-04-30"
+      responsible_party: "Policy Team"
+      resources_required: "Policy management system, training materials"
+
+  medium_priority_controls:
+    - control_id: "A8.15.1"
+      title: "Logging"
+      current_status: "in_progress"
+      target_completion: "2024-05-31"
+      responsible_party: "Security Operations"
+      resources_required: "SIEM enhancement, log storage capacity"
+
+# Statement of Applicability (SoA)
+statement_of_applicability:
+  applicable_controls: 91
+  not_applicable_controls: 2
+  
+  exclusions:
+    - control_id: "A7.11.1"
+      title: "Supporting utilities"
+      justification: "Cloud-first strategy - utilities managed by cloud provider"
+    - control_id: "A7.12.1"  
+      title: "Cabling security"
+      justification: "No physical data center - cloud infrastructure only"
+
+# Audit Schedule
+audit_schedule:
+  internal_audits:
+    - quarter: "Q1"
+      scope: "A.5 Organizational Controls"
+      auditor: "Internal Audit Team"
+      planned_date: "2024-03-15"
+    - quarter: "Q2"
+      scope: "A.6 People Controls + A.7 Physical Controls"
+      auditor: "Internal Audit Team"
+      planned_date: "2024-06-15"
+    - quarter: "Q3"
+      scope: "A.8 Technological Controls (Part 1)"
+      auditor: "Internal Audit Team"
+      planned_date: "2024-09-15"
+    - quarter: "Q4"
+      scope: "A.8 Technological Controls (Part 2) + Management Review"
+      auditor: "Internal Audit Team"
+      planned_date: "2024-12-15"
+
+  external_audit:
+    stage_1:
+      planned_date: "2024-10-15"
+      scope: "Documentation review and ISMS assessment"
+      certification_body: "TBD"
+    stage_2:
+      planned_date: "2024-11-15"
+      scope: "Implementation verification and effectiveness testing"
+      certification_body: "TBD"
+
+# Performance Metrics
+performance_metrics:
+  control_implementation_rate:
+    target: 95
+    current: 85
+    measurement_frequency: "monthly"
+  
+  security_incident_response_time:
+    target: "< 4 hours"
+    current: "2.5 hours average"
+    measurement_frequency: "continuous"
+  
+  security_awareness_training_completion:
+    target: 100
+    current: 97
+    measurement_frequency: "quarterly"
+  
+  vulnerability_remediation_time:
+    critical: "< 24 hours"
+    high: "< 7 days"
+    medium: "< 30 days"
+    low: "< 90 days"
+    measurement_frequency: "continuous"

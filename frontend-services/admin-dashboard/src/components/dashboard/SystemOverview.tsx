@@ -4,7 +4,7 @@ import React from 'react'
 import { useSystemHealth, useResourceMetrics, useServiceStatus } from '@/hooks/useApi'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { formatBytes, formatPercentage, formatRelativeTime, getStatusColor } from '@/lib/utils'
+import { formatBytes, formatRelativeTime } from '@/lib/utils'
 import { Activity, Cpu, HardDrive, MemoryStick, Network, Server, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 
 export function SystemOverview() {
@@ -39,7 +39,7 @@ export function SystemOverview() {
               {healthLoading ? (
                 <div className="animate-pulse bg-gray-200 h-8 w-20 rounded" />
               ) : (
-                health?.status?.charAt(0).toUpperCase() + health?.status?.slice(1) || 'Unknown'
+                health?.status ? health.status.charAt(0).toUpperCase() + health.status.slice(1) : 'Unknown'
               )}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -96,7 +96,7 @@ export function SystemOverview() {
               {servicesLoading ? (
                 <div className="animate-pulse bg-gray-200 h-8 w-20 rounded" />
               ) : (
-                `${Math.round(services?.reduce((acc: number, s: any) => acc + s.responseTime, 0) / (services?.length || 1) || 0)}ms`
+                `${Math.round((services?.reduce((acc: number, s: any) => acc + s.responseTime, 0) || 0) / (services?.length || 1))}ms`
               )}
             </div>
             <p className="text-xs text-muted-foreground">

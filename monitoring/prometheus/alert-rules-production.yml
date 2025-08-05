@@ -1,0 +1,367 @@
+# PyAirtable Production Alert Rules
+# Comprehensive alerting for service health, performance, business metrics, and infrastructure
+
+groups:
+  # Service Health Alerts
+  - name: pyairtable-service-health
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: up{job=~"pyairtable-.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: "{{ $labels.service }}"
+          category: service_health
+        annotations:
+          summary: "PyAirtable service {{ $labels.service }} is down"
+          description: "Service {{ $labels.service }} on instance {{ $labels.instance }} has been down for more than 1 minute."
+          runbook_url: "https://runbooks.pyairtable.com/service-down"
+          dashboard_url: "https://grafana.pyairtable.com/d/pyairtable-service-health"
+          business_impact: "High - Service unavailable to users"
+          recommended_action: "Check service logs and restart if necessary"
+
+      - alert: ServiceHighRestartRate
+        expr: increase(process_start_time_seconds{job=~"pyairtable-.*"}[15m]) > 3
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.service }}"
+          category: service_health
+        annotations:
+          summary: "High restart rate for service {{ $labels.service }}"
+          description: "Service {{ $labels.service }} has restarted {{ $value }} times in the last 15 minutes."
+          runbook_url: "https://runbooks.pyairtable.com/high-restart-rate"
+          business_impact: "Medium - Service instability"
+
+      - alert: ServiceMemoryLeak
+        expr: increase(container_memory_usage_bytes{name=~"pyairtable-.*"}[1h]) / 1024 / 1024 > 100
+        for: 30m
+        labels:
+          severity: warning
+          service: "{{ $labels.name }}"
+          category: service_health
+        annotations:
+          summary: "Potential memory leak in service {{ $labels.name }}"
+          description: "Memory usage for {{ $labels.name }} has increased by {{ $value }}MB in the last hour."
+          runbook_url: "https://runbooks.pyairtable.com/memory-leak"
+
+  # Performance Alerts
+  - name: pyairtable-performance
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: (sum(rate(http_requests_total{job=~"pyairtable-.*",status=~"5.."}[5m])) by (service) / sum(rate(http_requests_total{job=~"pyairtable-.*"}[5m])) by (service)) * 100 > 5
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.service }}"
+          category: performance
+        annotations:
+          summary: "High error rate for service {{ $labels.service }}"
+          description: "Error rate for {{ $labels.service }} is {{ $value | humanizePercentage }} which is above the 5% threshold."
+          runbook_url: "https://runbooks.pyairtable.com/high-error-rate"
+          dashboard_url: "https://grafana.pyairtable.com/d/pyairtable-service-health"
+          business_impact: "High - Users experiencing errors"
+          threshold: "5%"
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~"pyairtable-.*"}[5m])) by (service, le)) * 1000 > 2000
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.service }}"
+          category: performance
+        annotations:
+          summary: "High latency for service {{ $labels.service }}"
+          description: "95th percentile latency for {{ $labels.service }} is {{ $value }}ms which is above the 2000ms threshold."
+          runbook_url: "https://runbooks.pyairtable.com/high-latency"
+          business_impact: "Medium - Slow user experience"
+          threshold: "2000ms"
+
+      - alert: HighRequestRate
+        expr: sum(rate(http_requests_total{job=~"pyairtable-.*"}[5m])) by (service) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.service }}"
+          category: performance
+        annotations:
+          summary: "High request rate for {{ $labels.service }}"
+          description: "Request rate for {{ $labels.service }} is {{ $value }} req/s which may indicate unusual traffic."
+          runbook_url: "https://runbooks.pyairtable.com/high-request-rate"
+          business_impact: "Low - Monitor for potential DDoS or unusual usage"
+
+      - alert: LowThroughput
+        expr: sum(rate(http_requests_total{job=~"pyairtable-.*"}[5m])) by (service) < 1
+        for: 10m
+        labels:
+          severity: warning
+          service: "{{ $labels.service }}"
+          category: performance
+        annotations:
+          summary: "Low throughput for service {{ $labels.service }}"
+          description: "Request rate for {{ $labels.service }} is {{ $value }} req/s which is unusually low."
+          runbook_url: "https://runbooks.pyairtable.com/low-throughput"
+          business_impact: "Medium - Potential service issue or lack of traffic"
+
+  # Infrastructure Alerts
+  - name: pyairtable-infrastructure
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{name=~"pyairtable-.*"}[5m]) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: "{{ $labels.name }}"
+          category: infrastructure
+        annotations:
+          summary: "High CPU usage for {{ $labels.name }}"
+          description: "CPU usage for {{ $labels.name }} is {{ $value | humanizePercentage }} which is above 80%."
+          runbook_url: "https://runbooks.pyairtable.com/high-cpu"
+          threshold: "80%"
+
+      - alert: HighMemoryUsage
+        expr: (container_memory_usage_bytes{name=~"pyairtable-.*"} / container_spec_memory_limit_bytes{name=~"pyairtable-.*"}) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          service: "{{ $labels.name }}"
+          category: infrastructure
+        annotations:
+          summary: "High memory usage for {{ $labels.name }}"
+          description: "Memory usage for {{ $labels.name }} is {{ $value | humanizePercentage }} of limit."
+          runbook_url: "https://runbooks.pyairtable.com/high-memory"
+          threshold: "85%"
+
+      - alert: DiskSpaceLow
+        expr: (1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: critical
+          category: infrastructure
+          device: "{{ $labels.device }}"
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Disk usage on {{ $labels.device }} is {{ $value | humanizePercentage }}."
+          runbook_url: "https://runbooks.pyairtable.com/disk-space-low"
+          threshold: "85%"
+
+      - alert: DatabaseConnectionsHigh
+        expr: sum(postgresql_connections{}) > 80
+        for: 5m
+        labels:
+          severity: warning
+          category: infrastructure
+        annotations:
+          summary: "High database connections"
+          description: "PostgreSQL has {{ $value }} active connections which is approaching the limit."
+          runbook_url: "https://runbooks.pyairtable.com/high-db-connections"
+
+  # Business Metrics Alerts  
+  - name: pyairtable-business-metrics
+    interval: 60s
+    rules:
+      - alert: HighLLMCosts
+        expr: sum(increase(pyairtable_llm_cost_total[1h])) / 100 > 50
+        for: 5m
+        labels:
+          severity: warning
+          category: business_metrics
+        annotations:
+          summary: "High LLM costs detected"
+          description: "LLM costs in the last hour: ${{ $value | humanize }}. This exceeds the $50/hour threshold."
+          runbook_url: "https://runbooks.pyairtable.com/high-llm-costs"
+          business_impact: "High - Unexpected cost spike"
+          threshold: "$50/hour"
+
+      - alert: DailyLLMCostsBudgetExceeded
+        expr: sum(increase(pyairtable_llm_cost_total[24h])) / 100 > 500
+        for: 5m
+        labels:
+          severity: critical
+          category: business_metrics
+        annotations:
+          summary: "Daily LLM costs budget exceeded"
+          description: "Daily LLM costs: ${{ $value | humanize }}. This exceeds the $500/day budget."
+          runbook_url: "https://runbooks.pyairtable.com/budget-exceeded"
+          business_impact: "Critical - Budget overrun"
+          recommended_action: "Review usage patterns and consider implementing cost controls"
+
+      - alert: MonthlyLLMCostsBudgetWarning
+        expr: sum(increase(pyairtable_llm_cost_total[30d])) / 100 > 4000
+        for: 5m
+        labels:
+          severity: warning
+          category: business_metrics
+        annotations:
+          summary: "Monthly LLM costs approaching budget limit"
+          description: "Monthly LLM costs: ${{ $value | humanize }}. Approaching the $5000/month budget."
+          runbook_url: "https://runbooks.pyairtable.com/budget-warning"
+          business_impact: "Medium - Budget warning"
+
+      - alert: UnusualTokenUsage
+        expr: sum(rate(pyairtable_llm_tokens_total[1h])) > 100000
+        for: 10m
+        labels:
+          severity: warning
+          category: business_metrics
+        annotations:
+          summary: "Unusual LLM token usage detected"
+          description: "Token usage rate: {{ $value | humanize }} tokens/hour. This is unusually high."
+          runbook_url: "https://runbooks.pyairtable.com/unusual-token-usage"
+          business_impact: "Medium - Potential misuse or bot activity"
+
+      - alert: LowActiveUsers
+        expr: sum(increase(pyairtable_active_users_total[1h])) < 10
+        for: 30m
+        labels:
+          severity: warning
+          category: business_metrics
+        annotations:
+          summary: "Low active user count"
+          description: "Only {{ $value }} active users in the last hour. This is below normal levels."
+          runbook_url: "https://runbooks.pyairtable.com/low-active-users"
+          business_impact: "Medium - Potential service issue or low adoption"
+
+      - alert: WorkflowFailureRateHigh
+        expr: (sum(rate(pyairtable_workflow_executions_total{status="failed"}[5m])) / sum(rate(pyairtable_workflow_executions_total[5m]))) * 100 > 10
+        for: 5m
+        labels:
+          severity: warning
+          category: business_metrics
+        annotations:
+          summary: "High workflow failure rate"
+          description: "Workflow failure rate is {{ $value | humanizePercentage }} which exceeds 10%."
+          runbook_url: "https://runbooks.pyairtable.com/workflow-failures"
+          business_impact: "High - Users unable to complete workflows"
+
+  # Security Alerts
+  - name: pyairtable-security
+    interval: 30s
+    rules:
+      - alert: UnauthorizedAccessAttempts
+        expr: sum(rate(http_requests_total{job=~"pyairtable-.*",status="401"}[5m])) > 10
+        for: 2m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "High rate of unauthorized access attempts"
+          description: "{{ $value }} unauthorized access attempts per second detected."
+          runbook_url: "https://runbooks.pyairtable.com/unauthorized-access"
+          business_impact: "Critical - Potential security breach"
+          security_actions: "Review access logs, block suspicious IPs, notify security team"
+
+      - alert: SuspiciousUserActivity
+        expr: sum(rate(pyairtable_api_requests_total[5m])) by (user_id) > 100
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Suspicious user activity detected"
+          description: "User {{ $labels.user_id }} is making {{ $value }} requests per second."
+          runbook_url: "https://runbooks.pyairtable.com/suspicious-activity"
+          business_impact: "Medium - Potential abuse or bot activity"
+
+      - alert: MultipleFailedLogins
+        expr: sum(rate(pyairtable_login_attempts_total{status="failed"}[5m])) by (user_id) > 5
+        for: 2m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Multiple failed login attempts"
+          description: "{{ $value }} failed login attempts per second for user {{ $labels.user_id }}."
+          runbook_url: "https://runbooks.pyairtable.com/failed-logins"
+          business_impact: "Medium - Potential brute force attack"
+
+  # LGTM Stack Health
+  - name: pyairtable-monitoring-stack
+    interval: 60s
+    rules:
+      - alert: LokiIngestionFailing
+        expr: rate(loki_ingester_chunks_flushed_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: critical
+          category: monitoring
+        annotations:
+          summary: "Loki log ingestion failing"
+          description: "Loki is not ingesting logs. Log data may be lost."
+          runbook_url: "https://runbooks.pyairtable.com/loki-ingestion-failed"
+
+      - alert: TempoTracesNotReceived
+        expr: rate(tempo_distributor_spans_received_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: critical
+          category: monitoring
+        annotations:
+          summary: "Tempo not receiving traces"
+          description: "Tempo is not receiving trace data. Tracing may be unavailable."
+          runbook_url: "https://runbooks.pyairtable.com/tempo-not-receiving"
+
+      - alert: MimirIngestionRateLimited
+        expr: rate(cortex_distributor_ingestion_rate_limit_discarded_samples_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          category: monitoring
+        annotations:
+          summary: "Mimir ingestion rate limited"
+          description: "Mimir is discarding samples due to rate limiting."
+          runbook_url: "https://runbooks.pyairtable.com/mimir-rate-limited"
+
+      - alert: GrafanaDown
+        expr: up{job="grafana"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: monitoring
+        annotations:
+          summary: "Grafana is down"
+          description: "Grafana monitoring interface is unavailable."
+          runbook_url: "https://runbooks.pyairtable.com/grafana-down"
+
+  # Data Quality Alerts
+  - name: pyairtable-data-quality
+    interval: 60s
+    rules:
+      - alert: AirtableAPIRateLimited
+        expr: sum(rate(pyairtable_airtable_requests_total{status="429"}[5m])) > 1
+        for: 2m
+        labels:
+          severity: warning
+          category: data_quality
+        annotations:
+          summary: "Airtable API rate limiting detected"
+          description: "{{ $value }} Airtable API requests per second are being rate limited."
+          runbook_url: "https://runbooks.pyairtable.com/airtable-rate-limited"
+          business_impact: "Medium - Delayed data synchronization"
+
+      - alert: DataSyncFailures
+        expr: sum(rate(pyairtable_sync_operations_total{status="failed"}[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: data_quality
+        annotations:
+          summary: "Data synchronization failures detected"
+          description: "{{ $value }} data sync operations per second are failing."
+          runbook_url: "https://runbooks.pyairtable.com/data-sync-failures"
+          business_impact: "High - Data may be out of sync"
+
+      - alert: LongRunningQueries
+        expr: sum(rate(pyairtable_query_duration_seconds{quantile="0.95"}[5m])) > 30
+        for: 5m
+        labels:
+          severity: warning
+          category: data_quality
+        annotations:
+          summary: "Long running queries detected"
+          description: "95th percentile query duration is {{ $value }} seconds."
+          runbook_url: "https://runbooks.pyairtable.com/long-queries"
+          business_impact: "Medium - Slow user experience"

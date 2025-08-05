@@ -1,0 +1,43 @@
+{
+  "timestamp": 1754324077,
+  "airtable_connectivity": {
+    "status": "success",
+    "tables_found": 35,
+    "table_names": [
+      "Projects",
+      "Co creators and clients",
+      "Documents",
+      "Portfolio Projects",
+      "Facebook post"
+    ],
+    "response_time_ms": null
+  },
+  "gemini_connectivity": {
+    "status": "success",
+    "response": "Gemini API is working",
+    "working": true
+  },
+  "mcp_functionality": {
+    "status": "success",
+    "health_check": {
+      "status": "healthy",
+      "service": "mcp-server"
+    },
+    "root_response": {
+      "service": "mcp-server",
+      "status": "running"
+    },
+    "mcp_server_ready": true
+  },
+  "integration_scenario": {
+    "status": "error",
+    "error": "All connection attempts failed"
+  },
+  "summary": {
+    "total_tests": 4,
+    "passed_tests": 3,
+    "success_rate": 75.0,
+    "duration_seconds": 19.99,
+    "overall_status": "partial"
+  }
+}

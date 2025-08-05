@@ -1,0 +1,147 @@
+<testsuites id="" name="" tests="7" failures="2" skipped="3" errors="0" time="34.860196">
+<testsuite name="error-scenarios/error-handling.spec.js" timestamp="2025-08-05T15:38:04.629Z" hostname="Desktop Chrome" tests="7" failures="2" skipped="3" time="33.557" errors="0">
+<testcase name="Error Handling and Recovery › Execute complete error testing workflow" classname="error-scenarios/error-handling.spec.js" time="24.439">
+<system-out>
+<![CDATA[info: Agent action: error_prone_session_start {"action":"error_prone_session_start","agentId":"error-handling-test","agentName":"Error Test Agent","behavior":"error-prone","timestamp":"2025-08-05T15:38:05.660Z"}
+info: Agent action: triggering_input_validation_errors {"action":"triggering_input_validation_errors","agentId":"error-handling-test","agentName":"Error Test Agent","behavior":"error-prone","timestamp":"2025-08-05T15:38:05.662Z"}
+info: Agent action: triggering_form_errors {"action":"triggering_form_errors","agentId":"error-handling-test","agentName":"Error Test Agent","behavior":"error-prone","timestamp":"2025-08-05T15:38:06.972Z"}
+info: Agent action: triggering_chat_errors {"action":"triggering_chat_errors","agentId":"error-handling-test","agentName":"Error Test Agent","behavior":"error-prone","timestamp":"2025-08-05T15:38:08.170Z"}
+info: Agent action: triggering_navigation_errors {"action":"triggering_navigation_errors","agentId":"error-handling-test","agentName":"Error Test Agent","behavior":"error-prone","timestamp":"2025-08-05T15:38:09.347Z"}
+error: Agent error {"agentId":"error-handling-test","agentName":"Error Test Agent","behavior":"error-prone","context":{"invalidPage":"/nonexistent"},"error":"locator.count: Unknown engine \"text*\" while parsing selector text*=\"404\", text*=\"Not Found\", text*=\"Error\", [data-testid=\"error\"]","stack":"locator.count: Unknown engine \"text*\" while parsing selector text*=\"404\", text*=\"Not Found\", text*=\"Error\", [data-testid=\"error\"]\n    at ErrorProneAgent.triggerNavigationErrors (/Users/kg/IdeaProjects/pyairtable-compose/monitoring/lgtm-stack/synthetic-user-tests/src/agents/error-prone-agent.js:441:35)\n    at ErrorProneAgent.execute (/Users/kg/IdeaProjects/pyairtable-compose/monitoring/lgtm-stack/synthetic-user-tests/src/agents/error-prone-agent.js:42:7)\n    at /Users/kg/IdeaProjects/pyairtable-compose/monitoring/lgtm-stack/synthetic-user-tests/tests/error-scenarios/error-handling.spec.js:23:7\n    at /Users/kg/IdeaProjects/pyairtable-compose/monitoring/lgtm-stack/synthetic-user-tests/tests/error-scenarios/error-handling.spec.js:22:5","timestamp":"2025-08-05T15:38:12.037Z"}
+error: Agent error {"agentId":"error-handling-test","agentName":"Error Test Agent","behavior":"error-prone","context":{"invalidPage":"/admin"},"error":"locator.count: Unknown engine \"text*\" while parsing selector text*=\"404\", text*=\"Not Found\", text*=\"Error\", [data-testid=\"error\"]","stack":"locator.count: Unknown engine \"text*\" while parsing selector text*=\"404\", text*=\"Not Found\", text*=\"Error\", [data-testid=\"error\"]\n    at ErrorProneAgent.triggerNavigationErrors (/Users/kg/IdeaProjects/pyairtable-compose/monitoring/lgtm-stack/synthetic-user-tests/src/agents/error-prone-agent.js:441:35)\n    at ErrorProneAgent.execute (/Users/kg/IdeaProjects/pyairtable-compose/monitoring/lgtm-stack/synthetic-user-tests/src/agents/error-prone-agent.js:42:7)\n    at /Users/kg/IdeaProjects/pyairtable-compose/monitoring/lgtm-stack/synthetic-user-tests/tests/error-scenarios/error-handling.spec.js:23:7\n    at /Users/kg/IdeaProjects/pyairtable-compose/monitoring/lgtm-stack/synthetic-user-tests/tests/error-scenarios/error-handling.spec.js:22:5","timestamp":"2025-08-05T15:38:14.763Z"}
+info: Agent action: simulating_network_issues {"action":"simulating_network_issues","agentId":"error-handling-test","agentName":"Error Test Agent","behavior":"error-prone","timestamp":"2025-08-05T15:38:14.764Z"}
+info: Agent action: testing_error_recovery {"action":"testing_error_recovery","agentId":"error-handling-test","agentName":"Error Test Agent","behavior":"error-prone","timestamp":"2025-08-05T15:38:26.162Z"}
+info: Agent action: page_refresh_recovery_tested {"action":"page_refresh_recovery_tested","agentId":"error-handling-test","agentName":"Error Test Agent","behavior":"error-prone","timestamp":"2025-08-05T15:38:28.584Z"}
+info: Agent action: error_prone_session_complete {"action":"error_prone_session_complete","agentId":"error-handling-test","agentName":"Error Test Agent","behavior":"error-prone","errorTypes":{"network":2,"user":1,"validation":5},"recoveryAttempts":1,"timestamp":"2025-08-05T15:38:29.791Z","triggeredErrors":5}
+Error Testing Summary: {
+  "agentId": "error-handling-test",
+  "behavior": "error-prone",
+  "errorPatterns": {
+    "triggeredErrors": [
+      "empty_required_fields",
+      "invalid_email_format",
+      "invalid_number_inputs",
+      "special_characters",
+      "max_length_exceeded"
+    ],
+    "recoveryAttempts": [
+      "page_refresh_recovery"
+    ],
+    "validationErrors": [
+      "empty_required_fields",
+      "invalid_email_format",
+      "invalid_number_inputs",
+      "special_characters",
+      "max_length_exceeded"
+    ],
+    "networkErrors": [
+      "slow_network",
+      "network_failure"
+    ],
+    "userErrors": [
+      "invalid_navigation"
+    ]
+  },
+  "errorHandlingScore": 20
+}
+info: Agent cleanup completed {"agentId":"error-handling-test","agentName":"Error Test Agent","behavior":"error-prone","timestamp":"2025-08-05T15:38:29.797Z"}
+]]>
+</system-out>
+</testcase>
+<testcase name="Error Handling and Recovery › Form validation error scenarios" classname="error-scenarios/error-handling.spec.js" time="1.263">
+<system-out>
+<![CDATA[info: Agent cleanup completed {"agentId":"error-handling-test","agentName":"Error Test Agent","behavior":"error-prone","timestamp":"2025-08-05T15:38:31.072Z"}
+]]>
+</system-out>
+</testcase>
+<testcase name="Error Handling and Recovery › Chat input error scenarios" classname="error-scenarios/error-handling.spec.js" time="1.293">
+<failure message="error-handling.spec.js:146:3 Chat input error scenarios" type="FAILURE">
+<![CDATA[  [Desktop Chrome] › error-scenarios/error-handling.spec.js:146:3 › Error Handling and Recovery › Chat input error scenarios › Test rapid message sending 
+
+    TypeError: Cannot read properties of undefined (reading 'locator')
+
+      209 |
+      210 |     await test.step('Test rapid message sending', async ({ page }) => {
+    > 211 |       const chatInput = page.locator('textarea, input[placeholder*="chat"]');
+          |                              ^
+      212 |       const sendButton = page.locator('button[type="submit"]');
+      213 |       
+      214 |       if (await chatInput.count() > 0 && await sendButton.count() > 0) {
+        at /Users/kg/IdeaProjects/pyairtable-compose/monitoring/lgtm-stack/synthetic-user-tests/tests/error-scenarios/error-handling.spec.js:211:30
+        at /Users/kg/IdeaProjects/pyairtable-compose/monitoring/lgtm-stack/synthetic-user-tests/tests/error-scenarios/error-handling.spec.js:210:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/error-scenarios-error-hand-91463--Chat-input-error-scenarios-Desktop-Chrome/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/error-scenarios-error-hand-91463--Chat-input-error-scenarios-Desktop-Chrome/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/error-scenarios-error-hand-91463--Chat-input-error-scenarios-Desktop-Chrome/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[info: Agent cleanup completed {"agentId":"error-handling-test","agentName":"Error Test Agent","behavior":"error-prone","timestamp":"2025-08-05T15:38:32.411Z"}
+
+[[ATTACHMENT|error-scenarios-error-hand-91463--Chat-input-error-scenarios-Desktop-Chrome/test-failed-1.png]]
+
+[[ATTACHMENT|error-scenarios-error-hand-91463--Chat-input-error-scenarios-Desktop-Chrome/video.webm]]
+
+[[ATTACHMENT|error-scenarios-error-hand-91463--Chat-input-error-scenarios-Desktop-Chrome/error-context.md]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Error Handling and Recovery › Network error scenarios" classname="error-scenarios/error-handling.spec.js" time="6.562">
+<failure message="error-handling.spec.js:241:3 Network error scenarios" type="FAILURE">
+<![CDATA[  [Desktop Chrome] › error-scenarios/error-handling.spec.js:241:3 › Error Handling and Recovery › Network error scenarios › Test network failure recovery 
+
+    Error: locator.count: Unexpected token ""Error"" while parsing css selector "[data-testid="error"], .error, text*"Error", text*"Failed", text*"connection", text*"network"". Did you mean to CSS.escape it?
+
+      277 |       );
+      278 |       
+    > 279 |       if (await errorStates.count() > 0) {
+          |                             ^
+      280 |         console.log('Network error handling detected');
+      281 |         
+      282 |         // Look for retry mechanisms
+        at /Users/kg/IdeaProjects/pyairtable-compose/monitoring/lgtm-stack/synthetic-user-tests/tests/error-scenarios/error-handling.spec.js:279:29
+        at /Users/kg/IdeaProjects/pyairtable-compose/monitoring/lgtm-stack/synthetic-user-tests/tests/error-scenarios/error-handling.spec.js:264:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/error-scenarios-error-hand-bfc40-ery-Network-error-scenarios-Desktop-Chrome/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/error-scenarios-error-hand-bfc40-ery-Network-error-scenarios-Desktop-Chrome/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/error-scenarios-error-hand-bfc40-ery-Network-error-scenarios-Desktop-Chrome/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[Slow network load time: 2693ms
+info: Agent cleanup completed {"agentId":"error-handling-test","agentName":"Error Test Agent","behavior":"error-prone","timestamp":"2025-08-05T15:38:39.346Z"}
+
+[[ATTACHMENT|error-scenarios-error-hand-bfc40-ery-Network-error-scenarios-Desktop-Chrome/test-failed-1.png]]
+
+[[ATTACHMENT|error-scenarios-error-hand-bfc40-ery-Network-error-scenarios-Desktop-Chrome/video.webm]]
+
+[[ATTACHMENT|error-scenarios-error-hand-bfc40-ery-Network-error-scenarios-Desktop-Chrome/error-context.md]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Error Handling and Recovery › JavaScript error resilience" classname="error-scenarios/error-handling.spec.js" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Handling and Recovery › Accessibility error scenarios" classname="error-scenarios/error-handling.spec.js" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Error Handling and Recovery › Data corruption and recovery" classname="error-scenarios/error-handling.spec.js" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+</testsuites>

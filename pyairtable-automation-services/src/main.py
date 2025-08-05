@@ -1,9 +1,34 @@
 import logging
+import sys
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+# Initialize OpenTelemetry before importing other modules
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'python-services', 'shared'))
+try:
+    from telemetry import initialize_telemetry
+    
+    # Initialize telemetry for Automation Services (Port 8006)
+    tracer = initialize_telemetry(
+        service_name="automation-services",
+        service_version="1.0.0",
+        service_tier="automation",
+        otlp_endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317"),
+        resource_attributes={
+            "service.port": "8006",
+            "service.type": "automation-services",
+            "service.layer": "workflow-processing"
+        }
+    )
+    
+    logging.info("OpenTelemetry initialized for automation-services")
+except ImportError as e:
+    logging.warning(f"OpenTelemetry initialization failed: {e}")
+    tracer = None
 
 from .config import Settings
 from .database import Base, get_database_url

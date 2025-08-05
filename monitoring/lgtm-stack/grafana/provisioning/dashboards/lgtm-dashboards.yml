@@ -1,0 +1,104 @@
+# LGTM Stack Dashboard Provisioning Configuration
+# Organizes dashboards by observability pillars and business context
+
+apiVersion: 1
+
+providers:
+  # Platform Overview Dashboards
+  - name: 'platform-overview'
+    orgId: 1
+    folder: 'PyAirtable Platform'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/platform
+
+  # Infrastructure Monitoring
+  - name: 'infrastructure'
+    orgId: 1
+    folder: 'Infrastructure'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/infrastructure
+
+  # Application Performance Monitoring
+  - name: 'application-performance'
+    orgId: 1
+    folder: 'Application Performance'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/apm
+
+  # Service-Specific Dashboards
+  - name: 'service-dashboards'
+    orgId: 1
+    folder: 'PyAirtable Services'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/services
+
+  # Business Metrics
+  - name: 'business-metrics'
+    orgId: 1
+    folder: 'Business Metrics'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/business
+
+  # Cost Optimization
+  - name: 'cost-optimization'
+    orgId: 1
+    folder: 'Cost & Resource Optimization'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/cost
+
+  # LGTM Stack Monitoring
+  - name: 'lgtm-monitoring'
+    orgId: 1
+    folder: 'LGTM Stack Health'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/lgtm
+
+  # Security & Compliance
+  - name: 'security'
+    orgId: 1
+    folder: 'Security & Compliance'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 60
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/security
+
+  # Troubleshooting & Debugging
+  - name: 'troubleshooting'
+    orgId: 1
+    folder: 'Troubleshooting'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 15
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/debug

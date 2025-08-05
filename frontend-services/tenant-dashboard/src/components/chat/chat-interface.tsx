@@ -20,7 +20,7 @@ import {
 import { useRealtimeClient } from "@/lib/realtime/realtime-client"
 import { ChatMessageEvent, ChatStreamEvent, ConnectionState } from "@/lib/realtime/events"
 import { useSession } from "next-auth/react"
-import { trackEvent } from "@/app/posthog-provider"
+// Temporarily disabled: import { trackEvent } from "@/app/posthog-provider"
 import { cn } from "@/lib/utils"
 
 interface ChatMessage {
@@ -163,10 +163,10 @@ export function ChatInterface({
     setIsTyping(true)
 
     // Track chat interaction
-    trackEvent("chat_message_sent", {
-      message_length: userMessage.content.length,
-      user_id: session?.user?.id,
-    })
+    // Temporarily disabled: trackEvent("chat_message_sent", {
+    //   message_length: userMessage.content.length,
+    //   user_id: session?.user?.id,
+    // })
 
     // Send message via real-time connection
     const success = send({
@@ -322,10 +322,10 @@ export function ChatInterface({
                           variant="outline"
                           className="h-6 text-xs"
                           onClick={() => {
-                            trackEvent("chat_action_clicked", {
-                              action: action.action,
-                              message_id: message.id,
-                            })
+                            // Temporarily disabled: trackEvent("chat_action_clicked", {
+                            //   action: action.action,
+                            //   message_id: message.id,
+                            // })
                             // Handle action
                           }}
                         >

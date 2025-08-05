@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatRelativeTime, formatBytes, formatCurrency, getStatusColor } from '@/lib/utils'
-import { Search, Filter, MoreHorizontal, Users, HardDrive, CreditCard, AlertTriangle, CheckCircle, Settings } from 'lucide-react'
+import { Search, MoreHorizontal, Users, CreditCard, AlertTriangle, CheckCircle, Settings } from 'lucide-react'
 import { Tenant, FilterOptions } from '@/types'
 
 export function TenantList() {

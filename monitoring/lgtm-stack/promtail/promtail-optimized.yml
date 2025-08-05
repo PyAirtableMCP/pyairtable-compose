@@ -1,0 +1,263 @@
+# Optimized Promtail Configuration for LGTM Stack
+# Focus: Efficient log collection, processing, and forwarding to Loki
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+
+# Position file to track log reading progress
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    # Optimize batch settings for cost efficiency
+    batch_wait: 1s
+    batch_size: 1048576  # 1MB batch size
+    
+    # Retry configuration
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
+    
+    # Rate limiting
+    external_labels:
+      cluster: pyairtable-platform
+      environment: production
+
+scrape_configs:
+  # Docker container logs
+  - job_name: docker-containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: label
+            values: ["logging=promtail"]
+    
+    relabel_configs:
+      # Extract container name
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      
+      # Extract service name from container name
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/pyairtable-compose[_-]([^_-]+)[_-].*'
+        target_label: 'service'
+      
+      # Set job based on service
+      - source_labels: ['service']
+        target_label: 'job'
+      
+      # Add compose project
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
+        target_label: 'compose_project'
+      
+      # Add service from compose
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'compose_service'
+      
+      # Only scrape containers with logging label
+      - source_labels: ['__meta_docker_container_label_logging']
+        action: keep
+        regex: 'promtail'
+    
+    pipeline_stages:
+      # Parse JSON logs
+      - json:
+          expressions:
+            timestamp: time
+            level: level
+            message: msg
+            service: service
+            trace_id: trace_id
+            span_id: span_id
+            user_id: user_id
+            tenant_id: tenant_id
+      
+      # Parse timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+          fallback_formats:
+            - RFC3339
+            - "2006-01-02T15:04:05.000Z"
+      
+      # Set log level labels
+      - labels:
+          level:
+          service:
+          trace_id:
+          span_id:
+          user_id:
+          tenant_id:
+      
+      # Drop debug logs to reduce volume (cost optimization)
+      - drop:
+          source: level
+          expression: "DEBUG"
+      
+      # Drop health check logs
+      - drop:
+          source: message
+          expression: ".*health.*"
+      
+      # Rate limiting for high-volume services
+      - limit:
+          rate: 1000  # 1000 logs per second
+          burst: 2000
+          drop: true
+
+  # System logs (optional)
+  - job_name: system-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system-logs
+          __path__: /var/log/syslog
+    
+    pipeline_stages:
+      # Parse syslog format
+      - regex:
+          expression: '^(?P<timestamp>\w+\s+\d+\s+\d+:\d+:\d+)\s+(?P<hostname>\S+)\s+(?P<process>\S+):\s+(?P<message>.*)$'
+      
+      # Parse timestamp
+      - timestamp:
+          source: timestamp
+          format: "Jan 02 15:04:05"
+          location: "UTC"
+      
+      # Set labels
+      - labels:
+          hostname:
+          process:
+      
+      # Drop noisy system messages
+      - drop:
+          source: message
+          expression: ".*systemd.*|.*kernel.*|.*NetworkManager.*"
+
+  # Application specific logs (file-based)
+  - job_name: pyairtable-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: pyairtable-app-logs
+          __path__: /var/log/pyairtable/*.log
+    
+    pipeline_stages:
+      # Extract service from filename
+      - regex:
+          source: filename
+          expression: '/var/log/pyairtable/(?P<service>.*).log'
+      
+      # Try to parse as JSON first
+      - json:
+          expressions:
+            timestamp: time
+            level: level
+            message: msg
+            service: service
+            trace_id: trace_id
+            span_id: span_id
+            error: error
+      
+      # If not JSON, treat as plain text
+      - match:
+          selector: '{job="pyairtable-app-logs"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)\s+(?P<level>\w+)\s+(?P<message>.*)$'
+            
+            - timestamp:
+                source: timestamp
+                format: RFC3339
+      
+      # Set labels
+      - labels:
+          service:
+          level:
+          trace_id:
+          span_id:
+      
+      # Sample high-volume logs (cost optimization)
+      - sampling:
+          rate: 0.1  # Sample 10% of logs
+          selector: '{level="INFO"}'
+
+  # Kubernetes pod logs (if running in k8s)
+  - job_name: kubernetes-pods
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - pyairtable
+            - monitoring
+    
+    relabel_configs:
+      # Only scrape pods with logging annotation
+      - source_labels: [__meta_kubernetes_pod_annotation_logging_enabled]
+        action: keep
+        regex: 'true'
+      
+      # Extract pod information
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        target_label: app
+      
+      - source_labels: [__meta_kubernetes_pod_container_name]
+        target_label: container
+      
+      # Set the log path
+      - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+        target_label: __path__
+        separator: '/'
+        replacement: '/var/log/pods/*$1/*.log'
+    
+    pipeline_stages:
+      # Parse Kubernetes log format
+      - cri: {}
+      
+      # Parse JSON if present
+      - json:
+          expressions:
+            level: level
+            message: msg
+            service: service
+            trace_id: trace_id
+            span_id: span_id
+      
+      # Set labels
+      - labels:
+          level:
+          service:
+          trace_id:
+          span_id:
+      
+      # Drop verbose logs
+      - drop:
+          source: level
+          expression: "DEBUG|TRACE"
+
+# Limits configuration for resource management
+limits_config:
+  # Rate limiting per stream
+  readline_rate: 10000        # 10k lines per second per stream
+  readline_burst: 20000       # 20k line burst
+  
+  # Maximum streams
+  max_streams: 10000          # 10k streams max
+  
+  # Deduplication settings
+  max_line_size: 256kb        # 256KB max line size
+  max_line_size_truncate: true

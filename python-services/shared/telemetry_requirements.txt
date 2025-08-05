@@ -15,3 +15,6 @@ opentelemetry-distro==0.42b0
 opentelemetry-propagator-b3==1.21.0
 opentelemetry-propagator-jaeger==1.21.0
 opentelemetry-semantic-conventions==0.42b0
+
+# Structured logging for Loki integration
+structlog==23.2.0

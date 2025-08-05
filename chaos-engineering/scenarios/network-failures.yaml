@@ -1,0 +1,97 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: api-gateway-network-delay
+  namespace: chaos-engineering
+spec:
+  action: delay
+  mode: one
+  selector:
+    namespaces:
+      - pyairtable
+    labelSelectors:
+      "app": "api-gateway"
+  delay:
+    latency: "200ms"
+    correlation: "100"
+    jitter: "50ms"
+  duration: "5m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: database-connection-loss
+  namespace: chaos-engineering
+spec:
+  action: loss
+  mode: one
+  selector:
+    namespaces:
+      - pyairtable
+    labelSelectors:
+      "tier": "database"
+  loss:
+    loss: "10"
+    correlation: "100"
+  duration: "2m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: service-partition
+  namespace: chaos-engineering
+spec:
+  action: partition
+  mode: all
+  selector:
+    namespaces:
+      - pyairtable
+    labelSelectors:
+      "app": "auth-service"
+  direction: to
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - pyairtable
+      labelSelectors:
+        "app": "platform-services"
+  duration: "3m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: external-api-corruption
+  namespace: chaos-engineering
+spec:
+  action: corrupt
+  mode: one
+  selector:
+    namespaces:
+      - pyairtable
+    labelSelectors:
+      "component": "airtable-connector"
+  corrupt:
+    corrupt: "20"
+    correlation: "100"
+  duration: "2m"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: high-latency-simulation
+  namespace: chaos-engineering
+spec:
+  action: delay
+  mode: fixed-percent
+  value: "50"
+  selector:
+    namespaces:
+      - pyairtable
+    labelSelectors:
+      "tier": "backend"
+  delay:
+    latency: "1s"
+    correlation: "100"
+    jitter: "200ms"
+  duration: "10m"

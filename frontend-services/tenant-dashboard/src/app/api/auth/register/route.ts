@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
-import bcrypt from "bcryptjs"
 import { z } from "zod"
 
-const prisma = new PrismaClient()
+// Auth service base URL
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || "http://localhost:8007"
 
 const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -22,45 +21,42 @@ export async function POST(request: NextRequest) {
     const validatedData = registerSchema.parse(body)
     const { name, email, password } = validatedData
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
+    // Split name into first and last name
+    const nameParts = name.split(' ')
+    const firstName = nameParts[0] || name
+    const lastName = nameParts.slice(1).join(' ') || 'User'
+
+    // Call auth service to register user
+    const response = await fetch(`${AUTH_SERVICE_URL}/auth/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        first_name: firstName,
+        last_name: lastName,
+        tenant_id: "550e8400-e29b-41d4-a716-446655440000", // Default tenant ID
+      }),
     })
 
-    if (existingUser) {
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: "Registration failed" }))
       return NextResponse.json(
-        { error: "A user with this email already exists" },
-        { status: 400 }
+        { error: errorData.error || "Registration failed" },
+        { status: response.status }
       )
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12)
-
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        createdAt: true,
-      },
-    })
-
-    // Track registration event (if PostHog is available)
-    // This would be handled client-side or via server-side PostHog client
+    const user = await response.json()
 
     return NextResponse.json(
       { 
         message: "User created successfully",
         user: {
           id: user.id,
-          name: user.name,
+          name: `${user.first_name} ${user.last_name}`,
           email: user.email,
         }
       },
@@ -73,14 +69,6 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: error.errors[0].message },
-        { status: 400 }
-      )
-    }
-
-    // Handle Prisma errors
-    if (error instanceof Error && error.message.includes("Unique constraint")) {
-      return NextResponse.json(
-        { error: "A user with this email already exists" },
         { status: 400 }
       )
     }

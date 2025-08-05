@@ -1,0 +1,190 @@
+# LGTM Stack Unified Datasources Configuration
+# Integrates Loki, Grafana, Tempo, and Mimir for comprehensive observability
+
+apiVersion: 1
+
+datasources:
+  # Mimir - Long-term metrics storage (primary metrics source)
+  - name: Mimir
+    type: prometheus
+    access: proxy
+    url: http://mimir:8080/prometheus
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: "15s"
+      queryTimeout: "60s"
+      httpMethod: POST
+      # Enable recording rules and alerting
+      manageAlerts: true
+      prometheusType: Mimir
+      prometheusVersion: "2.40.0"
+      # Custom headers for multi-tenancy
+      customQueryParameters: ""
+      # Query optimization
+      incrementalQuerying: true
+      incrementalQueryOverlapWindow: "10m"
+    # Custom headers for Mimir
+    httpHeaderName1: "X-Scope-OrgID"
+    httpHeaderValue1: "pyairtable"
+    version: 1
+
+  # Prometheus - Short-term metrics (if keeping legacy)
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: false
+    editable: true
+    jsonData:
+      timeInterval: "15s"
+      queryTimeout: "60s"
+      httpMethod: POST
+      prometheusType: Prometheus
+      prometheusVersion: "2.45.0"
+    version: 1
+
+  # Tempo - Distributed tracing
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    editable: true
+    jsonData:
+      # Trace to logs correlation
+      tracesToLogsV2:
+        datasourceUid: 'loki'
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+        tags: [
+          { key: 'service.name', value: 'service' },
+          { key: 'span.kind', value: 'span_kind' },
+          { key: 'trace_id', value: 'trace_id' }
+        ]
+        filterByTraceID: true
+        filterBySpanID: false
+        customQuery: true
+        query: '{service="${__trace.service}"} |= "${__trace.traceID}"'
+      
+      # Trace to metrics correlation
+      tracesToMetricsV2:
+        datasourceUid: 'mimir'
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+        tags: [
+          { key: 'service.name', value: 'service' },
+          { key: 'operation', value: 'operation' }
+        ]
+        queries:
+          - name: 'Request Rate'
+            query: 'rate(http_requests_total{service="${__trace.service}"}[5m])'
+          - name: 'Error Rate'
+            query: 'rate(http_requests_total{service="${__trace.service}", status=~"5.."}[5m])'
+          - name: 'Duration'
+            query: 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="${__trace.service}"}[5m]))'
+      
+      # Service map
+      serviceMap:
+        datasourceUid: 'mimir'
+      
+      # Node graph
+      nodeGraph:
+        enabled: true
+      
+      # Search configuration
+      search:
+        hide: false
+      
+      # Span bar configuration
+      spanBar:
+        type: 'Tag'
+        tag: 'http.status_code'
+    version: 1
+
+  # Loki - Log aggregation
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: true
+    isDefault: false
+    jsonData:
+      # Derived fields for trace correlation
+      derivedFields:
+        - datasourceUid: 'tempo'
+          matcherRegex: '(?:trace_id|traceId|traceID)(?:=|:|\s+)([a-f0-9]+)'
+          name: 'TraceID'
+          url: '$${__value.raw}'
+          urlDisplayLabel: 'View Trace'
+        
+        - datasourceUid: 'tempo'
+          matcherRegex: '(?:span_id|spanId|spanID)(?:=|:|\s+)([a-f0-9]+)'
+          name: 'SpanID'
+          url: '$${__value.raw}'
+          urlDisplayLabel: 'View Span'
+      
+      # Alert configuration
+      alertmanager:
+        handleGrafanaManagedAlerts: true
+        implementation: prometheus
+      
+      # Log browser settings
+      logBrowser:
+        enabled: true
+      
+      # Logs to metrics correlation
+      logLevelFields: ['level', 'severity', 'log_level']
+    version: 1
+
+  # OTLP Metrics (from OpenTelemetry Collector)
+  - name: OTLP-Metrics
+    type: prometheus
+    access: proxy
+    url: http://otel-collector:8889
+    editable: true
+    isDefault: false
+    jsonData:
+      timeInterval: "15s"
+      queryTimeout: "30s"
+      httpMethod: GET
+      prometheusType: Prometheus
+      prometheusVersion: "2.40.0"
+    version: 1
+
+  # TestData (for dashboard development)
+  - name: TestData
+    type: testdata
+    access: proxy
+    isDefault: false
+    editable: false
+    version: 1
+
+  # Jaeger (legacy - for migration period)
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger-all-in-one:16686
+    editable: true
+    isDefault: false
+    jsonData:
+      # Migration helper - traces to logs
+      tracesToLogsV2:
+        datasourceUid: 'loki'
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+        tags: [
+          { key: 'service.name', value: 'service' },
+          { key: 'span.kind', value: 'span_kind' }
+        ]
+        filterByTraceID: true
+        filterBySpanID: false
+        customQuery: true
+        query: 'trace_id="${__trace.traceID}"'
+    version: 1
+
+# Delete datasources not in this list (cleanup)
+deleteDatasources:
+  - name: "Old-Prometheus"
+    orgId: 1
+  - name: "Old-Jaeger"  
+    orgId: 1

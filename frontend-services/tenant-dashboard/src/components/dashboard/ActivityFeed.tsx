@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -128,9 +129,11 @@ export function ActivityFeed({
                 <div className="flex-shrink-0">
                   <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium">
                     {activity.user.avatar ? (
-                      <img 
+                      <Image 
                         src={activity.user.avatar} 
                         alt={activity.user.fullName}
+                        width={32}
+                        height={32}
                         className="w-full h-full rounded-full"
                       />
                     ) : (

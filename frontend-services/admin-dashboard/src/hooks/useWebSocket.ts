@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { RealtimeUpdate, WebSocketMessage } from '@/types'
 
@@ -25,7 +25,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const [error, setError] = useState<string | null>(null)
   const socketRef = useRef<Socket | null>(null)
 
-  const connect = () => {
+  const connect = useCallback(() => {
     if (socketRef.current?.connected) return
 
     try {
@@ -69,13 +69,13 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       setError(err instanceof Error ? err.message : 'Connection failed')
       onError?.(err)
     }
-  }
+  }, [url, onConnect, onDisconnect, onError, onMessage])
 
-  const disconnect = () => {
+  const disconnect = useCallback(() => {
     socketRef.current?.disconnect()
     socketRef.current = null
     setIsConnected(false)
-  }
+  }, [])
 
   const send = (event: string, data: any) => {
     if (socketRef.current?.connected) {
@@ -103,7 +103,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     return () => {
       disconnect()
     }
-  }, [autoConnect, url])
+  }, [autoConnect, url, connect, disconnect])
 
   return {
     isConnected,

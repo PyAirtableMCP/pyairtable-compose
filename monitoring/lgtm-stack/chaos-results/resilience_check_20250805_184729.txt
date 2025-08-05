@@ -1,0 +1,3 @@
+endpoint_check: http://localhost:8007/health: 000000
+endpoint_check: http://localhost:8007/auth/verify: 000000
+endpoint_check: http://localhost:8007/analytics/metrics: 000000

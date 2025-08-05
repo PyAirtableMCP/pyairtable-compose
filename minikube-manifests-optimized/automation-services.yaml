@@ -1,0 +1,178 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: automation-services
+  namespace: pyairtable-dev
+  labels:
+    app: automation-services
+    component: automation
+    environment: development
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: automation-services
+  template:
+    metadata:
+      labels:
+        app: automation-services
+        component: automation
+        environment: development
+    spec:
+      containers:
+      - name: automation-services
+        image: pyairtable-automation-services:latest
+        imagePullPolicy: Never
+        ports:
+        - name: http
+          containerPort: 8006
+          protocol: TCP
+        
+        env:
+        - name: PORT
+          value: "8006"
+        - name: HOST
+          value: "0.0.0.0"
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: pyairtable-dev-config
+              key: ENVIRONMENT
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: pyairtable-dev-config
+              key: LOG_LEVEL
+        - name: ENABLE_DEBUG_ENDPOINTS
+          valueFrom:
+            configMapKeyRef:
+              name: pyairtable-dev-config
+              key: ENABLE_DEBUG_ENDPOINTS
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: pyairtable-dev-secrets
+              key: API_KEY
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: pyairtable-dev-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: pyairtable-dev-secrets
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: pyairtable-dev-secrets
+              key: POSTGRES_DB
+        - name: MCP_SERVER_URL
+          value: "http://mcp-server:8001"
+        - name: PLATFORM_SERVICES_URL
+          value: "http://platform-services:8007"
+        - name: MAX_FILE_SIZE
+          valueFrom:
+            secretKeyRef:
+              name: pyairtable-dev-secrets
+              key: MAX_FILE_SIZE
+        - name: UPLOAD_DIR
+          value: "/app/uploads"
+        - name: ALLOWED_EXTENSIONS
+          value: "pdf,doc,docx,txt,csv,xlsx,json,yaml"
+        
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "300m"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8006
+          initialDelaySeconds: 20
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8006
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        volumeMounts:
+        - name: app-logs
+          mountPath: /app/logs
+        - name: uploads
+          mountPath: /app/uploads
+        - name: processing
+          mountPath: /app/processing
+        
+        securityContext:
+          runAsNonRoot: false
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+      
+      volumes:
+      - name: app-logs
+        emptyDir: {}
+      - name: uploads
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: processing
+        emptyDir:
+          sizeLimit: 500Mi
+      
+      terminationGracePeriodSeconds: 15
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: automation-services
+  namespace: pyairtable-dev
+  labels:
+    app: automation-services
+    component: automation
+    environment: development
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8006
+    targetPort: 8006
+    protocol: TCP
+  selector:
+    app: automation-services
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: automation-services-external
+  namespace: pyairtable-dev
+  labels:
+    app: automation-services
+    component: automation-external
+    environment: development
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 8006
+    targetPort: 8006
+    nodePort: 30006
+    protocol: TCP
+  selector:
+    app: automation-services

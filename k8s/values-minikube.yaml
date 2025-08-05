@@ -541,9 +541,9 @@ ingress:
 secrets:
   # Development placeholders - override with actual values
   apiKey: "dev-api-key-replace-me"
-  geminiApiKey: ""  # Set via kubectl or environment
-  airtableToken: ""  # Set via kubectl or environment
-  airtableBase: ""   # Set via kubectl or environment
+  geminiApiKey: "AIzaSyCwAGazN5GMCu03ZYLFWWTkdLRKFQb-OxU"  # Set via kubectl or environment
+  airtableToken: "patewow2oXotOdgpz.c7e78f8a5d17f20dfcbe7d32736dd06f56916af7e1549d88ed8f6791a2eaf654"  # Set via kubectl or environment
+  airtableBase: "appVLUAubH5cFWhMV"   # Set via kubectl or environment
   jwtSecret: "dev-jwt-secret-replace-me-32-chars"
   nextauthSecret: "dev-nextauth-secret-replace-me-32-chars"
   redisPassword: "dev-redis-password"

@@ -1,0 +1,272 @@
+# Performance Service Level Objectives (SLOs) for PyAirtable Platform
+# These define the expected performance targets for all services
+
+global_slos:
+  availability: 99.9%  # 8.76 hours downtime per year
+  error_budget: 0.1%   # Maximum error rate
+  recovery_time: 300   # Maximum recovery time in seconds
+
+service_slos:
+  # API Gateway - Main entry point
+  api-gateway:
+    response_time:
+      p50: 100ms
+      p95: 500ms
+      p99: 1000ms
+      p99.9: 2000ms
+    throughput:
+      normal: 1000      # requests per second
+      peak: 2000        # requests per second
+      burst: 5000       # requests per second (short term)
+    error_rate:
+      max: 0.1%         # Maximum 0.1% error rate
+      critical: 1%      # Alert threshold
+    availability: 99.95%
+    
+  # LLM Orchestrator - AI/ML processing
+  llm-orchestrator:
+    response_time:
+      p50: 500ms        # AI processing is slower
+      p95: 2000ms
+      p99: 5000ms
+      p99.9: 10000ms
+    throughput:
+      normal: 100       # AI requests per second
+      peak: 200
+      burst: 500
+    error_rate:
+      max: 1%           # AI can have higher error rates
+      critical: 5%
+    availability: 99.9%
+    
+  # MCP Server - Protocol implementation
+  mcp-server:
+    response_time:
+      p50: 50ms
+      p95: 200ms
+      p99: 500ms
+      p99.9: 1000ms
+    throughput:
+      normal: 2000
+      peak: 4000
+      burst: 8000
+    error_rate:
+      max: 0.05%
+      critical: 0.5%
+    availability: 99.95%
+    
+  # Airtable Gateway - Direct API integration
+  airtable-gateway:
+    response_time:
+      p50: 200ms        # External API calls are slower
+      p95: 1000ms
+      p99: 2000ms
+      p99.9: 5000ms
+    throughput:
+      normal: 500       # Limited by Airtable API rate limits
+      peak: 1000
+      burst: 1500
+    error_rate:
+      max: 0.5%         # External API dependency
+      critical: 2%
+    availability: 99.9%
+    
+  # Platform Services - Core business logic
+  platform-services:
+    response_time:
+      p50: 100ms
+      p95: 500ms
+      p99: 1000ms
+      p99.9: 2000ms
+    throughput:
+      normal: 1500
+      peak: 3000
+      burst: 6000
+    error_rate:
+      max: 0.1%
+      critical: 1%
+    availability: 99.95%
+    
+  # Automation Services - Background processing
+  automation-services:
+    response_time:
+      p50: 200ms
+      p95: 1000ms
+      p99: 3000ms
+      p99.9: 10000ms    # Some automation can be slow
+    throughput:
+      normal: 200
+      peak: 500
+      burst: 1000
+    error_rate:
+      max: 1%           # Automation can have higher error tolerance
+      critical: 5%
+    availability: 99.9%
+    
+  # Saga Orchestrator - Transaction coordination
+  saga-orchestrator:
+    response_time:
+      p50: 100ms
+      p95: 500ms
+      p99: 2000ms
+      p99.9: 5000ms
+    throughput:
+      normal: 300
+      peak: 600
+      burst: 1200
+    error_rate:
+      max: 0.5%
+      critical: 2%
+    availability: 99.9%
+    
+  # Redis - Caching layer
+  redis:
+    response_time:
+      p50: 1ms
+      p95: 5ms
+      p99: 10ms
+      p99.9: 50ms
+    throughput:
+      normal: 10000
+      peak: 20000
+      burst: 50000
+    error_rate:
+      max: 0.01%
+      critical: 0.1%
+    availability: 99.99%
+
+# Database Performance SLOs
+database_slos:
+  postgresql:
+    connection_pool:
+      max_connections: 100
+      idle_timeout: 300s
+      max_lifetime: 3600s
+    query_performance:
+      simple_queries: 10ms      # SELECT by primary key
+      complex_queries: 100ms    # JOINs and aggregations
+      reporting_queries: 1000ms # Analytics queries
+      full_text_search: 500ms   # Search queries
+    throughput:
+      reads_per_sec: 5000
+      writes_per_sec: 1000
+      transactions_per_sec: 2000
+
+# Load Testing Scenarios
+load_scenarios:
+  smoke_test:
+    description: "Basic functionality validation"
+    users: 1
+    duration: "1m"
+    ramp_up: "0s"
+    
+  load_test:
+    description: "Normal expected load"
+    users: 50
+    duration: "10m"
+    ramp_up: "2m"
+    
+  stress_test:
+    description: "Above normal load to find breaking point"
+    users: 200
+    duration: "15m"
+    ramp_up: "5m"
+    
+  spike_test:
+    description: "Sudden load increase"
+    users: 500
+    duration: "2m"
+    ramp_up: "10s"
+    
+  volume_test:
+    description: "Large amount of data processing"
+    users: 100
+    duration: "30m"
+    ramp_up: "5m"
+    data_multiplier: 10
+    
+  soak_test:
+    description: "Extended duration for memory leak detection"
+    users: 30
+    duration: "4h"
+    ramp_up: "10m"
+    
+  breakpoint_test:
+    description: "Find system breaking point"
+    users: 1000
+    duration: "20m"
+    ramp_up: "10m"
+
+# Performance Budgets
+performance_budgets:
+  frontend:
+    first_contentful_paint: 1.5s
+    largest_contentful_paint: 2.5s
+    first_input_delay: 100ms
+    cumulative_layout_shift: 0.1
+    total_blocking_time: 300ms
+    
+  api_endpoints:
+    auth_login: 500ms
+    user_profile: 200ms
+    workspace_list: 300ms
+    table_records: 1000ms
+    search_query: 2000ms
+    
+  database_queries:
+    user_lookup: 10ms
+    workspace_query: 50ms
+    record_fetch: 100ms
+    analytics_query: 2000ms
+    full_text_search: 500ms
+
+# Alert Thresholds
+alert_thresholds:
+  critical:
+    response_time_p95_breach: "2x SLO"
+    error_rate_breach: "5x SLO"
+    availability_breach: "Below 99%"
+    memory_usage: "Above 90%"
+    cpu_usage: "Above 90%"
+    disk_usage: "Above 85%"
+    
+  warning:
+    response_time_p95_breach: "1.5x SLO"
+    error_rate_breach: "2x SLO"
+    availability_breach: "Below 99.5%"
+    memory_usage: "Above 80%"
+    cpu_usage: "Above 80%"
+    disk_usage: "Above 75%"
+
+# Test Data Configuration
+test_data:
+  users:
+    count: 1000
+    distribution:
+      admin: 5%
+      power_user: 15%
+      regular_user: 70%
+      read_only: 10%
+      
+  workspaces:
+    count: 500
+    avg_tables_per_workspace: 10
+    avg_records_per_table: 1000
+    
+  concurrent_sessions:
+    peak_hours: 200
+    normal_hours: 50
+    off_hours: 10
+
+# Resource Limits for Testing
+resource_limits:
+  test_environment:
+    cpu_cores: 8
+    memory_gb: 16
+    disk_gb: 100
+    network_mbps: 1000
+    
+  load_generators:
+    max_concurrent_users: 2000
+    max_requests_per_second: 10000
+    max_test_duration: "8h"

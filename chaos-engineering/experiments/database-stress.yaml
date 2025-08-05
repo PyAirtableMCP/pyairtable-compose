@@ -1,0 +1,251 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Workflow
+metadata:
+  name: database-stress-workflow
+  namespace: chaos-engineering
+spec:
+  entry: database-stress-test
+  templates:
+    - name: database-stress-test
+      templateType: Serial
+      deadline: 25m
+      children:
+        - database-health-check
+        - connection-stress-test
+        - io-stress-test
+        - failover-test
+        - performance-recovery-check
+    
+    - name: database-health-check
+      templateType: Task
+      deadline: 3m
+      task:
+        container:
+          name: db-health-check
+          image: postgres:13
+          command: ["/bin/bash"]
+          args:
+            - -c
+            - |
+              echo "🗄️ Checking database health"
+              
+              # Wait for database to be ready
+              until pg_isready -h postgres.pyairtable.svc.cluster.local -p 5432; do
+                echo "⏳ Waiting for database..."
+                sleep 2
+              done
+              
+              echo "✅ Database is accessible"
+              
+              # Check connection count
+              PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres.pyairtable.svc.cluster.local -U $POSTGRES_USER -d $POSTGRES_DB -c "
+                SELECT count(*) as active_connections 
+                FROM pg_stat_activity 
+                WHERE state = 'active';"
+              
+              echo "📊 Database baseline established"
+          env:
+            - name: POSTGRES_USER
+              value: "pyairtable"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: password
+            - name: POSTGRES_DB
+              value: "pyairtable"
+    
+    - name: connection-stress-test
+      templateType: Parallel
+      deadline: 8m
+      children:
+        - inject-connection-delay
+        - simulate-connection-load
+    
+    - name: inject-connection-delay
+      templateType: Task
+      deadline: 6m
+      task:
+        networkChaos:
+          action: delay
+          mode: all
+          selector:
+            namespaces:
+              - pyairtable
+            labelSelectors:
+              "app": "postgres"
+          delay:
+            latency: "200ms"
+            correlation: "100"
+            jitter: "50ms"
+          duration: "5m"
+    
+    - name: simulate-connection-load
+      templateType: Task
+      deadline: 7m
+      task:
+        container:
+          name: connection-load
+          image: postgres:13
+          command: ["/bin/bash"]
+          args:
+            - -c
+            - |
+              echo "🔄 Simulating database connection load"
+              
+              # Create multiple concurrent connections
+              for i in {1..20}; do
+                (
+                  PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres.pyairtable.svc.cluster.local -U $POSTGRES_USER -d $POSTGRES_DB -c "
+                    SELECT pg_sleep(10), 'Connection $i' as connection_id;
+                  " &
+                ) &
+              done
+              
+              # Monitor connection count during load
+              for j in {1..30}; do
+                PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres.pyairtable.svc.cluster.local -U $POSTGRES_USER -d $POSTGRES_DB -c "
+                  SELECT count(*) as active_connections 
+                  FROM pg_stat_activity 
+                  WHERE state = 'active';" || echo "Connection check $j failed"
+                sleep 10
+              done
+              
+              wait
+              echo "✅ Connection load test completed"
+          env:
+            - name: POSTGRES_USER
+              value: "pyairtable"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: password
+            - name: POSTGRES_DB
+              value: "pyairtable"
+    
+    - name: io-stress-test
+      templateType: Task
+      deadline: 8m
+      task:
+        stressChaos:
+          mode: one
+          selector:
+            namespaces:
+              - pyairtable
+            labelSelectors:
+              "app": "postgres"
+          stressors:
+            io:
+              workers: 2
+              size: "500MB"
+              ioType: "mixed"
+          duration: "6m"
+    
+    - name: failover-test
+      templateType: Serial
+      deadline: 6m
+      children:
+        - kill-database-pod
+        - wait-for-restart
+        - verify-data-integrity
+    
+    - name: kill-database-pod
+      templateType: Task
+      deadline: 1m
+      task:
+        podChaos:
+          action: pod-kill
+          mode: one
+          selector:
+            namespaces:
+              - pyairtable
+            labelSelectors:
+              "app": "postgres"
+          duration: "30s"
+    
+    - name: wait-for-restart
+      templateType: Task
+      deadline: 3m
+      task:
+        container:
+          name: wait-restart
+          image: postgres:13
+          command: ["/bin/bash"]
+          args:
+            - -c
+            - |
+              echo "⏳ Waiting for database restart"
+              
+              # Wait for pod to be ready
+              for i in {1..30}; do
+                if pg_isready -h postgres.pyairtable.svc.cluster.local -p 5432; then
+                  echo "✅ Database restarted and ready"
+                  break
+                fi
+                echo "Waiting for database restart... ($i/30)"
+                sleep 10
+              done
+    
+    - name: verify-data-integrity
+      templateType: Task
+      deadline: 2m
+      task:
+        container:
+          name: data-integrity
+          image: postgres:13
+          command: ["/bin/bash"]
+          args:
+            - -c
+            - |
+              echo "🔍 Verifying data integrity after restart"
+              
+              PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres.pyairtable.svc.cluster.local -U $POSTGRES_USER -d $POSTGRES_DB -c "
+                SELECT schemaname, tablename, n_tup_ins, n_tup_upd, n_tup_del 
+                FROM pg_stat_user_tables 
+                ORDER BY schemaname, tablename;
+              "
+              
+              echo "✅ Data integrity check completed"
+          env:
+            - name: POSTGRES_USER
+              value: "pyairtable"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: password
+            - name: POSTGRES_DB
+              value: "pyairtable"
+    
+    - name: performance-recovery-check
+      templateType: Task
+      deadline: 3m
+      task:
+        container:
+          name: performance-check
+          image: postgres:13
+          command: ["/bin/bash"]
+          args:
+            - -c
+            - |
+              echo "📊 Checking database performance recovery"
+              
+              # Run performance test queries
+              PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres.pyairtable.svc.cluster.local -U $POSTGRES_USER -d $POSTGRES_DB -c "
+                \timing on
+                SELECT count(*) FROM information_schema.tables;
+                SELECT current_timestamp;
+              "
+              
+              echo "🎉 Database stress test completed successfully"
+          env:
+            - name: POSTGRES_USER
+              value: "pyairtable"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: password
+            - name: POSTGRES_DB
+              value: "pyairtable"

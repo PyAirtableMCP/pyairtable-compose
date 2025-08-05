@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -97,7 +98,7 @@ export function Header({ onMenuToggle, className }: HeaderProps) {
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-semibold">
                 {tenant.avatar ? (
-                  <img src={tenant.avatar} alt={tenant.name} className="w-full h-full rounded-lg" />
+                  <Image src={tenant.avatar} alt={tenant.name} width={32} height={32} className="w-full h-full rounded-lg" />
                 ) : (
                   getInitials(tenant.name)
                 )}
@@ -214,7 +215,7 @@ export function Header({ onMenuToggle, className }: HeaderProps) {
               >
                 <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium">
                   {user.avatar ? (
-                    <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full" />
+                    <Image src={user.avatar} alt={user.name} width={32} height={32} className="w-full h-full rounded-full" />
                   ) : (
                     getInitials(user.name)
                   )}

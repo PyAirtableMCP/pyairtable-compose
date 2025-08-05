@@ -17,8 +17,9 @@ RUN apt-get update && apt-get install -y \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy requirements
+# Copy project files
 COPY pyproject.toml /tmp/
+COPY src/ /tmp/src/
 WORKDIR /tmp
 
 # Install Python dependencies
@@ -52,9 +53,6 @@ WORKDIR /app
 COPY src/ ./src/
 COPY pyproject.toml ./
 
-# Install the package in editable mode
-RUN pip install -e .
-
 # Change ownership
 RUN chown -R appuser:appuser /app
 
@@ -68,5 +66,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Expose port
 EXPOSE 8008
 
-# Run the application
+# Set Python path and run the application
+ENV PYTHONPATH="/app/src"
 CMD ["python", "-m", "saga_orchestrator.main"]

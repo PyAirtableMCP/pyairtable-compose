@@ -16,20 +16,20 @@ export function createStoreSlice<T extends object, E extends T = T>(
 }
 
 // Helper for creating async slices
+interface AsyncSliceState<TData = any> {
+  data: TData | null
+  loading: boolean
+  error: string | null
+  fetch: () => Promise<void>
+  setData: (data: TData) => void
+  clear: () => void
+}
+
 export function createAsyncSlice<T, TData = any>(
   name: string,
   fetchFn: () => Promise<TData>
 ) {
-  return createStoreSlice<T & {
-    [K in keyof T]: T[K]
-  } & {
-    [K in `${string}Data`]: TData | null
-    [K in `${string}Loading`]: boolean
-    [K in `${string}Error`]: string | null
-    [K in `fetch${string}`]: () => Promise<void>
-    [K in `set${string}Data`]: (data: TData) => void
-    [K in `clear${string}`]: () => void
-  }>((set, get) => {
+  return createStoreSlice<T & AsyncSliceState<TData>>((set, get) => {
     const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1)
     
     return {

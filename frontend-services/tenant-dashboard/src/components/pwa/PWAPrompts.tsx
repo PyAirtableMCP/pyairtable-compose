@@ -286,7 +286,7 @@ export function ConnectionStatus() {
     <div className="fixed top-0 left-0 right-0 z-50">
       <Alert variant="destructive" className="rounded-none border-x-0 border-t-0">
         <AlertDescription className="text-center">
-          You're currently offline. Some features may not be available.
+          You&apos;re currently offline. Some features may not be available.
         </AlertDescription>
       </Alert>
     </div>

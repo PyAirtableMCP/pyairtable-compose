@@ -1,0 +1,242 @@
+# Hot Reload Development Configuration
+# Volume mounts and configuration for live development
+# Enables code changes without container rebuilds
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hot-reload-config
+  namespace: pyairtable-dev
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: development
+data:
+  # Python hot reload configuration
+  python-hot-reload.py: |
+    import os
+    import sys
+    import time
+    import subprocess
+    from watchdog.observers import Observer
+    from watchdog.events import FileSystemEventHandler
+    
+    class CodeChangeHandler(FileSystemEventHandler):
+        def __init__(self, service_name):
+            self.service_name = service_name
+            self.last_reload = 0
+            
+        def on_modified(self, event):
+            if event.is_directory:
+                return
+                
+            # Only reload for Python files
+            if not event.src_path.endswith('.py'):
+                return
+                
+            # Debounce reloads (max once per 3 seconds)
+            now = time.time()
+            if now - self.last_reload < 3:
+                return
+                
+            print(f"[HOT-RELOAD] Code change detected in {event.src_path}")
+            print(f"[HOT-RELOAD] Reloading {self.service_name}...")
+            
+            # Send SIGUSR1 to trigger reload (if supported)
+            try:
+                subprocess.run(['pkill', '-USR1', '-f', self.service_name], check=False)
+                print(f"[HOT-RELOAD] Reload signal sent to {self.service_name}")
+            except Exception as e:
+                print(f"[HOT-RELOAD] Failed to send reload signal: {e}")
+                
+            self.last_reload = now
+    
+    def start_watcher(service_name, watch_path):
+        event_handler = CodeChangeHandler(service_name)
+        observer = Observer()
+        observer.schedule(event_handler, watch_path, recursive=True)
+        observer.start()
+        
+        print(f"[HOT-RELOAD] Watching {watch_path} for {service_name}")
+        
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            observer.stop()
+        observer.join()
+    
+    if __name__ == "__main__":
+        service = os.environ.get('SERVICE_NAME', 'unknown')
+        watch_dir = os.environ.get('WATCH_DIR', '/app/src')
+        start_watcher(service, watch_dir)
+  
+  # Development startup script
+  dev-entrypoint.sh: |
+    #!/bin/bash
+    set -e
+    
+    echo "[DEV] Starting development mode for $SERVICE_NAME"
+    echo "[DEV] Hot reload: $ENABLE_HOT_RELOAD"
+    echo "[DEV] Debug mode: $ENABLE_DEBUG"
+    
+    # Start hot reload watcher in background if enabled
+    if [[ "$ENABLE_HOT_RELOAD" == "true" ]]; then
+        echo "[DEV] Starting hot reload watcher..."
+        python /dev-config/python-hot-reload.py &
+        HOT_RELOAD_PID=$!
+        
+        # Cleanup function
+        cleanup() {
+            echo "[DEV] Stopping hot reload watcher..."
+            kill $HOT_RELOAD_PID 2>/dev/null || true
+            exit 0
+        }
+        trap cleanup SIGTERM SIGINT
+    fi
+    
+    # Start the main application
+    echo "[DEV] Starting main application..."
+    exec "$@"
+
+---
+# PersistentVolume for development code
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: dev-code-pv
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: development
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: dev-code
+  hostPath:
+    path: /tmp/pyairtable-dev-code
+    type: DirectoryOrCreate
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dev-code-pvc
+  namespace: pyairtable-dev
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: development
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: dev-code
+
+---
+# StorageClass for development
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: dev-code
+  labels:
+    app.kubernetes.io/name: pyairtable
+    app.kubernetes.io/component: development
+provisioner: k8s.io/minikube-hostpath
+parameters:
+  type: Directory
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+
+---
+# Development tools deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-tools
+  namespace: pyairtable-dev
+  labels:
+    app: dev-tools
+    component: development
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dev-tools
+  template:
+    metadata:
+      labels:
+        app: dev-tools
+        component: development
+    spec:
+      containers:
+      - name: dev-tools
+        image: python:3.11-slim
+        command: ["/bin/bash"]
+        args: ["-c", "while true; do sleep 30; done"]
+        
+        env:
+        - name: ENVIRONMENT
+          value: "development"
+        - name: PYTHONPATH
+          value: "/app/src:/dev-code"
+        
+        volumeMounts:
+        - name: dev-code
+          mountPath: /dev-code
+        - name: dev-config
+          mountPath: /dev-config
+        
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        
+        # Development packages
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/bash
+              - -c
+              - |
+                pip install --no-cache-dir watchdog psutil uvicorn[standard] fastapi python-multipart
+                chmod +x /dev-config/*.sh
+      
+      volumes:
+      - name: dev-code
+        persistentVolumeClaim:
+          claimName: dev-code-pvc
+      - name: dev-config
+        configMap:
+          name: hot-reload-config
+          defaultMode: 0755
+      
+      restartPolicy: Always
+
+---
+# Service for development tools
+apiVersion: v1
+kind: Service
+metadata:
+  name: dev-tools
+  namespace: pyairtable-dev
+  labels:
+    app: dev-tools
+    component: development
+spec:
+  selector:
+    app: dev-tools
+  ports:
+  - name: debug
+    port: 5678
+    targetPort: 5678
+  - name: metrics
+    port: 8080
+    targetPort: 8080

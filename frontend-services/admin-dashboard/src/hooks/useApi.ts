@@ -56,7 +56,7 @@ export function useTenants(options?: FilterOptions) {
   return useQuery({
     queryKey: ['tenants', options],
     queryFn: () => apiClient.getTenants(options),
-    keepPreviousData: true,
+    placeholderData: (previousData: any) => previousData,
   })
 }
 
@@ -144,7 +144,7 @@ export function useUsers(options?: FilterOptions) {
   return useQuery({
     queryKey: ['users', options],
     queryFn: () => apiClient.getUsers(options),
-    keepPreviousData: true,
+    placeholderData: (previousData: any) => previousData,
   })
 }
 

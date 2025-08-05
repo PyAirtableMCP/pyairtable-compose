@@ -1,5 +1,5 @@
 import { toast } from 'react-hot-toast'
-import { ApiResponse, PaginatedResponse, FilterOptions } from '@/types'
+import { PaginatedResponse, FilterOptions, SystemHealth, ResourceMetrics, ServiceHealth, FeatureFlag, Tenant, User } from '@/types'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1'
 
@@ -58,16 +58,16 @@ class ApiClient {
   }
 
   // System Health & Monitoring
-  async getSystemHealth() {
-    return this.request('/admin/system/health')
+  async getSystemHealth(): Promise<SystemHealth> {
+    return this.request<SystemHealth>('/admin/system/health')
   }
 
-  async getResourceMetrics() {
-    return this.request('/admin/system/metrics')
+  async getResourceMetrics(): Promise<ResourceMetrics> {
+    return this.request<ResourceMetrics>('/admin/system/metrics')
   }
 
-  async getServiceStatus() {
-    return this.request('/admin/system/services')
+  async getServiceStatus(): Promise<ServiceHealth[]> {
+    return this.request<ServiceHealth[]>('/admin/system/services')
   }
 
   async getAlerts() {
@@ -81,7 +81,7 @@ class ApiClient {
   }
 
   // Tenant Management
-  async getTenants(options?: FilterOptions): Promise<PaginatedResponse<any>> {
+  async getTenants(options?: FilterOptions): Promise<PaginatedResponse<Tenant>> {
     const params = new URLSearchParams()
     if (options?.search) params.append('search', options.search)
     if (options?.sort) {
@@ -131,7 +131,7 @@ class ApiClient {
   }
 
   // User Management
-  async getUsers(options?: FilterOptions): Promise<PaginatedResponse<any>> {
+  async getUsers(options?: FilterOptions): Promise<PaginatedResponse<User>> {
     const params = new URLSearchParams()
     if (options?.search) params.append('search', options.search)
     if (options?.sort) {
@@ -182,8 +182,8 @@ class ApiClient {
   }
 
   // System Configuration
-  async getFeatureFlags() {
-    return this.request('/admin/config/feature-flags')
+  async getFeatureFlags(): Promise<FeatureFlag[]> {
+    return this.request<FeatureFlag[]>('/admin/config/feature-flags')
   }
 
   async updateFeatureFlag(flagId: string, updates: any) {

@@ -117,6 +117,23 @@ scrape_configs:
         target_label: tier
         replacement: 'automation'
 
+  # SAGA Orchestrator (Distributed transactions)
+  - job_name: 'saga-orchestrator'
+    static_configs:
+      - targets: ['saga-orchestrator:8008']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'saga-orchestrator'
+      - source_labels: [__address__]
+        target_label: tier
+        replacement: 'orchestration'
+      - source_labels: [__address__]
+        target_label: component
+        replacement: 'saga-engine'
+
   # Frontend (Next.js)
   - job_name: 'frontend'
     static_configs:

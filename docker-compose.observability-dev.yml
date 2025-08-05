@@ -1,0 +1,467 @@
+version: '3.8'
+
+# Development-Optimized Observability Stack for PyAirtable Platform
+# Lightweight configuration with fast startup and minimal resource usage
+
+services:
+  # === METRICS & MONITORING ===
+  
+  # Prometheus - Metrics collection with development optimizations
+  prometheus-dev:
+    image: prom/prometheus:v2.47.2
+    container_name: prometheus-dev
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=3d'  # Shorter retention for dev
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+      - '--storage.tsdb.min-block-duration=5m'  # Faster compaction
+      - '--storage.tsdb.max-block-duration=10m'
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus-dev-data:/prometheus
+    networks:
+      - observability-dev
+      - pyairtable-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.3'
+        reservations:
+          memory: 128M
+          cpus: '0.15'
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=9090"
+      - "service=prometheus"
+      - "tier=observability"
+
+  # Grafana - Visualization with pre-configured dashboards
+  grafana-dev:
+    image: grafana/grafana:10.2.0
+    container_name: grafana-dev
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-clock-panel
+      - GF_RENDERING_SERVER_URL=http://renderer:8081/render
+      - GF_RENDERING_CALLBACK_URL=http://grafana-dev:3000/
+      - GF_LOG_FILTERS=rendering:debug
+    volumes:
+      - grafana-dev-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - observability-dev
+    restart: unless-stopped
+    depends_on:
+      - prometheus-dev
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.2'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    labels:
+      - "service=grafana"
+      - "tier=observability"
+
+  # === DISTRIBUTED TRACING ===
+  
+  # Jaeger - All-in-one with memory storage for development
+  jaeger-dev:
+    image: jaegertracing/all-in-one:1.50
+    container_name: jaeger-dev
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # Jaeger collector HTTP
+      - "14250:14250"  # Jaeger collector gRPC
+      - "6831:6831/udp"  # Jaeger agent UDP
+      - "6832:6832/udp"  # Jaeger agent UDP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - SPAN_STORAGE_TYPE=memory  # Use memory storage for development
+      - JAEGER_DISABLED=false
+      - LOG_LEVEL=info
+    networks:
+      - observability-dev
+      - pyairtable-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.3'
+        reservations:
+          memory: 128M
+          cpus: '0.15'
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=14269"
+      - "service=jaeger"
+      - "tier=observability"
+
+  # OpenTelemetry Collector - Lightweight configuration
+  otel-collector-dev:
+    image: otel/opentelemetry-collector-contrib:0.88.0
+    container_name: otel-collector-dev
+    command: ["--config=/etc/otel-collector-config.yml"]
+    volumes:
+      - ./monitoring/otel/otel-collector-config.yml:/etc/otel-collector-config.yml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8888:8888"   # Prometheus metrics
+      - "8889:8889"   # Prometheus exporter metrics
+      - "13133:13133" # Health check
+    networks:
+      - observability-dev
+      - pyairtable-network
+    restart: unless-stopped
+    depends_on:
+      - jaeger-dev
+      - prometheus-dev
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.2'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=8888"
+      - "service=otel-collector"
+      - "tier=observability"
+
+  # === LOGGING STACK (Lightweight) ===
+  
+  # Elasticsearch - Single node with reduced memory
+  elasticsearch-dev:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: elasticsearch-dev
+    environment:
+      - discovery.type=single-node
+      - cluster.name=pyairtable-dev-logs
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"  # Reduced memory for dev
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - xpack.ml.enabled=false  # Disable ML features
+      - cluster.routing.allocation.disk.threshold_enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch-dev-data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - observability-dev
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.4'
+        reservations:
+          memory: 256M
+          cpus: '0.2'
+    labels:
+      - "service=elasticsearch"
+      - "tier=logging"
+
+  # Kibana - Log visualization
+  kibana-dev:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: kibana-dev
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch-dev:9200
+      - SERVER_NAME=kibana-dev.local
+      - SERVER_BASEPATH=""
+      - XPACK_SECURITY_ENABLED=false
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=a-32-character-long-passphrase
+    networks:
+      - observability-dev
+    restart: unless-stopped
+    depends_on:
+      - elasticsearch-dev
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.3'
+        reservations:
+          memory: 128M
+          cpus: '0.15'
+    labels:
+      - "service=kibana"
+      - "tier=logging"
+
+  # Logstash - Log processing
+  logstash-dev:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: logstash-dev
+    volumes:
+      - ./monitoring/logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./monitoring/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+    ports:
+      - "5044:5044"  # Beats input
+      - "5000:5000"  # TCP input
+      - "9600:9600"  # API
+    environment:
+      - "LS_JAVA_OPTS=-Xms256m -Xmx256m"  # Reduced memory for dev
+      - XPACK_MONITORING_ENABLED=false
+    networks:
+      - observability-dev
+    restart: unless-stopped
+    depends_on:
+      - elasticsearch-dev
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+          cpus: '0.3'
+        reservations:
+          memory: 256M
+          cpus: '0.15'
+    labels:
+      - "service=logstash"
+      - "tier=logging"
+
+  # Filebeat - Log shipping (simplified for development)
+  filebeat-dev:
+    image: docker.elastic.co/beats/filebeat:8.11.0
+    container_name: filebeat-dev
+    user: root
+    volumes:
+      - ./monitoring/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - observability-dev
+      - pyairtable-network
+    restart: unless-stopped
+    depends_on:
+      - logstash-dev
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.1'
+        reservations:
+          memory: 64M
+          cpus: '0.05'
+    labels:
+      - "service=filebeat"
+      - "tier=logging"
+
+  # === INFRASTRUCTURE MONITORING ===
+  
+  # Node Exporter - Host metrics
+  node-exporter-dev:
+    image: prom/node-exporter:v1.6.1
+    container_name: node-exporter-dev
+    ports:
+      - "9100:9100"
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - observability-dev
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.1'
+        reservations:
+          memory: 32M
+          cpus: '0.05'
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=9100"
+      - "service=node-exporter"
+      - "tier=system"
+
+  # cAdvisor - Container metrics
+  cadvisor-dev:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: cadvisor-dev
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    networks:
+      - observability-dev
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.2'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=8080"
+      - "service=cadvisor"
+      - "tier=system"
+
+  # === SERVICE MESH PROXY (Optional) ===
+  
+  # Envoy Proxy - Lightweight service mesh for development
+  envoy-proxy-dev:
+    image: envoyproxy/envoy:v1.28-latest
+    container_name: envoy-proxy-dev
+    ports:
+      - "8000:8000"  # Main proxy port
+      - "9901:9901"  # Admin interface
+    volumes:
+      - ./observability/envoy-proxy.yaml:/etc/envoy/envoy.yaml:ro
+    networks:
+      - observability-dev
+      - pyairtable-network
+    restart: unless-stopped
+    depends_on:
+      - jaeger-dev
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.2'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=9901"
+      - "service=envoy-proxy"
+      - "tier=gateway"
+
+  # === DEVELOPMENT UTILITIES ===
+  
+  # Mailhog - Email testing for development
+  mailhog-dev:
+    image: mailhog/mailhog:v1.0.1
+    container_name: mailhog-dev
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - observability-dev
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+          cpus: '0.1'
+        reservations:
+          memory: 16M
+          cpus: '0.05'
+    labels:
+      - "service=mailhog"
+      - "tier=development"
+
+  # Redis Commander - Redis management UI
+  redis-commander-dev:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander-dev
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    networks:
+      - observability-dev
+      - pyairtable-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.1'
+        reservations:
+          memory: 32M
+          cpus: '0.05'
+    labels:
+      - "service=redis-commander"
+      - "tier=development"
+
+  # pgAdmin - PostgreSQL management UI
+  pgadmin-dev:
+    image: dpage/pgadmin4:7.8
+    container_name: pgadmin-dev
+    ports:
+      - "8082:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@pyairtable.dev
+      - PGADMIN_DEFAULT_PASSWORD=admin123
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    volumes:
+      - pgadmin-dev-data:/var/lib/pgadmin
+    networks:
+      - observability-dev
+      - pyairtable-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.1'
+        reservations:
+          memory: 64M
+          cpus: '0.05'
+    labels:
+      - "service=pgadmin"
+      - "tier=development"
+
+networks:
+  observability-dev:
+    driver: bridge
+    name: observability-dev
+  pyairtable-network:
+    external: true
+
+volumes:
+  prometheus-dev-data:
+    driver: local
+  grafana-dev-data:
+    driver: local
+  elasticsearch-dev-data:
+    driver: local
+  pgadmin-dev-data:
+    driver: local

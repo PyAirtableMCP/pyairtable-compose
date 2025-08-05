@@ -1,59 +1,75 @@
-import { withAuth } from "next-auth/middleware"
 import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
+import { getToken } from "next-auth/jwt"
 
-export default withAuth(
-  function middleware(req) {
-    // Get the pathname of the request
-    const { pathname } = req.nextUrl
+export async function middleware(req: NextRequest) {
+  // Get token from request
+  const token = await getToken({ 
+    req, 
+    secret: process.env.NEXTAUTH_SECRET 
+  })
 
-    // Check if user has completed onboarding
-    const hasCompletedOnboarding = req.nextauth.token?.onboardingCompleted
+  // Define protected routes
+  const protectedPaths = [
+    '/dashboard',
+    '/workspace',
+    '/admin',
+    '/api/protected',
+    '/settings',
+    '/profile'
+  ]
 
-    // Redirect to onboarding if not completed (except for auth routes and onboarding itself)
-    if (
-      req.nextauth.token &&
-      !hasCompletedOnboarding &&
-      !pathname.startsWith("/auth") &&
-      pathname !== "/auth/onboarding"
-    ) {
-      return NextResponse.redirect(new URL("/auth/onboarding", req.url))
-    }
+  const isProtectedPath = protectedPaths.some(path => 
+    req.nextUrl.pathname.startsWith(path)
+  )
 
-    // If user has completed onboarding but is trying to access onboarding, redirect to dashboard
-    if (
-      req.nextauth.token &&
-      hasCompletedOnboarding &&
-      pathname === "/auth/onboarding"
-    ) {
-      return NextResponse.redirect(new URL("/", req.url))
-    }
+  // Allow access to authentication routes
+  const authPaths = ['/auth', '/api/auth']
+  const isAuthPath = authPaths.some(path => 
+    req.nextUrl.pathname.startsWith(path)
+  )
 
-    return NextResponse.next()
-  },
-  {
-    callbacks: {
-      authorized: ({ token, req }) => {
-        const { pathname } = req.nextUrl
+  // Allow access to public routes
+  const publicPaths = ['/', '/about', '/contact', '/privacy', '/terms']
+  const isPublicPath = publicPaths.includes(req.nextUrl.pathname)
 
-        // Allow access to public routes
-        if (
-          pathname.startsWith("/auth") ||
-          pathname.startsWith("/api/auth") ||
-          pathname === "/terms" ||
-          pathname === "/privacy" ||
-          pathname.startsWith("/_next") ||
-          pathname.startsWith("/favicon") ||
-          pathname === "/manifest.json"
-        ) {
-          return true
-        }
-
-        // Require authentication for all other routes
-        return !!token
-      },
-    },
+  // Check authentication for protected routes
+  if (isProtectedPath && !token) {
+    const loginUrl = new URL('/auth/signin', req.url)
+    loginUrl.searchParams.set('callbackUrl', req.url)
+    return NextResponse.redirect(loginUrl)
   }
-)
+
+  // Check authorization for admin routes
+  if (req.nextUrl.pathname.startsWith('/admin')) {
+    if (!token) {
+      const loginUrl = new URL('/auth/signin', req.url)
+      loginUrl.searchParams.set('callbackUrl', req.url)
+      return NextResponse.redirect(loginUrl)
+    }
+    
+    if (token.role !== 'admin' && token.role !== 'owner') {
+      return NextResponse.redirect(new URL('/unauthorized', req.url))
+    }
+  }
+
+  // Add security headers
+  const response = NextResponse.next()
+  
+  // Security headers for all responses
+  response.headers.set('X-Frame-Options', 'DENY')
+  response.headers.set('X-Content-Type-Options', 'nosniff')
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+  
+  // CSP header for additional protection
+  response.headers.set(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none';"
+  )
+
+  return response
+}
 
 export const config = {
   matcher: [

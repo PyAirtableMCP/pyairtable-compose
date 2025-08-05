@@ -1,0 +1,1284 @@
+{
+  "test_run_id": "working_mcp_1754326860",
+  "timestamp": "2025-08-04T20:01:00.722610",
+  "base_id": "appVLUAubH5cFWhMV",
+  "tests": {
+    "test_1_tables": {
+      "status": "success",
+      "table_count": 35,
+      "tables": [
+        {
+          "id": "tbl3fbMkeU6vVdlGm",
+          "name": "Projects",
+          "description": null,
+          "field_count": 21,
+          "view_count": 2
+        },
+        {
+          "id": "tbliZiHLza2u6TOpi",
+          "name": "Co creators and clients",
+          "description": null,
+          "field_count": 20,
+          "view_count": 1
+        },
+        {
+          "id": "tblbQmbum6jc1jpWG",
+          "name": "Documents",
+          "description": null,
+          "field_count": 7,
+          "view_count": 3
+        },
+        {
+          "id": "tblxP0L2hEnTwQIIu",
+          "name": "Portfolio Projects",
+          "description": null,
+          "field_count": 14,
+          "view_count": 5
+        },
+        {
+          "id": "tbl4JOCLonueUbzcT",
+          "name": "Facebook post",
+          "description": null,
+          "field_count": 4,
+          "view_count": 1
+        },
+        {
+          "id": "tblfUcCtDndhdHzZ5",
+          "name": "Company Invoicing information",
+          "description": null,
+          "field_count": 7,
+          "view_count": 1
+        },
+        {
+          "id": "tbl1gFQyldVdMnyx4",
+          "name": "Project expenses",
+          "description": null,
+          "field_count": 11,
+          "view_count": 8
+        },
+        {
+          "id": "tblRYSFSSOwOanQOf",
+          "name": "Invoice Bulgaria",
+          "description": null,
+          "field_count": 15,
+          "view_count": 1
+        },
+        {
+          "id": "tblx8gHb5tarPsv2G",
+          "name": "Invoice Denmark",
+          "description": null,
+          "field_count": 9,
+          "view_count": 1
+        },
+        {
+          "id": "tblwROcSxgULh8uQn",
+          "name": "Project tasks",
+          "description": null,
+          "field_count": 10,
+          "view_count": 7
+        },
+        {
+          "id": "tblaiAP65iAzqRwqH",
+          "name": "Working hours",
+          "description": null,
+          "field_count": 9,
+          "view_count": 14
+        },
+        {
+          "id": "tblpqDpXSGYqsSlHH",
+          "name": "Revit tools",
+          "description": null,
+          "field_count": 4,
+          "view_count": 1
+        },
+        {
+          "id": "tbliIdtljgylE7urU",
+          "name": "Work library",
+          "description": null,
+          "field_count": 31,
+          "view_count": 1
+        },
+        {
+          "id": "tblYlzsb1Omv5eNPI",
+          "name": "Work price Bulgaria",
+          "description": null,
+          "field_count": 4,
+          "view_count": 1
+        },
+        {
+          "id": "tblTS1usMGsOP3Bji",
+          "name": "Materials denmark",
+          "description": null,
+          "field_count": 29,
+          "view_count": 1
+        },
+        {
+          "id": "tblwaNModmPNrXCx9",
+          "name": "MATERIAL BULGARIA",
+          "description": null,
+          "field_count": 14,
+          "view_count": 1
+        },
+        {
+          "id": "tbleSZpLhQpYGPBFx",
+          "name": "P23Nomad Studio Revit version 2",
+          "description": null,
+          "field_count": 11,
+          "view_count": 3
+        },
+        {
+          "id": "tblAMOppJFJDjPhK7",
+          "name": "P23Nomad Studio Version 2",
+          "description": null,
+          "field_count": 24,
+          "view_count": 3
+        },
+        {
+          "id": "tblUz6KZxyiCKva6K",
+          "name": "Kenneth house",
+          "description": null,
+          "field_count": 9,
+          "view_count": 1
+        },
+        {
+          "id": "tblsYP6jVjY4ExkFC",
+          "name": "Nysted",
+          "description": null,
+          "field_count": 9,
+          "view_count": 1
+        },
+        {
+          "id": "tblcY5hF6f0KFGuLv",
+          "name": "Kevin Bathroom",
+          "description": null,
+          "field_count": 18,
+          "view_count": 4
+        },
+        {
+          "id": "tblDeoGLpEmvtYKHO",
+          "name": "Kratbjerg 101 fredensborg",
+          "description": null,
+          "field_count": 19,
+          "view_count": 4
+        },
+        {
+          "id": "tblxeZr4HS0BECit7",
+          "name": "Summer house",
+          "description": null,
+          "field_count": 19,
+          "view_count": 7
+        },
+        {
+          "id": "tblcrQBgBLw4fLwvZ",
+          "name": "R\u00f8nneholmsvej 33",
+          "description": null,
+          "field_count": 20,
+          "view_count": 4
+        },
+        {
+          "id": "tblYwdxWcRpXkjGgp",
+          "name": "N\u00d8RREVANGSVEJ 8, 3200 HELSINGE",
+          "description": null,
+          "field_count": 20,
+          "view_count": 4
+        },
+        {
+          "id": "tblUeRPYzCljF9ez3",
+          "name": "P37Ellebjergvej 36, 2450 K\u00f8benhavn",
+          "description": null,
+          "field_count": 21,
+          "view_count": 4
+        },
+        {
+          "id": "tblnaD3T2n3vhypjs",
+          "name": "P39Overgade 59A, 5000 Odense",
+          "description": null,
+          "field_count": 20,
+          "view_count": 4
+        },
+        {
+          "id": "tblv14ihKC5rF8m8y",
+          "name": "N\u00d8RREVANGSVEJ 8, 3200 HELSINGE copy",
+          "description": null,
+          "field_count": 20,
+          "view_count": 4
+        },
+        {
+          "id": "tblThpDRm1a0EfJBi",
+          "name": "P41Nyvangs Alle 4, 4300 Holb\u00e6k",
+          "description": null,
+          "field_count": 20,
+          "view_count": 4
+        },
+        {
+          "id": "tbl96qAmPyp5mtJ3m",
+          "name": "Storebjerg 4, 2670 Greve",
+          "description": null,
+          "field_count": 20,
+          "view_count": 4
+        },
+        {
+          "id": "tblIr0EzKweCSW9V1",
+          "name": "Kenneth foundation",
+          "description": null,
+          "field_count": 20,
+          "view_count": 4
+        },
+        {
+          "id": "tblqOFXmY9zoTM1Lt",
+          "name": "Kenneth summer house",
+          "description": null,
+          "field_count": 19,
+          "view_count": 7
+        },
+        {
+          "id": "tbl97m8PmxnbNedo7",
+          "name": "Tesdorpfsvej 48e, 2000 Frederiksberg",
+          "description": null,
+          "field_count": 20,
+          "view_count": 4
+        },
+        {
+          "id": "tblObKVXDP5LKLvHd",
+          "name": "P46Paradislyngen 19, 4573 H\u00f8jby",
+          "description": null,
+          "field_count": 21,
+          "view_count": 4
+        },
+        {
+          "id": "tblBObA3GFYWNoH5O",
+          "name": "Test Metadata Table",
+          "description": "Test table for metadata",
+          "field_count": 1,
+          "view_count": 1
+        }
+      ]
+    },
+    "test_2_populate": {
+      "status": "success",
+      "results": [
+        {
+          "table_name": "Projects",
+          "status": "success",
+          "record_id": "recBcc0Q6cG0mPTXZ"
+        },
+        {
+          "table_name": "Co creators and clients",
+          "status": "success",
+          "record_id": "recDVi1AWX2NLJsGO"
+        },
+        {
+          "table_name": "Documents",
+          "status": "success",
+          "record_id": "recX881tLdfFop6et"
+        },
+        {
+          "table_name": "Portfolio Projects",
+          "status": "success",
+          "record_id": "recUrf4ppmcz6h0oR"
+        },
+        {
+          "table_name": "Facebook post",
+          "status": "success",
+          "record_id": "recEhIVQplLXfduUh"
+        }
+      ],
+      "successful_count": 5,
+      "total_count": 5
+    },
+    "test_3_analyze": {
+      "status": "success",
+      "analyses": [
+        {
+          "table_name": "Projects",
+          "table_id": "tbl3fbMkeU6vVdlGm",
+          "field_info": {
+            "table_name": "Projects",
+            "table_id": "tbl3fbMkeU6vVdlGm",
+            "total_fields": 21,
+            "field_types": {
+              "formula": 1,
+              "multipleAttachments": 2,
+              "singleLineText": 3,
+              "singleSelect": 1,
+              "multilineText": 1,
+              "url": 1,
+              "date": 2,
+              "rollup": 2,
+              "multipleRecordLinks": 7,
+              "autoNumber": 1
+            },
+            "fields": [
+              {
+                "name": "Project ID",
+                "id": "fldB7oxsOOhTrbDEt",
+                "type": "formula",
+                "description": null,
+                "is_primary": false,
+                "options": {},
+                "formula": ""
+              },
+              {
+                "name": "Cover photo",
+                "id": "fldCcYZCIk2QR9udu",
+                "type": "multipleAttachments",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Project name ",
+                "id": "fld0TEakKuU1hhs4p",
+                "type": "singleLineText",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Project location ",
+                "id": "fldZ3ICzm2OSyzNnS",
+                "type": "singleLineText",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Project status ",
+                "id": "flds1V0t9eQviGYU0",
+                "type": "singleSelect",
+                "description": null,
+                "is_primary": false,
+                "options": {},
+                "choice_count": 0,
+                "choices": []
+              },
+              {
+                "name": "Project description ",
+                "id": "fldzOyZOiogBEqSfi",
+                "type": "multilineText",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Revit",
+                "id": "fld3gwuRJ01V2kFtr",
+                "type": "url",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Project documents ",
+                "id": "fldGIAEjEESnyTIxu",
+                "type": "multipleAttachments",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Start date",
+                "id": "fldIuXDNhSJve4JkZ",
+                "type": "date",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Finish date  ",
+                "id": "fldhAIRt8Xy8H54u9",
+                "type": "date",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Total hours",
+                "id": "flduEqGJhgBjlOWUF",
+                "type": "rollup",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Total expenses ",
+                "id": "fldJivqabXwBpECRb",
+                "type": "rollup",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Invoice",
+                "id": "fldzwK1lxyof13bHS",
+                "type": "multipleRecordLinks",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Co creators",
+                "id": "fldka7AUnb0t4NG9U",
+                "type": "multipleRecordLinks",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Documents",
+                "id": "fldA4MV6ha9WzECqC",
+                "type": "singleLineText",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Id",
+                "id": "fld9QRStDgaqjmpkA",
+                "type": "autoNumber",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Project tasks",
+                "id": "fldzK7dcEDnpcr0T6",
+                "type": "multipleRecordLinks",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Working hours",
+                "id": "fldYVxsQ2kGu5C4Du",
+                "type": "multipleRecordLinks",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Project expenses",
+                "id": "fldEFoXUFqO1svXJf",
+                "type": "multipleRecordLinks",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Documents 2",
+                "id": "fld3gwdDgSupIfGp4",
+                "type": "multipleRecordLinks",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Invoice copy",
+                "id": "fldTmmZ2kTKCmYwtr",
+                "type": "multipleRecordLinks",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              }
+            ]
+          },
+          "sample_records": 10,
+          "analysis": {
+            "table_name": "Projects",
+            "analysis_summary": {
+              "records_analyzed": 45,
+              "total_fields": 21,
+              "avg_fill_rate": 55.8
+            },
+            "field_analysis": {
+              "Project ID": {
+                "field_name": "Project ID",
+                "field_type": "formula",
+                "total_records": 45,
+                "filled_count": 45,
+                "empty_count": 0,
+                "fill_rate": 100.0
+              },
+              "Cover photo": {
+                "field_name": "Cover photo",
+                "field_type": "multipleAttachments",
+                "total_records": 45,
+                "filled_count": 42,
+                "empty_count": 3,
+                "fill_rate": 93.3
+              },
+              "Project name ": {
+                "field_name": "Project name ",
+                "field_type": "singleLineText",
+                "total_records": 45,
+                "filled_count": 45,
+                "empty_count": 0,
+                "fill_rate": 100.0,
+                "avg_length": 16.6,
+                "max_length": 36,
+                "min_length": 3
+              },
+              "Project location ": {
+                "field_name": "Project location ",
+                "field_type": "singleLineText",
+                "total_records": 45,
+                "filled_count": 43,
+                "empty_count": 2,
+                "fill_rate": 95.6,
+                "avg_length": 15.5,
+                "max_length": 44,
+                "min_length": 7
+              },
+              "Project status ": {
+                "field_name": "Project status ",
+                "field_type": "singleSelect",
+                "total_records": 45,
+                "filled_count": 44,
+                "empty_count": 1,
+                "fill_rate": 97.8,
+                "unique_values": [
+                  "Done",
+                  "not won ",
+                  "In progress ",
+                  "New"
+                ],
+                "unique_count": 4
+              },
+              "Project description ": {
+                "field_name": "Project description ",
+                "field_type": "multilineText",
+                "total_records": 45,
+                "filled_count": 21,
+                "empty_count": 24,
+                "fill_rate": 46.7,
+                "avg_length": 58.3,
+                "max_length": 308,
+                "min_length": 9
+              },
+              "Revit": {
+                "field_name": "Revit",
+                "field_type": "url",
+                "total_records": 45,
+                "filled_count": 12,
+                "empty_count": 33,
+                "fill_rate": 26.7,
+                "avg_length": 23.3,
+                "max_length": 27,
+                "min_length": 23
+              },
+              "Project documents ": {
+                "field_name": "Project documents ",
+                "field_type": "multipleAttachments",
+                "total_records": 45,
+                "filled_count": 29,
+                "empty_count": 16,
+                "fill_rate": 64.4
+              },
+              "Start date": {
+                "field_name": "Start date",
+                "field_type": "date",
+                "total_records": 45,
+                "filled_count": 5,
+                "empty_count": 40,
+                "fill_rate": 11.1
+              },
+              "Finish date  ": {
+                "field_name": "Finish date  ",
+                "field_type": "date",
+                "total_records": 45,
+                "filled_count": 5,
+                "empty_count": 40,
+                "fill_rate": 11.1
+              },
+              "Total hours": {
+                "field_name": "Total hours",
+                "field_type": "rollup",
+                "total_records": 45,
+                "filled_count": 45,
+                "empty_count": 0,
+                "fill_rate": 100.0
+              },
+              "Total expenses ": {
+                "field_name": "Total expenses ",
+                "field_type": "rollup",
+                "total_records": 45,
+                "filled_count": 45,
+                "empty_count": 0,
+                "fill_rate": 100.0
+              },
+              "Invoice": {
+                "field_name": "Invoice",
+                "field_type": "multipleRecordLinks",
+                "total_records": 45,
+                "filled_count": 9,
+                "empty_count": 36,
+                "fill_rate": 20.0
+              },
+              "Co creators": {
+                "field_name": "Co creators",
+                "field_type": "multipleRecordLinks",
+                "total_records": 45,
+                "filled_count": 17,
+                "empty_count": 28,
+                "fill_rate": 37.8
+              },
+              "Documents": {
+                "field_name": "Documents",
+                "field_type": "singleLineText",
+                "total_records": 45,
+                "filled_count": 4,
+                "empty_count": 41,
+                "fill_rate": 8.9,
+                "avg_length": 38.8,
+                "max_length": 49,
+                "min_length": 15
+              },
+              "Id": {
+                "field_name": "Id",
+                "field_type": "autoNumber",
+                "total_records": 45,
+                "filled_count": 45,
+                "empty_count": 0,
+                "fill_rate": 100.0
+              },
+              "Project tasks": {
+                "field_name": "Project tasks",
+                "field_type": "multipleRecordLinks",
+                "total_records": 45,
+                "filled_count": 13,
+                "empty_count": 32,
+                "fill_rate": 28.9
+              },
+              "Working hours": {
+                "field_name": "Working hours",
+                "field_type": "multipleRecordLinks",
+                "total_records": 45,
+                "filled_count": 19,
+                "empty_count": 26,
+                "fill_rate": 42.2
+              },
+              "Project expenses": {
+                "field_name": "Project expenses",
+                "field_type": "multipleRecordLinks",
+                "total_records": 45,
+                "filled_count": 6,
+                "empty_count": 39,
+                "fill_rate": 13.3
+              },
+              "Documents 2": {
+                "field_name": "Documents 2",
+                "field_type": "multipleRecordLinks",
+                "total_records": 45,
+                "filled_count": 26,
+                "empty_count": 19,
+                "fill_rate": 57.8
+              },
+              "Invoice copy": {
+                "field_name": "Invoice copy",
+                "field_type": "multipleRecordLinks",
+                "total_records": 45,
+                "filled_count": 7,
+                "empty_count": 38,
+                "fill_rate": 15.6
+              }
+            },
+            "data_quality_insights": [
+              "Low data completion: Project description , Revit, Start date, Finish date  , Invoice, Co creators, Documents, Project tasks, Working hours, Project expenses, Invoice copy have <50% fill rate",
+              "Complete data: Project ID, Project name , Total hours, Total expenses , Id have 100% fill rate"
+            ]
+          },
+          "status": "success"
+        },
+        {
+          "table_name": "Co creators and clients",
+          "table_id": "tbliZiHLza2u6TOpi",
+          "field_info": {
+            "table_name": "Co creators and clients",
+            "table_id": "tbliZiHLza2u6TOpi",
+            "total_fields": 20,
+            "field_types": {
+              "singleLineText": 5,
+              "phoneNumber": 1,
+              "email": 1,
+              "multipleRecordLinks": 5,
+              "singleSelect": 1,
+              "rollup": 2,
+              "currency": 1,
+              "formula": 2,
+              "multipleLookupValues": 2
+            },
+            "fields": [
+              {
+                "name": "Name",
+                "id": "fldmhWKF7bIg3lTiE",
+                "type": "singleLineText",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Phone",
+                "id": "fldCAq4QDGTzPW3yo",
+                "type": "phoneNumber",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Email",
+                "id": "fldLR4jLUYqHqrVPo",
+                "type": "email",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Adress",
+                "id": "fldW2arB943XiX9Is",
+                "type": "singleLineText",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Projects",
+                "id": "fldO6CRfvwMIvPKJi",
+                "type": "multipleRecordLinks",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Working hours",
+                "id": "fldvcstHwpvGBywH6",
+                "type": "multipleRecordLinks",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Project tasks",
+                "id": "flda53n4DuNDAnnt8",
+                "type": "multipleRecordLinks",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Select",
+                "id": "fld19J8rk75w1VvZe",
+                "type": "singleSelect",
+                "description": null,
+                "is_primary": false,
+                "options": {},
+                "choice_count": 0,
+                "choices": []
+              },
+              {
+                "name": "Project expenses",
+                "id": "fldCDwU9tfPuctIkk",
+                "type": "multipleRecordLinks",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Price DKK Rollup (from Project expenses)",
+                "id": "fldmGfqFFxUMzQCFE",
+                "type": "rollup",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Salary ",
+                "id": "fldeD4GE2JrRykGUU",
+                "type": "currency",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Working hours  Rollup (from Working hours)",
+                "id": "fldsSHXsBgkVX25C8",
+                "type": "rollup",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Calculation",
+                "id": "fldIvAoIlnpEv2TSE",
+                "type": "formula",
+                "description": null,
+                "is_primary": false,
+                "options": {},
+                "formula": ""
+              },
+              {
+                "name": "Need to get",
+                "id": "fld8PRtrmfBK6XO77",
+                "type": "formula",
+                "description": null,
+                "is_primary": false,
+                "options": {},
+                "formula": ""
+              },
+              {
+                "name": "P02 Bathroom project",
+                "id": "fldjDlgfIPFKmFYHG",
+                "type": "singleLineText",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Start  (from P06 Bathroom project)",
+                "id": "fldv6ydC3oMXP7iKd",
+                "type": "multipleLookupValues",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Finish (from P06 Bathroom project)",
+                "id": "fldnIIpfGZ83ReuAo",
+                "type": "multipleLookupValues",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Sub task",
+                "id": "fld4q4V4CohKhu3ax",
+                "type": "singleLineText",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "P04 Kitchen",
+                "id": "fldoF15lCsuHwyNZd",
+                "type": "singleLineText",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Client list Invoicing",
+                "id": "fldJYRhjQTNcUa5NQ",
+                "type": "multipleRecordLinks",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              }
+            ]
+          },
+          "sample_records": 10,
+          "analysis": {
+            "table_name": "Co creators and clients",
+            "analysis_summary": {
+              "records_analyzed": 16,
+              "total_fields": 20,
+              "avg_fill_rate": 46.9
+            },
+            "field_analysis": {
+              "Name": {
+                "field_name": "Name",
+                "field_type": "singleLineText",
+                "total_records": 16,
+                "filled_count": 16,
+                "empty_count": 0,
+                "fill_rate": 100.0,
+                "avg_length": 14.8,
+                "max_length": 22,
+                "min_length": 4
+              },
+              "Phone": {
+                "field_name": "Phone",
+                "field_type": "phoneNumber",
+                "total_records": 16,
+                "filled_count": 8,
+                "empty_count": 8,
+                "fill_rate": 50.0
+              },
+              "Email": {
+                "field_name": "Email",
+                "field_type": "email",
+                "total_records": 16,
+                "filled_count": 9,
+                "empty_count": 7,
+                "fill_rate": 56.2,
+                "avg_length": 20.9,
+                "max_length": 30,
+                "min_length": 12
+              },
+              "Adress": {
+                "field_name": "Adress",
+                "field_type": "singleLineText",
+                "total_records": 16,
+                "filled_count": 3,
+                "empty_count": 13,
+                "fill_rate": 18.8,
+                "avg_length": 29.7,
+                "max_length": 31,
+                "min_length": 27
+              },
+              "Projects": {
+                "field_name": "Projects",
+                "field_type": "multipleRecordLinks",
+                "total_records": 16,
+                "filled_count": 4,
+                "empty_count": 12,
+                "fill_rate": 25.0
+              },
+              "Working hours": {
+                "field_name": "Working hours",
+                "field_type": "multipleRecordLinks",
+                "total_records": 16,
+                "filled_count": 12,
+                "empty_count": 4,
+                "fill_rate": 75.0
+              },
+              "Project tasks": {
+                "field_name": "Project tasks",
+                "field_type": "multipleRecordLinks",
+                "total_records": 16,
+                "filled_count": 3,
+                "empty_count": 13,
+                "fill_rate": 18.8
+              },
+              "Select": {
+                "field_name": "Select",
+                "field_type": "singleSelect",
+                "total_records": 16,
+                "filled_count": 11,
+                "empty_count": 5,
+                "fill_rate": 68.8,
+                "unique_values": [
+                  "Client ",
+                  "Co creator "
+                ],
+                "unique_count": 2
+              },
+              "Project expenses": {
+                "field_name": "Project expenses",
+                "field_type": "multipleRecordLinks",
+                "total_records": 16,
+                "filled_count": 7,
+                "empty_count": 9,
+                "fill_rate": 43.8
+              },
+              "Price DKK Rollup (from Project expenses)": {
+                "field_name": "Price DKK Rollup (from Project expenses)",
+                "field_type": "rollup",
+                "total_records": 16,
+                "filled_count": 16,
+                "empty_count": 0,
+                "fill_rate": 100.0
+              },
+              "Salary ": {
+                "field_name": "Salary ",
+                "field_type": "currency",
+                "total_records": 16,
+                "filled_count": 7,
+                "empty_count": 9,
+                "fill_rate": 43.8
+              },
+              "Working hours  Rollup (from Working hours)": {
+                "field_name": "Working hours  Rollup (from Working hours)",
+                "field_type": "rollup",
+                "total_records": 16,
+                "filled_count": 16,
+                "empty_count": 0,
+                "fill_rate": 100.0
+              },
+              "Calculation": {
+                "field_name": "Calculation",
+                "field_type": "formula",
+                "total_records": 16,
+                "filled_count": 16,
+                "empty_count": 0,
+                "fill_rate": 100.0
+              },
+              "Need to get": {
+                "field_name": "Need to get",
+                "field_type": "formula",
+                "total_records": 16,
+                "filled_count": 16,
+                "empty_count": 0,
+                "fill_rate": 100.0
+              },
+              "P02 Bathroom project": {
+                "field_name": "P02 Bathroom project",
+                "field_type": "singleLineText",
+                "total_records": 16,
+                "filled_count": 0,
+                "empty_count": 16,
+                "fill_rate": 0.0
+              },
+              "Start  (from P06 Bathroom project)": {
+                "field_name": "Start  (from P06 Bathroom project)",
+                "field_type": "multipleLookupValues",
+                "total_records": 16,
+                "filled_count": 0,
+                "empty_count": 16,
+                "fill_rate": 0.0
+              },
+              "Finish (from P06 Bathroom project)": {
+                "field_name": "Finish (from P06 Bathroom project)",
+                "field_type": "multipleLookupValues",
+                "total_records": 16,
+                "filled_count": 0,
+                "empty_count": 16,
+                "fill_rate": 0.0
+              },
+              "Sub task": {
+                "field_name": "Sub task",
+                "field_type": "singleLineText",
+                "total_records": 16,
+                "filled_count": 1,
+                "empty_count": 15,
+                "fill_rate": 6.2,
+                "avg_length": 504.0,
+                "max_length": 504,
+                "min_length": 504
+              },
+              "P04 Kitchen": {
+                "field_name": "P04 Kitchen",
+                "field_type": "singleLineText",
+                "total_records": 16,
+                "filled_count": 1,
+                "empty_count": 15,
+                "fill_rate": 6.2,
+                "avg_length": 465.0,
+                "max_length": 465,
+                "min_length": 465
+              },
+              "Client list Invoicing": {
+                "field_name": "Client list Invoicing",
+                "field_type": "multipleRecordLinks",
+                "total_records": 16,
+                "filled_count": 4,
+                "empty_count": 12,
+                "fill_rate": 25.0
+              }
+            },
+            "data_quality_insights": [
+              "Low data completion: Adress, Projects, Project tasks, Project expenses, Salary , P02 Bathroom project, Start  (from P06 Bathroom project), Finish (from P06 Bathroom project), Sub task, P04 Kitchen, Client list Invoicing have <50% fill rate",
+              "Unused fields: P02 Bathroom project, Start  (from P06 Bathroom project), Finish (from P06 Bathroom project) are completely empty",
+              "Complete data: Name, Price DKK Rollup (from Project expenses), Working hours  Rollup (from Working hours), Calculation, Need to get have 100% fill rate"
+            ]
+          },
+          "status": "success"
+        },
+        {
+          "table_name": "Documents",
+          "table_id": "tblbQmbum6jc1jpWG",
+          "field_info": {
+            "table_name": "Documents",
+            "table_id": "tblbQmbum6jc1jpWG",
+            "total_fields": 7,
+            "field_types": {
+              "singleLineText": 1,
+              "multipleAttachments": 1,
+              "multipleRecordLinks": 1,
+              "createdBy": 1,
+              "createdTime": 1,
+              "lastModifiedTime": 1,
+              "singleSelect": 1
+            },
+            "fields": [
+              {
+                "name": "Name",
+                "id": "fldXiAZby9yqkBjZY",
+                "type": "singleLineText",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Attachments",
+                "id": "fldpPcKJSRdCysKMr",
+                "type": "multipleAttachments",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Project",
+                "id": "fldQJZCAFG01Gc6oh",
+                "type": "multipleRecordLinks",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Created by",
+                "id": "fld2um9Saamhw4v7w",
+                "type": "createdBy",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Created",
+                "id": "fldk4ljSVPuwbwA4n",
+                "type": "createdTime",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Last Modified",
+                "id": "fld4cgC341JZInLg4",
+                "type": "lastModifiedTime",
+                "description": null,
+                "is_primary": false,
+                "options": {}
+              },
+              {
+                "name": "Category",
+                "id": "fld89MuDGGuoyfXe6",
+                "type": "singleSelect",
+                "description": null,
+                "is_primary": false,
+                "options": {},
+                "choice_count": 0,
+                "choices": []
+              }
+            ]
+          },
+          "sample_records": 10,
+          "analysis": {
+            "table_name": "Documents",
+            "analysis_summary": {
+              "records_analyzed": 50,
+              "total_fields": 7,
+              "avg_fill_rate": 91.1
+            },
+            "field_analysis": {
+              "Name": {
+                "field_name": "Name",
+                "field_type": "singleLineText",
+                "total_records": 50,
+                "filled_count": 36,
+                "empty_count": 14,
+                "fill_rate": 72.0,
+                "avg_length": 14.9,
+                "max_length": 23,
+                "min_length": 3
+              },
+              "Attachments": {
+                "field_name": "Attachments",
+                "field_type": "multipleAttachments",
+                "total_records": 50,
+                "filled_count": 38,
+                "empty_count": 12,
+                "fill_rate": 76.0
+              },
+              "Project": {
+                "field_name": "Project",
+                "field_type": "multipleRecordLinks",
+                "total_records": 50,
+                "filled_count": 50,
+                "empty_count": 0,
+                "fill_rate": 100.0
+              },
+              "Created by": {
+                "field_name": "Created by",
+                "field_type": "createdBy",
+                "total_records": 50,
+                "filled_count": 50,
+                "empty_count": 0,
+                "fill_rate": 100.0
+              },
+              "Created": {
+                "field_name": "Created",
+                "field_type": "createdTime",
+                "total_records": 50,
+                "filled_count": 50,
+                "empty_count": 0,
+                "fill_rate": 100.0
+              },
+              "Last Modified": {
+                "field_name": "Last Modified",
+                "field_type": "lastModifiedTime",
+                "total_records": 50,
+                "filled_count": 50,
+                "empty_count": 0,
+                "fill_rate": 100.0
+              },
+              "Category": {
+                "field_name": "Category",
+                "field_type": "singleSelect",
+                "total_records": 50,
+                "filled_count": 45,
+                "empty_count": 5,
+                "fill_rate": 90.0,
+                "unique_values": [
+                  "Photos",
+                  "Revit",
+                  "Drawings",
+                  "Bank "
+                ],
+                "unique_count": 4
+              }
+            },
+            "data_quality_insights": [
+              "Complete data: Project, Created by, Created, Last Modified have 100% fill rate"
+            ]
+          },
+          "status": "success"
+        }
+      ],
+      "successful_count": 3
+    },
+    "test_4_export": {
+      "status": "success",
+      "tables_with_data": 5,
+      "export_results": [
+        {
+          "table_name": "Projects",
+          "status": "success",
+          "export_size": 0
+        }
+      ]
+    },
+    "test_5_validate": {
+      "status": "success",
+      "record_count": 5,
+      "sample_records": [
+        {
+          "id": "recBcc0Q6cG0mPTXZ",
+          "fields": {
+            "Name": "Projects - Metadata Analysis"
+          },
+          "createdTime": "2025-08-04T17:01:02.000Z"
+        },
+        {
+          "id": "recDVi1AWX2NLJsGO",
+          "fields": {
+            "Name": "Co creators and clients - Metadata Analysis"
+          },
+          "createdTime": "2025-08-04T17:01:03.000Z"
+        },
+        {
+          "id": "recEhIVQplLXfduUh",
+          "fields": {
+            "Name": "Facebook post - Metadata Analysis"
+          },
+          "createdTime": "2025-08-04T17:01:06.000Z"
+        }
+      ]
+    }
+  },
+  "summary": {
+    "total_tests": 5,
+    "successful_tests": 5,
+    "failed_tests": 0,
+    "success_rate": 1.0,
+    "base_table_count": 35,
+    "metadata_records_created": 5
+  }
+}

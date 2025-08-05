@@ -1,0 +1,66 @@
+[
+  {
+    "id": "ws_001",
+    "name": "Marketing Workspace",
+    "owner_id": 1,
+    "table_count": 5,
+    "record_count": 1000,
+    "status": "active"
+  },
+  {
+    "id": "ws_002",
+    "name": "Sales Pipeline",
+    "owner_id": 2,
+    "table_count": 3,
+    "record_count": 500,
+    "status": "active"
+  },
+  {
+    "id": "ws_003",
+    "name": "Product Development",
+    "owner_id": 4,
+    "table_count": 8,
+    "record_count": 2000,
+    "status": "active"
+  },
+  {
+    "id": "ws_004",
+    "name": "Customer Support",
+    "owner_id": 3,
+    "table_count": 4,
+    "record_count": 1500,
+    "status": "active"
+  },
+  {
+    "id": "ws_005",
+    "name": "HR Management",
+    "owner_id": 1,
+    "table_count": 6,
+    "record_count": 300,
+    "status": "active"
+  },
+  {
+    "id": "ws_006",
+    "name": "Finance Tracking",
+    "owner_id": 4,
+    "table_count": 10,
+    "record_count": 5000,
+    "status": "active"
+  },
+  {
+    "id": "ws_007",
+    "name": "Performance Testing",
+    "owner_id": 6,
+    "table_count": 2,
+    "record_count": 100,
+    "status": "active"
+  },
+  {
+    "id": "ws_008",
+    "name": "Load Testing Data",
+    "owner_id": 9,
+    "table_count": 3,
+    "record_count": 750,
+    "status": "active"
+  }
+]

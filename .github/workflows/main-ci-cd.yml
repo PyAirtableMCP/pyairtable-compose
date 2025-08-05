@@ -1,0 +1,583 @@
+name: PyAirtable Platform CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_PREFIX: pyairtablemcp
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect-changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.changes.outputs.services }}
+      platform-services: ${{ steps.changes.outputs.platform-services }}
+      automation-services: ${{ steps.changes.outputs.automation-services }}
+      gateway: ${{ steps.changes.outputs.gateway }}
+      ai-services: ${{ steps.changes.outputs.ai-services }}
+      frontend: ${{ steps.changes.outputs.frontend }}
+      infrastructure: ${{ steps.changes.outputs.infrastructure }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            platform-services:
+              - 'python-services/platform-services/**'
+              - 'go-services/platform-services/**'
+            automation-services:
+              - 'python-services/automation-services/**'
+              - 'go-services/automation-services/**'
+            gateway:
+              - 'go-services/api-gateway/**'
+              - 'python-services/api-gateway/**'
+            ai-services:
+              - 'python-services/llm-orchestrator/**'
+              - 'python-services/mcp-server/**'
+              - 'python-services/airtable-gateway/**'
+            frontend:
+              - 'frontend-services/**'
+            infrastructure:
+              - 'k8s/**'
+              - 'docker-compose*.yml'
+              - 'scripts/**'
+          list-files: json
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+          
+      - name: Run secret detection
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
+          
+      - name: Check for exposed secrets in values files
+        run: |
+          # Check for API keys and tokens in configuration files
+          if grep -r -E "(AIzaSy|pat[a-zA-Z0-9]{32}|sk-[a-zA-Z0-9]{48})" k8s/ --include="*.yaml" --include="*.yml"; then
+            echo "::error::Exposed secrets found in configuration files"
+            exit 1
+          fi
+          
+          # Check for hardcoded credentials
+          if grep -r -E "(password.*=.*['\"][^'\"]{8,}['\"]|token.*=.*['\"][^'\"]{32,}['\"])" . --include="*.py" --include="*.go" --exclude-dir=node_modules; then
+            echo "::warning::Potential hardcoded credentials found"
+          fi
+
+  test-platform-services:
+    name: Test Platform Services
+    runs-on: ubuntu-latest
+    needs: [detect-changes, security-scan]
+    if: needs.detect-changes.outputs.platform-services == 'true'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          
+      - name: Install dependencies
+        run: |
+          cd python-services/platform-services
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio
+          
+      - name: Run unit tests
+        env:
+          DATABASE_URL: postgresql://postgres:test_password@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-jwt-secret-32-characters-long
+          API_KEY: test-api-key
+        run: |
+          cd python-services/platform-services
+          pytest tests/ -v --cov=. --cov-report=xml --cov-report=term
+          
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: python-services/platform-services/coverage.xml
+          flags: platform-services
+          
+  test-automation-services:
+    name: Test Automation Services
+    runs-on: ubuntu-latest
+    needs: [detect-changes, security-scan]
+    if: needs.detect-changes.outputs.automation-services == 'true'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          
+      - name: Install dependencies
+        run: |
+          cd python-services/automation-services
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+          
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql://postgres:test_password@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379
+        run: |
+          cd python-services/automation-services
+          pytest tests/ -v --cov=. --cov-report=xml
+          
+  test-gateway:
+    name: Test API Gateway
+    runs-on: ubuntu-latest
+    needs: [detect-changes, security-scan]
+    if: needs.detect-changes.outputs.gateway == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          cache: true
+          cache-dependency-path: go-services/api-gateway/go.sum
+          
+      - name: Run tests
+        run: |
+          cd go-services/api-gateway
+          go test -v -race -coverprofile=coverage.out ./...
+          go tool cover -html=coverage.out -o coverage.html
+          
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: go-services/api-gateway/coverage.out
+          flags: api-gateway
+
+  test-ai-services:
+    name: Test AI Services
+    runs-on: ubuntu-latest
+    needs: [detect-changes, security-scan]
+    if: needs.detect-changes.outputs.ai-services == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          
+      - name: Test LLM Orchestrator
+        run: |
+          cd python-services/llm-orchestrator
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+          pytest tests/ -v --cov=src --cov-report=xml
+          
+      - name: Test MCP Server
+        run: |
+          cd python-services/mcp-server
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+          pytest tests/ -v --cov=src --cov-report=xml
+
+  test-frontend:
+    name: Test Frontend Services
+    runs-on: ubuntu-latest
+    needs: [detect-changes, security-scan]
+    if: needs.detect-changes.outputs.frontend == 'true'
+    strategy:
+      matrix:
+        service: [tenant-dashboard, admin-dashboard, auth-frontend]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend-services/${{ matrix.service }}/package-lock.json
+          
+      - name: Install dependencies
+        run: |
+          cd frontend-services/${{ matrix.service }}
+          npm ci
+          
+      - name: Run type check
+        run: |
+          cd frontend-services/${{ matrix.service }}
+          npm run type-check
+          
+      - name: Run tests
+        run: |
+          cd frontend-services/${{ matrix.service }}
+          npm test -- --coverage --watchAll=false
+          
+      - name: Run E2E tests
+        if: matrix.service == 'tenant-dashboard'
+        run: |
+          cd frontend-services/${{ matrix.service }}
+          npm run build
+          npm start &
+          sleep 30
+          npm run test:e2e
+
+  build-and-push:
+    name: Build and Push Images
+    runs-on: ubuntu-latest
+    needs: [detect-changes, test-platform-services, test-automation-services, test-gateway, test-ai-services, test-frontend]
+    if: always() && (needs.detect-changes.result == 'success' && !failure() && !cancelled())
+    strategy:
+      matrix:
+        include:
+          - service: platform-services
+            context: python-services/platform-services
+            dockerfile: python-services/platform-services/Dockerfile
+            condition: needs.detect-changes.outputs.platform-services == 'true'
+          - service: automation-services
+            context: python-services/automation-services
+            dockerfile: python-services/automation-services/Dockerfile
+            condition: needs.detect-changes.outputs.automation-services == 'true'
+          - service: api-gateway
+            context: go-services/api-gateway
+            dockerfile: go-services/api-gateway/Dockerfile
+            condition: needs.detect-changes.outputs.gateway == 'true'
+          - service: llm-orchestrator
+            context: python-services/llm-orchestrator
+            dockerfile: python-services/llm-orchestrator/Dockerfile
+            condition: needs.detect-changes.outputs.ai-services == 'true'
+          - service: mcp-server
+            context: python-services/mcp-server
+            dockerfile: python-services/mcp-server/Dockerfile
+            condition: needs.detect-changes.outputs.ai-services == 'true'
+          - service: airtable-gateway
+            context: python-services/airtable-gateway
+            dockerfile: python-services/airtable-gateway/Dockerfile
+            condition: needs.detect-changes.outputs.ai-services == 'true'
+          - service: tenant-dashboard
+            context: frontend-services/tenant-dashboard
+            dockerfile: frontend-services/tenant-dashboard/Dockerfile
+            condition: needs.detect-changes.outputs.frontend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        if: fromJSON(matrix.condition)
+        
+      - name: Setup Docker Buildx
+        if: fromJSON(matrix.condition)
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Log in to Container Registry
+        if: fromJSON(matrix.condition)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Extract metadata
+        if: fromJSON(matrix.condition)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PREFIX }}-${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            
+      - name: Build and push
+        if: fromJSON(matrix.condition)
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+          
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.8.0
+        with:
+          cluster_name: integration-test
+          config: tests/kind-config.yaml
+          
+      - name: Load images to kind
+        run: |
+          # Load built images into kind cluster
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PREFIX }}-platform-services:${{ github.sha }}
+          kind load docker-image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PREFIX }}-platform-services:${{ github.sha }} --name integration-test
+          
+      - name: Deploy to test cluster
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/test/
+          envsubst < k8s/test/platform-services-test.yaml | kubectl apply -f -
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          
+      - name: Wait for deployment
+        run: |
+          kubectl rollout status deployment/platform-services-test -n pyairtable-test --timeout=300s
+          
+      - name: Run integration tests
+        run: |
+          kubectl apply -f tests/integration/test-job.yaml
+          kubectl wait --for=condition=complete job/integration-tests -n pyairtable-test --timeout=600s
+          
+      - name: Get test results
+        if: always()
+        run: |
+          kubectl logs job/integration-tests -n pyairtable-test
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [integration-tests]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBECONFIG_STAGING }}" | base64 -d > ~/.kube/config
+          kubectl config current-context
+          
+      - name: Deploy to staging
+        run: |
+          # Update staging deployment with new images
+          kubectl set image deployment/platform-services platform-services=${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PREFIX }}-platform-services:${{ github.sha }} -n pyairtable-staging
+          kubectl set image deployment/automation-services automation-services=${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PREFIX }}-automation-services:${{ github.sha }} -n pyairtable-staging
+          kubectl set image deployment/api-gateway api-gateway=${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PREFIX }}-api-gateway:${{ github.sha }} -n pyairtable-staging
+          
+          # Wait for rollout to complete
+          kubectl rollout status deployment/platform-services -n pyairtable-staging --timeout=600s
+          kubectl rollout status deployment/automation-services -n pyairtable-staging --timeout=600s
+          kubectl rollout status deployment/api-gateway -n pyairtable-staging --timeout=600s
+          
+      - name: Run smoke tests
+        run: |
+          kubectl apply -f tests/smoke/smoke-tests.yaml -n pyairtable-staging
+          kubectl wait --for=condition=complete job/smoke-tests -n pyairtable-staging --timeout=300s
+          
+      - name: Notify deployment
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#deployments'
+          text: 'Staging deployment completed for commit ${{ github.sha }}'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBECONFIG_PRODUCTION }}" | base64 -d > ~/.kube/config
+          kubectl config current-context
+          
+      - name: Pre-deployment checks
+        run: |
+          # Verify staging is healthy
+          kubectl get pods -n pyairtable-staging
+          
+          # Check for any active incidents
+          if [ "${{ secrets.INCIDENT_STATUS }}" = "active" ]; then
+            echo "Active incident detected, aborting deployment"
+            exit 1
+          fi
+          
+      - name: Blue-Green Deployment
+        run: |
+          # Deploy green environment
+          envsubst < k8s/production/green-deployment.yaml | kubectl apply -f -
+          
+          # Wait for green deployment
+          kubectl rollout status deployment/platform-services-green -n pyairtable --timeout=600s
+          kubectl rollout status deployment/automation-services-green -n pyairtable --timeout=600s
+          kubectl rollout status deployment/api-gateway-green -n pyairtable --timeout=600s
+          
+      - name: Canary traffic test
+        run: |
+          # Route 10% traffic to green
+          kubectl patch service platform-services -n pyairtable -p '{"spec":{"selector":{"version":"green"}}}'
+          
+          # Monitor for 5 minutes
+          sleep 300
+          
+          # Check error rates
+          ERROR_RATE=$(kubectl exec -n monitoring prometheus-0 -- promtool query instant 'rate(http_requests_total{job="platform-services",status=~"5.."}[5m])' | grep -o '[0-9.]*' | head -1)
+          if (( $(echo "$ERROR_RATE > 0.01" | bc -l) )); then
+            echo "High error rate detected: $ERROR_RATE"
+            kubectl patch service platform-services -n pyairtable -p '{"spec":{"selector":{"version":"blue"}}}'
+            exit 1
+          fi
+          
+      - name: Full traffic switch
+        run: |
+          # Switch all traffic to green
+          kubectl patch service platform-services -n pyairtable -p '{"spec":{"selector":{"version":"green"}}}'
+          kubectl patch service automation-services -n pyairtable -p '{"spec":{"selector":{"version":"green"}}}'
+          kubectl patch service api-gateway -n pyairtable -p '{"spec":{"selector":{"version":"green"}}}'
+          
+          # Monitor for 10 minutes
+          sleep 600
+          
+      - name: Cleanup blue deployment
+        run: |
+          # Remove blue deployment
+          kubectl delete deployment platform-services-blue -n pyairtable --ignore-not-found=true
+          kubectl delete deployment automation-services-blue -n pyairtable --ignore-not-found=true
+          kubectl delete deployment api-gateway-blue -n pyairtable --ignore-not-found=true
+          
+      - name: Post-deployment verification
+        run: |
+          # Run comprehensive health checks
+          kubectl apply -f tests/production/health-check.yaml
+          kubectl wait --for=condition=complete job/production-health-check -n pyairtable --timeout=300s
+          
+      - name: Notify successful deployment
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#deployments'
+          text: '🚀 Production deployment successful! Version ${{ github.sha }} is now live.'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          
+  security-post-deployment:
+    name: Security Validation
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run security scan on deployed services
+        run: |
+          # OWASP ZAP baseline scan
+          docker run -v $(pwd):/zap/wrk/:rw -t owasp/zap2docker-stable zap-baseline.py \
+            -t https://api.pyairtable.com \
+            -g gen.conf \
+            -r zap-report.html
+            
+      - name: Upload security report
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-scan-report
+          path: zap-report.html

@@ -1,0 +1,250 @@
+version: '3.8'
+
+services:
+  # MinIO for shared object storage
+  minio:
+    image: minio/minio:RELEASE.2024-01-16T16-07-38Z
+    platform: linux/arm64
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - lgtm-network
+
+  # MinIO client for bucket initialization
+  minio-init:
+    image: minio/mc:RELEASE.2024-01-13T08-44-48Z
+    platform: linux/arm64
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set minio http://minio:9000 minioadmin minioadmin123;
+      /usr/bin/mc mb minio/loki-data || true;
+      /usr/bin/mc mb minio/tempo-data || true;
+      /usr/bin/mc mb minio/mimir-blocks || true;
+      /usr/bin/mc mb minio/mimir-ruler || true;
+      /usr/bin/mc mb minio/mimir-alertmanager || true;
+      /usr/bin/mc policy set public minio/loki-data;
+      /usr/bin/mc policy set public minio/tempo-data;
+      /usr/bin/mc policy set public minio/mimir-blocks;
+      /usr/bin/mc policy set public minio/mimir-ruler;
+      /usr/bin/mc policy set public minio/mimir-alertmanager;
+      exit 0;
+      "
+    networks:
+      - lgtm-network
+
+  # Loki - Log aggregation with optimized configuration
+  loki:
+    image: grafana/loki:2.9.4
+    platform: linux/arm64
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/loki.yml
+    volumes:
+      - ./loki/loki-simple.yml:/etc/loki/loki.yml:ro
+      - loki-data:/loki
+    depends_on:
+      - minio-init
+    restart: unless-stopped
+    networks:
+      - lgtm-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # Tempo - Distributed tracing
+  tempo:
+    image: grafana/tempo:2.3.1
+    platform: linux/arm64
+    container_name: tempo
+    ports:
+      - "3200:3200"
+      - "14268:14268"  # Jaeger HTTP
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+    command: -config.file=/etc/tempo/tempo.yml
+    volumes:
+      - ./tempo/tempo-simple.yml:/etc/tempo/tempo.yml:ro
+      - tempo-data:/var/tempo
+    depends_on:
+      - minio-init
+    restart: unless-stopped
+    networks:
+      - lgtm-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # Mimir - Long-term metrics storage
+  mimir:
+    image: grafana/mimir:2.10.3
+    platform: linux/arm64
+    container_name: mimir
+    ports:
+      - "8081:8080"
+      - "7946:7946"
+    command: -config.file=/etc/mimir/mimir.yml
+    volumes:
+      - ./mimir/mimir-simple.yml:/etc/mimir/mimir.yml:ro
+      - mimir-data:/data
+    depends_on:
+      - minio-init
+    restart: unless-stopped
+    networks:
+      - lgtm-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+
+  # Grafana - Unified visualization
+  grafana:
+    image: grafana/grafana:10.2.0
+    platform: linux/arm64
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel,grafana-clock-panel
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - loki
+      - tempo
+      - mimir
+    restart: unless-stopped
+    networks:
+      - lgtm-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+
+  # Promtail - Log collection
+  promtail:
+    image: grafana/promtail:2.9.4
+    platform: linux/arm64
+    container_name: promtail
+    volumes:
+      - ./promtail/promtail-optimized.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    restart: unless-stopped
+    networks:
+      - lgtm-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  # OpenTelemetry Collector - Enhanced for LGTM
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.89.0
+    platform: linux/arm64
+    container_name: otel-collector
+    ports:
+      - "4320:4317"   # OTLP gRPC (mapped to avoid conflict with Tempo)
+      - "4319:4318"   # OTLP HTTP
+      - "8889:8889"   # Prometheus metrics
+      - "13133:13133" # Health check
+    command: ["--config=/etc/otelcol-contrib/otel-collector.yml"]
+    volumes:
+      - ./otel/otel-collector-simple.yml:/etc/otelcol-contrib/otel-collector.yml:ro
+    depends_on:
+      - tempo
+      - mimir
+    restart: unless-stopped
+    networks:
+      - lgtm-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # AlertManager for notifications
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    platform: linux/arm64
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager-optimized.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+    restart: unless-stopped
+    networks:
+      - lgtm-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+volumes:
+  minio-data:
+  loki-data:
+  tempo-data:
+  mimir-data:
+  grafana-data:
+
+networks:
+  lgtm-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

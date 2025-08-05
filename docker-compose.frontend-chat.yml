@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # PyAirtable Chat Frontend - Tenant Dashboard with Chat Interface
+  tenant-dashboard:
+    build:
+      context: ./frontend-services/tenant-dashboard
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3004:3002"
+    environment:
+      # Backend API Configuration
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+      - NEXT_PUBLIC_WEBSOCKET_URL=ws://localhost:8000/ws
+      - NEXT_PUBLIC_SSE_URL=http://localhost:8000/sse
+      
+      # Service-specific endpoints
+      - NEXT_PUBLIC_LLM_ORCHESTRATOR_URL=http://localhost:8003
+      - NEXT_PUBLIC_MCP_SERVER_URL=http://localhost:8001
+      - NEXT_PUBLIC_AIRTABLE_GATEWAY_URL=http://localhost:8002
+      
+      # Application Configuration
+      - NEXT_PUBLIC_ENVIRONMENT=development
+      - NEXT_PUBLIC_ENABLE_DEVTOOLS=true
+      - NEXT_PUBLIC_APP_NAME=PyAirtable AI Assistant
+      - NEXT_PUBLIC_APP_DESCRIPTION=AI-powered Airtable data analysis and automation
+      
+      # Authentication Configuration (using mock data for now)
+      - NEXTAUTH_URL=http://localhost:3004
+      - NEXTAUTH_SECRET=development-secret-key-change-in-production
+      
+      # Feature Flags
+      - NEXT_PUBLIC_ENABLE_CHAT=true
+      - NEXT_PUBLIC_ENABLE_WEBSOCKETS=true
+      - NEXT_PUBLIC_ENABLE_SSE=true
+      - NEXT_PUBLIC_ENABLE_REALTIME=true
+      
+      # Development Configuration
+      - NODE_ENV=development
+      
+    # depends_on will be handled by external network connectivity
+    networks:
+      - pyairtable-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      # For development hot reload (commented out for production build)
+      # - ./frontend-services/tenant-dashboard/src:/app/src:cached
+      # - ./frontend-services/tenant-dashboard/public:/app/public:cached
+      # - /app/node_modules
+      # - /app/.next
+      - ./frontend-services/tenant-dashboard/.env.local:/app/.env.local:ro
+
+
+networks:
+  pyairtable-network:
+    external: true

@@ -53,16 +53,20 @@ datasources:
       maxConcurrentShardRequests: 5
     version: 1
 
-  # Loki Alternative (if using Loki instead of ELK)
-  # - name: Loki
-  #   type: loki
-  #   access: proxy
-  #   url: http://loki:3100
-  #   editable: true
-  #   jsonData:
-  #     derivedFields:
-  #       - datasourceUid: 'jaeger'
-  #         matcherRegex: 'trace_id=(\w+)'
-  #         name: 'TraceID'
-  #         url: '$${__value.raw}'
-  #   version: 1
+  # Loki - Lightweight log aggregation
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: true
+    isDefault: false
+    jsonData:
+      derivedFields:
+        - datasourceUid: 'jaeger'
+          matcherRegex: 'trace_id=(\w+)'
+          name: 'TraceID'
+          url: '$${__value.raw}'
+      alertmanager:
+        handleGrafanaManagedAlerts: true
+        implementation: prometheus
+    version: 1

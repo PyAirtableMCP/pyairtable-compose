@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatRelativeTime } from '@/lib/utils'
-import { Search, Toggle, Zap, Settings, Users, Shield, AlertTriangle } from 'lucide-react'
+import { Search, ToggleLeft, Zap, Settings, Users, Shield, AlertTriangle } from 'lucide-react'
 import { FeatureFlag } from '@/types'
 
 export function FeatureFlags() {
@@ -83,7 +83,7 @@ export function FeatureFlags() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Flags</CardTitle>
-            <Toggle className="w-4 h-4 text-muted-foreground" />
+            <ToggleLeft className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">

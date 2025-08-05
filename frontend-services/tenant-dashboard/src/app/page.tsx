@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import type { Tenant } from "@/types";
-import { useFeatureFlag } from "./posthog-provider";
+// Temporarily disabled: import { useFeatureFlag } from "./posthog-provider";
 
 // Mock tenant data for development
 const mockTenant: Tenant = {
@@ -376,13 +376,13 @@ function ErrorState({ error }: { error: Error }) {
 }
 
 export default function HomePage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const isDevelopment = process.env.NODE_ENV === "development";
   const { data: tenant, isLoading, error } = useTenant();
   
   // Feature flags for progressive disclosure
-  const showAdvancedMetrics = useFeatureFlag("advanced-metrics", false);
-  const showBillingSection = useFeatureFlag("billing-controls", false);
+  const showAdvancedMetrics = false; // useFeatureFlag("advanced-metrics", false);
+  const showBillingSection = false; // useFeatureFlag("billing-controls", false);
   
   // Use mock data in development
   const currentTenant = isDevelopment ? mockTenant : tenant;
@@ -399,6 +399,12 @@ export default function HomePage() {
 
   if (!currentTenant) {
     return <ErrorState error={new Error("No tenant data available")} />;
+  }
+
+  // For demo purposes, redirect to chat interface as main landing page
+  if (typeof window !== 'undefined') {
+    window.location.href = '/chat';
+    return null;
   }
 
   return (

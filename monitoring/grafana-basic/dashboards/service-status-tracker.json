@@ -1,0 +1,407 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "PyAirtable Service Status Tracker",
+    "tags": ["pyairtable", "services", "status", "broken"],
+    "timezone": "browser",
+    "refresh": "10s",
+    "schemaVersion": 30,
+    "version": 0,
+    "time": {
+      "from": "now-15m",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "🚦 WORKING SERVICES STATUS",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=\"api-gateway\"}",
+            "legendFormat": "API Gateway"
+          },
+          {
+            "expr": "up{job=\"airtable-gateway\"}",
+            "legendFormat": "Airtable Gateway"
+          },
+          {
+            "expr": "up{job=\"mcp-server\"}",
+            "legendFormat": "MCP Server"
+          },
+          {
+            "expr": "up{job=\"llm-orchestrator\"}",
+            "legendFormat": "LLM Orchestrator"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "displayName": "${__field.labels.__name__}",
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "🔴 DOWN",
+                    "color": "red"
+                  },
+                  "1": {
+                    "text": "🟢 UP",
+                    "color": "green"
+                  }
+                },
+                "type": "value"
+              }
+            ],
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "unit": "none"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "none",
+          "justifyMode": "auto"
+        }
+      },
+      {
+        "id": 2,
+        "title": "⚠️ BROKEN SERVICES TRACKING",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "absent(up{job=\"auth-service\"})",
+            "legendFormat": "Auth Service"
+          },
+          {
+            "expr": "absent(up{job=\"notification-service\"})",
+            "legendFormat": "Notification Service"
+          },
+          {
+            "expr": "absent(up{job=\"file-service\"})",
+            "legendFormat": "File Service"
+          },
+          {
+            "expr": "absent(up{job=\"workflow-engine\"})",
+            "legendFormat": "Workflow Engine"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "displayName": "${__field.labels.__name__}",
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "🟡 MISSING",
+                    "color": "yellow"
+                  },
+                  "1": {
+                    "text": "🔴 BROKEN",
+                    "color": "red"
+                  }
+                },
+                "type": "value"
+              }
+            ],
+            "thresholds": {
+              "steps": [
+                {"color": "yellow", "value": 0},
+                {"color": "red", "value": 1}
+              ]
+            },
+            "unit": "none"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "none",
+          "justifyMode": "auto"
+        }
+      },
+      {
+        "id": 3,
+        "title": "📊 Service Uptime (Last 24h)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "avg_over_time(up{job=~\"api-gateway|airtable-gateway|mcp-server|llm-orchestrator\"}[24h]) * 100",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 2,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 95},
+                {"color": "green", "value": 99}
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 6,
+          "w": 24,
+          "x": 0,
+          "y": 8
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "horizontal",
+          "textMode": "auto",
+          "colorMode": "background"
+        }
+      },
+      {
+        "id": 4,
+        "title": "🔄 API Request Rate (Working Services)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{job=~\"api-gateway|airtable-gateway|mcp-server|llm-orchestrator\"}[5m])) by (job)",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Requests/sec",
+            "min": 0
+          },
+          {
+            "show": false
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 14
+        },
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true,
+          "avg": true
+        }
+      },
+      {
+        "id": 5,
+        "title": "⚡ Response Time (95th percentile)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~\"api-gateway|airtable-gateway|mcp-server|llm-orchestrator\"}[5m])) by (job, le))",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Seconds",
+            "min": 0
+          },
+          {
+            "show": false
+          }
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [2],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "10s",
+          "handler": 1,
+          "name": "High Response Time Alert",
+          "noDataState": "no_data",
+          "notifications": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 14
+        }
+      },
+      {
+        "id": 6,
+        "title": "🚨 Critical Error Events",
+        "type": "logs",
+        "targets": [
+          {
+            "expr": "{service=~\"api-gateway|airtable-gateway|mcp-server|llm-orchestrator\"} |= \"ERROR\" or |= \"CRITICAL\" or |= \"FATAL\"",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": true,
+          "showCommonLabels": false,
+          "wrapLogMessage": true,
+          "prettifyLogMessage": false,
+          "enableLogDetails": true,
+          "dedupStrategy": "none",
+          "sortOrder": "Descending"
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 22
+        }
+      },
+      {
+        "id": 7,
+        "title": "💾 Infrastructure Health",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=\"postgres\"}",
+            "legendFormat": "PostgreSQL"
+          },
+          {
+            "expr": "up{job=\"redis\"}",
+            "legendFormat": "Redis"
+          },
+          {
+            "expr": "up{job=\"node-exporter\"}",
+            "legendFormat": "System"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "🔴 DOWN",
+                    "color": "red"
+                  },
+                  "1": {
+                    "text": "🟢 UP",
+                    "color": "green"
+                  }
+                },
+                "type": "value"
+              }
+            ],
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 6,
+          "w": 12,
+          "x": 0,
+          "y": 30
+        }
+      },
+      {
+        "id": 8,
+        "title": "📈 System Resource Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "CPU Usage %"
+          },
+          {
+            "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100",
+            "legendFormat": "Memory Usage %"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Percentage",
+            "min": 0,
+            "max": 100
+          },
+          {
+            "show": false
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 80,
+            "colorMode": "critical",
+            "op": "gt"
+          }
+        ],
+        "gridPos": {
+          "h": 6,
+          "w": 12,
+          "x": 12,
+          "y": 30
+        }
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "Service Outages",
+          "datasource": "Prometheus",
+          "enable": true,
+          "expr": "changes(up{job=~\"api-gateway|airtable-gateway|mcp-server|llm-orchestrator\"}[1m]) > 0",
+          "iconColor": "red",
+          "titleFormat": "{{job}} Status Change",
+          "textFormat": "Service {{job}} changed status"
+        }
+      ]
+    }
+  }
+}
