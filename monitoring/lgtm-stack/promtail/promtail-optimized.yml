@@ -12,9 +12,8 @@ positions:
 
 clients:
   - url: http://loki:3100/loki/api/v1/push
-    # Optimize batch settings for cost efficiency
-    batch_wait: 1s
-    batch_size: 1048576  # 1MB batch size
+    # Note: batch_wait and batch_size are not supported in this Promtail version
+    # They are managed internally by the client
     
     # Retry configuration
     backoff_config:
