@@ -40,26 +40,31 @@ export default function LoginPage() {
       setIsLoading(true)
       setError(null)
 
+      console.log("🔐 Starting login with:", { email: data.email })
+
       const result = await signIn("credentials", {
         email: data.email,
         password: data.password,
         redirect: false,
       })
 
+      console.log("🔐 SignIn result:", result)
+
       if (result?.error) {
+        console.error("🔐 SignIn error:", result.error)
         setError("Invalid email or password")
         return
       }
 
       if (result?.ok) {
+        console.log("🔐 SignIn successful, redirecting to dashboard")
         toast.success("Welcome back!")
         
         // Refresh session to get updated data
         await getSession()
         
-        // Redirect to dashboard
-        router.push("/")
-        router.refresh()
+        // Use Next.js router for client-side navigation
+        router.push("/dashboard")
       }
     } catch (error) {
       console.error("Login error:", error)
@@ -136,7 +141,7 @@ export default function LoginPage() {
           </div>
 
           {/* Email/Password Form */}
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
             <div className="space-y-2">
               <div className="relative">
                 <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />

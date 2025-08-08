@@ -1,0 +1,25 @@
+# Page snapshot
+
+```yaml
+- heading "Welcome back" [level=3]
+- paragraph: Sign in to your PyAirtable account
+- alert: Invalid email or password
+- button "Google":
+  - img
+  - text: Google
+- button "GitHub":
+  - img
+  - text: GitHub
+- text: Or continue with email
+- img
+- textbox "Enter your email": special.user+test@example.com
+- img
+- textbox "Enter your password": SpecialPassword123!@#
+- button "Sign In"
+- link "Forgot your password?":
+  - /url: /auth/forgot-password
+- text: Don't have an account?
+- link "Sign up":
+  - /url: /auth/register
+- alert
+```

@@ -15,73 +15,45 @@ test.describe('Complete User Registration Flow', () => {
 
     // Step 1: Navigate to registration from landing page
     await page.goto('/auth/register')
-    await expect(page.getByRole('heading', { name: /create account|sign up|register/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /create your account/i })).toBeVisible()
 
-    // Step 2: Fill out registration form
-    await page.getByLabel(/email/i).fill(newUser.email)
-    await page.getByLabel(/password/i).fill(newUser.password)
-    
-    // Handle confirm password field if present
-    const confirmPasswordField = page.getByLabel(/confirm password|repeat password/i)
-    if (await confirmPasswordField.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await confirmPasswordField.fill(newUser.password)
-    }
-    
-    await page.getByLabel(/name|full name/i).fill(newUser.name)
+    // Step 2: Fill out registration form using placeholder text selectors
+    await page.getByPlaceholder('Enter your full name').fill(newUser.name)
+    await page.getByPlaceholder('Enter your email').fill(newUser.email)
+    await page.getByPlaceholder('Create a password').fill(newUser.password)
+    await page.getByPlaceholder('Confirm your password').fill(newUser.password)
 
-    // Accept terms and conditions if present
-    const termsCheckbox = page.getByLabel(/terms|privacy|agree/i)
-    if (await termsCheckbox.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await termsCheckbox.check()
-    }
+    // Accept terms and conditions checkbox
+    await page.getByLabel(/I agree to the Terms of Service and Privacy Policy/i).check()
 
     // Step 3: Submit registration
-    await page.getByRole('button', { name: /sign up|register|create account/i }).click()
+    await page.getByRole('button', { name: /create account/i }).click()
 
     // Step 4: Handle post-registration flow
-    // Could redirect to email verification, onboarding, or directly to dashboard
-    await expect(page).toHaveURL(/\/(verify-email|onboarding|dashboard|chat)/, { timeout: 15000 })
+    // Should redirect to onboarding after successful registration
+    await expect(page).toHaveURL(/\/auth\/onboarding/, { timeout: 15000 })
 
-    // Step 5: If email verification required, simulate verification
-    if (page.url().includes('/verify-email')) {
-      // Look for verification message
-      await expect(page.getByText(/verify|check your email|confirmation/i)).toBeVisible()
-      
-      // Mock email verification (in real scenario, would click email link)
-      await page.goto('/auth/verify?token=mock-verification-token&email=' + encodeURIComponent(newUser.email))
-      
-      // Should redirect to dashboard or onboarding
-      await expect(page).toHaveURL(/\/(onboarding|dashboard|chat)/, { timeout: 10000 })
-    }
-
-    // Step 6: Complete onboarding if present
-    if (page.url().includes('/onboarding')) {
-      // Handle onboarding steps
-      await expect(page.getByText(/welcome|getting started|setup/i)).toBeVisible()
-      
-      // Fill onboarding form if present
-      const continueButton = page.getByRole('button', { name: /continue|next|get started/i })
-      if (await continueButton.isVisible()) {
-        await continueButton.click()
-      }
-      
-      // Complete any additional onboarding steps
-      await page.waitForURL(/\/(dashboard|chat)/, { timeout: 10000 })
-    }
-
-    // Step 7: Verify successful registration and access to main application
-    await CommonHelpers.waitForPageLoad(page)
+    // Step 5: Complete onboarding flow
+    await expect(page.getByText(/welcome|getting started/i)).toBeVisible()
     
-    // Should be on main dashboard or chat page
-    expect(['/dashboard', '/chat', '/']).toContain(new URL(page.url()).pathname)
+    // Look for and complete onboarding steps
+    const continueButton = page.getByRole('button', { name: /continue|next|get started|complete setup/i })
+    if (await continueButton.isVisible()) {
+      await continueButton.click()
+      // Wait for redirect after onboarding
+      await expect(page).toHaveURL(/\/(dashboard|chat|\/)/,  { timeout: 10000 })
+    }
+
+    // Step 6: Verify successful registration and access to main application
+    await CommonHelpers.waitForPageLoad(page)
     
     // Verify user is authenticated
     await AuthHelpers.verifyAuthenticated(page)
 
-    // Step 8: Verify access to protected features
+    // Step 7: Verify access to protected features
     // Navigate to chat interface
     await page.goto('/chat')
-    await expect(page.getByText(/pyairtable ai assistant|welcome|chat/i)).toBeVisible()
+    await expect(page.getByText(/PyAirtable Assistant/i)).toBeVisible()
 
     // Clean up test user
     await CommonHelpers.cleanupTestData(page, newUser.email)
@@ -91,16 +63,13 @@ test.describe('Complete User Registration Flow', () => {
     await page.goto('/auth/register')
     
     // Try to register with existing test user email
-    await page.getByLabel(/email/i).fill(testUsers.standard.email)
-    await page.getByLabel(/password/i).fill('NewPassword123!')
-    await page.getByLabel(/name/i).fill('Another User')
+    await page.getByPlaceholder('Enter your full name').fill('Another User')
+    await page.getByPlaceholder('Enter your email').fill(testUsers.standard.email)
+    await page.getByPlaceholder('Create a password').fill('NewPassword123!')
+    await page.getByPlaceholder('Confirm your password').fill('NewPassword123!')
     
-    const confirmPasswordField = page.getByLabel(/confirm password/i)
-    if (await confirmPasswordField.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await confirmPasswordField.fill('NewPassword123!')
-    }
-
-    await page.getByRole('button', { name: /sign up|register/i }).click()
+    await page.getByLabel(/I agree to the Terms of Service and Privacy Policy/i).check()
+    await page.getByRole('button', { name: /create account/i }).click()
 
     // Should show error about existing email
     await CommonHelpers.verifyErrorMessage(page, /email already exists|user already registered|email taken/i)
@@ -110,12 +79,13 @@ test.describe('Complete User Registration Flow', () => {
     await page.goto('/auth/register')
     
     const uniqueUser = generateUniqueTestUser('password-test')
-    await page.getByLabel(/email/i).fill(uniqueUser.email)
-    await page.getByLabel(/name/i).fill(uniqueUser.name)
+    await page.getByPlaceholder('Enter your full name').fill(uniqueUser.name)
+    await page.getByPlaceholder('Enter your email').fill(uniqueUser.email)
     
     // Test weak password
-    await page.getByLabel(/password/i).fill('123')
-    await page.getByRole('button', { name: /sign up|register/i }).click()
+    await page.getByPlaceholder('Create a password').fill('123')
+    await page.getByLabel(/I agree to the Terms of Service and Privacy Policy/i).check()
+    await page.getByRole('button', { name: /create account/i }).click()
     
     // Should show password requirement error
     await CommonHelpers.verifyErrorMessage(page, /password.*requirements|password.*strong|password.*length/i)
@@ -125,11 +95,13 @@ test.describe('Complete User Registration Flow', () => {
     await page.goto('/auth/register')
     
     // Test invalid email format
-    await page.getByLabel(/email/i).fill('invalid-email')
-    await page.getByLabel(/password/i).fill('ValidPassword123!')
-    await page.getByLabel(/name/i).fill('Test User')
+    await page.getByPlaceholder('Enter your full name').fill('Test User')
+    await page.getByPlaceholder('Enter your email').fill('invalid-email')
+    await page.getByPlaceholder('Create a password').fill('ValidPassword123!')
+    await page.getByPlaceholder('Confirm your password').fill('ValidPassword123!')
     
-    await page.getByRole('button', { name: /sign up|register/i }).click()
+    await page.getByLabel(/I agree to the Terms of Service and Privacy Policy/i).check()
+    await page.getByRole('button', { name: /create account/i }).click()
     
     // Should show email format error
     await CommonHelpers.verifyErrorMessage(page, /valid email|email format|invalid email/i)
@@ -140,19 +112,16 @@ test.describe('Complete User Registration Flow', () => {
     
     const uniqueUser = generateUniqueTestUser('mismatch-test')
     
-    await page.getByLabel(/email/i).fill(uniqueUser.email)
-    await page.getByLabel(/name/i).fill(uniqueUser.name)
-    await page.getByLabel(/^password/i).fill('Password123!')
+    await page.getByPlaceholder('Enter your full name').fill(uniqueUser.name)
+    await page.getByPlaceholder('Enter your email').fill(uniqueUser.email)
+    await page.getByPlaceholder('Create a password').fill('Password123!')
+    await page.getByPlaceholder('Confirm your password').fill('DifferentPassword123!')
     
-    const confirmField = page.getByLabel(/confirm password|repeat password/i)
-    if (await confirmField.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await confirmField.fill('DifferentPassword123!')
-      
-      await page.getByRole('button', { name: /sign up|register/i }).click()
-      
-      // Should show password mismatch error
-      await CommonHelpers.verifyErrorMessage(page, /passwords.*match|passwords.*same|password.*mismatch/i)
-    }
+    await page.getByLabel(/I agree to the Terms of Service and Privacy Policy/i).check()
+    await page.getByRole('button', { name: /create account/i }).click()
+    
+    // Should show password mismatch error
+    await CommonHelpers.verifyErrorMessage(page, /passwords.*match|passwords.*same|password.*mismatch/i)
   })
 
   test('should require terms and conditions acceptance', async ({ page }) => {
@@ -160,47 +129,46 @@ test.describe('Complete User Registration Flow', () => {
     
     const uniqueUser = generateUniqueTestUser('terms-test')
     
-    await page.getByLabel(/email/i).fill(uniqueUser.email)
-    await page.getByLabel(/password/i).fill(uniqueUser.password)
-    await page.getByLabel(/name/i).fill(uniqueUser.name)
+    await page.getByPlaceholder('Enter your full name').fill(uniqueUser.name)
+    await page.getByPlaceholder('Enter your email').fill(uniqueUser.email)
+    await page.getByPlaceholder('Create a password').fill(uniqueUser.password)
+    await page.getByPlaceholder('Confirm your password').fill(uniqueUser.password)
     
-    // Don't check terms checkbox
-    const termsCheckbox = page.getByLabel(/terms|privacy|agree/i)
-    if (await termsCheckbox.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await page.getByRole('button', { name: /sign up|register/i }).click()
-      
-      // Should show terms acceptance error
-      await CommonHelpers.verifyErrorMessage(page, /accept.*terms|agree.*terms|terms.*required/i)
-    }
+    // Don't check terms checkbox - leave it unchecked
+    await page.getByRole('button', { name: /create account/i }).click()
+    
+    // Should show terms acceptance error
+    await CommonHelpers.verifyErrorMessage(page, /accept.*terms|agree.*terms|terms.*required/i)
   })
 
   test('should navigate between registration and login pages', async ({ page }) => {
     await page.goto('/auth/register')
     
     // Click link to go to login page
-    await page.getByRole('link', { name: /sign in|login|already have account/i }).click()
+    await page.getByRole('link', { name: /sign in/i }).click()
     
     await expect(page).toHaveURL(/\/auth\/login/)
-    await expect(page.getByRole('heading', { name: /sign in|login/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /welcome back/i })).toBeVisible()
     
     // Navigate back to registration
-    await page.getByRole('link', { name: /sign up|register|create account/i }).click()
+    await page.getByRole('link', { name: /sign up/i }).click()
     
     await expect(page).toHaveURL(/\/auth\/register/)
-    await expect(page.getByRole('heading', { name: /create account|sign up|register/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /create your account/i })).toBeVisible()
   })
 
   test('should be accessible', async ({ page }) => {
     await page.goto('/auth/register')
     
-    // Test keyboard navigation
+    // Test keyboard navigation - first focusable element should be the name field
     await page.keyboard.press('Tab')
-    const firstField = page.getByLabel(/email/i)
+    const firstField = page.getByPlaceholder('Enter your full name')
     await expect(firstField).toBeFocused()
     
-    // Check form labels and accessibility
-    await expect(firstField).toHaveAttribute('type', 'email')
-    await expect(page.getByLabel(/password/i)).toHaveAttribute('type', 'password')
+    // Check form field attributes
+    await expect(page.getByPlaceholder('Enter your email')).toHaveAttribute('type', 'email')
+    await expect(page.getByPlaceholder('Create a password')).toHaveAttribute('type', 'password')
+    await expect(page.getByPlaceholder('Confirm your password')).toHaveAttribute('type', 'password')
     
     // Verify aria-labels and form structure
     await CommonHelpers.verifyAccessibility(page)
@@ -215,24 +183,16 @@ test.describe('Complete User Registration Flow', () => {
       name: 'Special Test User'
     }
     
-    await page.getByLabel(/email/i).fill(specialUser.email)
-    await page.getByLabel(/password/i).fill(specialUser.password)
-    await page.getByLabel(/name/i).fill(specialUser.name)
+    await page.getByPlaceholder('Enter your full name').fill(specialUser.name)
+    await page.getByPlaceholder('Enter your email').fill(specialUser.email)
+    await page.getByPlaceholder('Create a password').fill(specialUser.password)
+    await page.getByPlaceholder('Confirm your password').fill(specialUser.password)
     
-    const confirmField = page.getByLabel(/confirm password/i)
-    if (await confirmField.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await confirmField.fill(specialUser.password)
-    }
-
-    const termsCheckbox = page.getByLabel(/terms|privacy|agree/i)
-    if (await termsCheckbox.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await termsCheckbox.check()
-    }
-    
-    await page.getByRole('button', { name: /sign up|register/i }).click()
+    await page.getByLabel(/I agree to the Terms of Service and Privacy Policy/i).check()
+    await page.getByRole('button', { name: /create account/i }).click()
     
     // Should handle special characters in email correctly
-    await expect(page).toHaveURL(/\/(verify-email|onboarding|dashboard|chat)/, { timeout: 15000 })
+    await expect(page).toHaveURL(/\/auth\/onboarding/, { timeout: 15000 })
     
     // Clean up
     await CommonHelpers.cleanupTestData(page, specialUser.email)

@@ -17,8 +17,8 @@ test.describe('Complete Chat Interface User Journey', () => {
 
   test('should complete full chat interaction journey', async ({ page }) => {
     // Step 1: Verify chat interface loads correctly
-    await expect(page.getByText(/pyairtable ai assistant/i)).toBeVisible()
-    await expect(page.getByPlaceholder(/ask anything|type your message/i)).toBeVisible()
+    await expect(page.getByText(/PyAirtable Assistant/i)).toBeVisible()
+    await expect(page.getByPlaceholder(/Ask anything about your data/i)).toBeVisible()
     
     // Verify connection status
     await ChatHelpers.verifyConnectionStatus(page, 'connected')
@@ -142,7 +142,7 @@ test.describe('Complete Chat Interface User Journey', () => {
   })
 
   test('should handle empty and invalid inputs', async ({ page }) => {
-    const messageInput = page.getByPlaceholder(/ask anything|type your message/i)
+    const messageInput = page.getByPlaceholder(/Ask anything about your data/i)
     const sendButton = page.getByRole('button', { name: /send/i })
     
     // Try to send empty message
@@ -161,7 +161,7 @@ test.describe('Complete Chat Interface User Journey', () => {
   })
 
   test('should support keyboard shortcuts and accessibility', async ({ page }) => {
-    const messageInput = page.getByPlaceholder(/ask anything|type your message/i)
+    const messageInput = page.getByPlaceholder(/Ask anything about your data/i)
     
     // Test Enter to send
     await messageInput.fill('Test message via Enter key')
@@ -273,7 +273,7 @@ test.describe('Complete Chat Interface User Journey', () => {
     await AuthHelpers.handleSessionExpiry(page)
     
     // Try to send another message
-    const messageInput = page.getByPlaceholder(/ask anything|type your message/i)
+    const messageInput = page.getByPlaceholder(/Ask anything about your data/i)
     await messageInput.fill('Message after session expiry')
     
     // Should either redirect to login or show auth error
@@ -295,7 +295,7 @@ test.describe('Complete Chat Interface User Journey', () => {
       await exampleElements.first().click()
       
       // Should populate the input or send the example
-      const messageInput = page.getByPlaceholder(/ask anything|type your message/i)
+      const messageInput = page.getByPlaceholder(/Ask anything about your data/i)
       const inputValue = await messageInput.inputValue()
       
       expect(inputValue.length).toBeGreaterThan(0)

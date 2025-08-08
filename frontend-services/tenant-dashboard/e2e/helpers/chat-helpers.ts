@@ -13,7 +13,7 @@ export class ChatHelpers {
     await this.waitForChatInterface(page)
     
     // Find message input
-    const messageInput = page.getByPlaceholder(/ask anything|type your message|ask a question/i)
+    const messageInput = page.getByPlaceholder(/Ask anything about your data/i)
     await expect(messageInput).toBeVisible()
     
     // Type message
@@ -49,8 +49,8 @@ export class ChatHelpers {
       await page.waitForTimeout(2000) // Give some time for response
     }
     
-    // Verify response is present
-    const assistantMessages = page.locator('[data-role="assistant"], .message-assistant').last()
+    // Verify response is present - look for bot messages in the chat
+    const assistantMessages = page.locator('div:has(svg[data-id="Bot"])').last()
     await expect(assistantMessages).toBeVisible({ timeout: 5000 })
     
     return assistantMessages
@@ -60,11 +60,11 @@ export class ChatHelpers {
    * Verify chat interface is loaded and ready
    */
   static async waitForChatInterface(page: Page) {
-    // Wait for chat container
-    await expect(page.locator('.chat-interface, [data-testid="chat-interface"]')).toBeVisible({ timeout: 10000 })
+    // Wait for PyAirtable Assistant heading
+    await expect(page.getByText(/PyAirtable Assistant/i)).toBeVisible({ timeout: 10000 })
     
     // Wait for message input to be ready
-    const messageInput = page.getByPlaceholder(/ask anything|type your message|ask a question/i)
+    const messageInput = page.getByPlaceholder(/Ask anything about your data/i)
     await expect(messageInput).toBeVisible()
     await expect(messageInput).toBeEnabled()
     
@@ -76,7 +76,8 @@ export class ChatHelpers {
    * Verify connection status
    */
   static async verifyConnectionStatus(page: Page, expectedStatus: 'connected' | 'disconnected' | 'connecting') {
-    const statusBadge = page.locator('.connection-status, [data-testid="connection-status"]')
+    // Look for connection status badge in the chat interface
+    const statusBadge = page.locator('[class*="Badge"]').filter({ hasText: new RegExp(expectedStatus, 'i') })
     
     if (await statusBadge.isVisible()) {
       await expect(statusBadge).toContainText(expectedStatus, { ignoreCase: true })
@@ -185,7 +186,7 @@ export class ChatHelpers {
    * Verify chat accessibility
    */
   static async verifyAccessibility(page: Page) {
-    const messageInput = page.getByPlaceholder(/ask anything|type your message/i)
+    const messageInput = page.getByPlaceholder(/Ask anything about your data/i)
     
     // Test keyboard navigation
     await messageInput.focus()

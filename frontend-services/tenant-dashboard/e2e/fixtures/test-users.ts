@@ -10,7 +10,7 @@ export const testUsers = {
   // Standard test user for login tests
   standard: {
     email: 'testuser@example.com',
-    password: 'TestPassword123!',
+    password: 'TestPassword123',
     name: 'Test User',
     role: 'user'
   } as TestUser,

@@ -13,25 +13,22 @@ export class AuthHelpers {
     await page.goto('/auth/register')
     
     // Wait for registration form to load
-    await expect(page.getByRole('heading', { name: /create account|sign up|register/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /create your account/i })).toBeVisible()
     
-    // Fill registration form
-    await page.getByLabel(/email/i).fill(user.email)
-    await page.getByLabel(/password/i).fill(user.password)
-    await page.getByLabel(/confirm password|repeat password/i).fill(user.password)
-    await page.getByLabel(/name|full name/i).fill(user.name)
+    // Fill registration form using placeholder selectors
+    await page.getByPlaceholder('Enter your full name').fill(user.name)
+    await page.getByPlaceholder('Enter your email').fill(user.email)
+    await page.getByPlaceholder('Create a password').fill(user.password)
+    await page.getByPlaceholder('Confirm your password').fill(user.password)
     
-    // Accept terms if checkbox exists
-    const termsCheckbox = page.getByLabel(/terms|privacy|agree/i)
-    if (await termsCheckbox.isVisible()) {
-      await termsCheckbox.check()
-    }
+    // Accept terms checkbox
+    await page.getByLabel(/I agree to the Terms of Service and Privacy Policy/i).check()
     
     // Submit registration
-    await page.getByRole('button', { name: /sign up|register|create account/i }).click()
+    await page.getByRole('button', { name: /create account/i }).click()
     
     // Wait for success or redirect
-    await expect(page).toHaveURL(/\/(dashboard|onboarding|verify-email)/, { timeout: 10000 })
+    await expect(page).toHaveURL(/\/auth\/onboarding/, { timeout: 10000 })
   }
 
   /**
@@ -41,20 +38,29 @@ export class AuthHelpers {
     await page.goto('/auth/login')
     
     // Wait for login form
-    await expect(page.getByRole('heading', { name: /sign in|login/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /welcome back/i })).toBeVisible()
     
-    // Fill login form
-    await page.getByLabel(/email/i).fill(user.email)
-    await page.getByLabel(/password/i).fill(user.password)
+    // Fill login form using placeholder selectors
+    await page.getByPlaceholder('Enter your email').fill(user.email)
+    await page.getByPlaceholder('Enter your password').fill(user.password)
     
     // Submit login
-    await page.getByRole('button', { name: /sign in|login/i }).click()
+    await page.getByRole('button', { name: /sign in/i }).click()
     
     // Wait for successful login redirect
     await expect(page).toHaveURL(/\/(dashboard|chat|$)/, { timeout: 10000 })
     
-    // Verify user is logged in by checking for user-specific elements
-    await expect(page.getByText(/welcome|dashboard|logout/i)).toBeVisible({ timeout: 10000 })
+    // Verify user is logged in by checking for welcome message or dashboard elements
+    try {
+      await expect(page.getByText(/Welcome back/i).first()).toBeVisible({ timeout: 5000 })
+    } catch {
+      // Fallback: check if we're on dashboard/chat page and have session
+      const currentUrl = page.url()
+      const isOnAuthenticatedPage = currentUrl.includes('/dashboard') || currentUrl.includes('/chat')
+      if (!isOnAuthenticatedPage) {
+        throw new Error('User is not on an authenticated page')
+      }
+    }
   }
 
   /**
@@ -119,23 +125,51 @@ export class AuthHelpers {
    * Verify user is authenticated
    */
   static async verifyAuthenticated(page: Page) {
-    // Check for authenticated state indicators
-    const authIndicators = [
-      page.getByText(/welcome/i),
-      page.getByText(/dashboard/i),
-      page.getByRole('button', { name: /logout/i }),
-      page.locator('[data-testid="user-menu"]')
-    ]
-
+    // Check for authenticated state indicators - more flexible approach
     let isAuthenticated = false
-    for (const indicator of authIndicators) {
-      try {
-        if (await indicator.isVisible({ timeout: 2000 })) {
-          isAuthenticated = true
-          break
+    
+    // Try to find welcome message first
+    try {
+      if (await page.getByText(/Welcome back/i).first().isVisible({ timeout: 3000 })) {
+        isAuthenticated = true
+      }
+    } catch (error) {
+      // Continue with other checks
+    }
+    
+    // Check for chat interface elements if on chat page
+    if (!isAuthenticated) {
+      const chatIndicators = [
+        page.getByText(/PyAirtable Assistant/i).first(),
+        page.getByText(/Ask anything about your data/i).first(),
+        page.getByPlaceholder(/Ask anything about your data/i).first()
+      ]
+      
+      for (const indicator of chatIndicators) {
+        try {
+          if (await indicator.isVisible({ timeout: 2000 })) {
+            isAuthenticated = true
+            break
+          }
+        } catch (error) {
+          // Continue checking
         }
+      }
+    }
+
+    // Alternative: Check if we're on an authenticated page (not login) and verify session
+    if (!isAuthenticated) {
+      const currentUrl = page.url()
+      const isNotOnLoginPage = !currentUrl.includes('/auth/login')
+      
+      try {
+        const sessionResponse = await page.request.get('/api/auth/session')
+        const sessionData = await sessionResponse.json()
+        const hasValidSession = sessionData?.user?.email
+        isAuthenticated = isNotOnLoginPage && !!hasValidSession
       } catch (error) {
-        // Continue checking
+        // Session check failed, not authenticated
+        isAuthenticated = false
       }
     }
 

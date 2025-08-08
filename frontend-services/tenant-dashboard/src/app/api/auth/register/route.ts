@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
 // Auth service base URL
-const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || "http://localhost:8007"
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || "http://localhost:8009"
 
 const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
