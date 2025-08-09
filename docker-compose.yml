@@ -8,14 +8,14 @@ services:
       context: ../pyairtable-api-gateway
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "7000:7000"
     environment:
-      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
-      - MCP_SERVER_URL=http://mcp-server:8001
-      - LLM_ORCHESTRATOR_URL=http://llm-orchestrator:8003
-      - PLATFORM_SERVICES_URL=http://platform-services:8007
-      - AUTOMATION_SERVICES_URL=http://automation-services:8006
-      - SAGA_ORCHESTRATOR_URL=http://saga-orchestrator:8008
+      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:7002
+      - MCP_SERVER_URL=http://mcp-server:7001
+      - LLM_ORCHESTRATOR_URL=http://llm-orchestrator:7003
+      - PLATFORM_SERVICES_URL=http://platform-services:7007
+      - AUTOMATION_SERVICES_URL=http://automation-services:7006
+      - SAGA_ORCHESTRATOR_URL=http://saga-orchestrator:7008
       - API_KEY=${API_KEY}
       - LOG_LEVEL=${LOG_LEVEL}
       - CORS_ORIGINS=${CORS_ORIGINS}
@@ -42,12 +42,12 @@ services:
     healthcheck:
       test: [
         "CMD-SHELL",
-        "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\" || exit 1"
+        "curl -f -H 'Accept: application/json' -H 'X-API-Key: ${API_KEY}' http://localhost:7000/api/health && curl -f -H 'Accept: application/json' http://localhost:7000/api/status || exit 1"
       ]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 90s
+      interval: 20s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
 
   # LLM Orchestrator - Gemini 2.5 Flash integration
   llm-orchestrator:
@@ -56,16 +56,16 @@ services:
     #   context: ../llm-orchestrator-py
     #   dockerfile: Dockerfile
     ports:
-      - "8003:8003"
+      - "7003:7003"
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - MCP_SERVER_HTTP_URL=http://mcp-server:8001
+      - MCP_SERVER_HTTP_URL=http://mcp-server:7001
       - USE_HTTP_MCP=true
       # Airtable configuration
       - AIRTABLE_BASE=${AIRTABLE_BASE}
       - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
       # Redis session storage
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6380
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - USE_REDIS_SESSIONS=true
       # Legacy stdio config (fallback)
@@ -84,12 +84,12 @@ services:
     healthcheck:
       test: [
         "CMD-SHELL",
-        "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8003/health')\" || exit 1"
+        "curl -f -H 'Accept: application/json' http://localhost:7003/health && curl -f -H 'Accept: application/json' http://localhost:7003/status || exit 1"
       ]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+      interval: 20s
+      timeout: 15s
+      retries: 3
+      start_period: 90s
 
   # MCP Server - Protocol implementation (HTTP mode for performance)
   mcp-server:
@@ -98,12 +98,12 @@ services:
     #   context: ../mcp-server-py
     #   dockerfile: Dockerfile
     ports:
-      - "8001:8001"
+      - "7001:7001"
     environment:
-      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
+      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:7002
       - AIRTABLE_GATEWAY_API_KEY=${API_KEY}
       - MCP_SERVER_MODE=http
-      - MCP_SERVER_PORT=8001
+      - MCP_SERVER_PORT=7001
       # Airtable configuration
       - AIRTABLE_BASE=${AIRTABLE_BASE}
       - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
@@ -117,12 +117,12 @@ services:
     healthcheck:
       test: [
         "CMD-SHELL",
-        "curl -f http://localhost:8001/health || exit 1"
+        "curl -f -H 'Accept: application/json' http://localhost:7001/health && curl -f -H 'Accept: application/json' http://localhost:7001/status || exit 1"
       ]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
+      interval: 20s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
 
   # Airtable Gateway - Direct Airtable API integration
   airtable-gateway:
@@ -131,7 +131,7 @@ services:
       context: ./python-services/airtable-gateway
       dockerfile: Dockerfile
     ports:
-      - "8002:8002"
+      - "7002:7002"
     environment:
       - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
       - AIRTABLE_PAT=${AIRTABLE_TOKEN}
@@ -149,12 +149,12 @@ services:
     healthcheck:
       test: [
         "CMD-SHELL",
-        "curl -f http://localhost:8002/health || exit 1"
+        "curl -f -H 'Accept: application/json' -H 'X-API-Key: ${API_KEY}' http://localhost:7002/health && curl -f -H 'Accept: application/json' http://localhost:7002/status || exit 1"
       ]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 45s
+      interval: 20s
+      timeout: 15s
+      retries: 3
+      start_period: 75s
 
   # Phase 4 Consolidated Services
   # Platform Services - Unified Auth & Analytics (Port 8007) 
@@ -163,26 +163,36 @@ services:
       context: ../pyairtable-platform-services
       dockerfile: Dockerfile
     ports:
-      - "8007:8007"
+      - "7007:8007"
     environment:
       # Service Configuration
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - LOG_LEVEL=${LOG_LEVEL}
       - API_KEY=${API_KEY}
       - REQUIRE_API_KEY=${REQUIRE_API_KEY:-true}
-      # JWT Authentication
+      # JWT Authentication (Secure Configuration)
       - JWT_SECRET=${JWT_SECRET}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-1h}
+      - JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN:-7d}
+      - JWT_ISSUER=pyairtable-platform
+      - JWT_AUDIENCE=pyairtable-services
       # Database and Redis
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6380
       - REDIS_PASSWORD=${REDIS_PASSWORD}
-      # CORS and Security
-      - CORS_ORIGINS=${CORS_ORIGINS:-*}
-      # Auth Settings
+      # CORS and Security (Strict Configuration)
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - CORS_METHODS=${CORS_METHODS}
+      - CORS_HEADERS=${CORS_HEADERS}
+      - CORS_CREDENTIALS=${CORS_CREDENTIALS}
+      - CORS_MAX_AGE=${CORS_MAX_AGE}
+      # Auth Settings (Security Hardened)
       - PASSWORD_MIN_LENGTH=${PASSWORD_MIN_LENGTH:-8}
       - PASSWORD_HASH_ROUNDS=${PASSWORD_HASH_ROUNDS:-12}
+      - ACCOUNT_LOCKOUT_ATTEMPTS=${ACCOUNT_LOCKOUT_ATTEMPTS:-5}
+      - ACCOUNT_LOCKOUT_DURATION=${ACCOUNT_LOCKOUT_DURATION:-900}
+      - SESSION_TIMEOUT=${SESSION_TIMEOUT:-3600}
       # Analytics Settings
       - ANALYTICS_RETENTION_DAYS=${ANALYTICS_RETENTION_DAYS:-90}
       - METRICS_BATCH_SIZE=${METRICS_BATCH_SIZE:-100}
@@ -197,12 +207,12 @@ services:
     healthcheck:
       test: [
         "CMD-SHELL",
-        "curl -f http://localhost:8007/health || exit 1"
+        "curl -f -H 'Accept: application/json' http://localhost:7007/health && curl -f -H 'Accept: application/json' http://localhost:7007/auth/health && curl -f -H 'Accept: application/json' http://localhost:7007/analytics/health || exit 1"
       ]
       interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
 
   # Automation Services - Unified file processing and workflow automation (Port 8006)
   automation-services:
@@ -211,14 +221,14 @@ services:
       context: ./pyairtable-automation-services
       dockerfile: Dockerfile
     ports:
-      - "8006:8006"
+      - "7006:7006"
     environment:
-      - MCP_SERVER_URL=http://mcp-server:8001
-      - PLATFORM_SERVICES_URL=http://platform-services:8007
-      - AUTH_SERVICE_URL=http://platform-services:8007
+      - MCP_SERVER_URL=http://mcp-server:7001
+      - PLATFORM_SERVICES_URL=http://platform-services:7007
+      - AUTH_SERVICE_URL=http://platform-services:7007
       - API_KEY=${API_KEY}
       - LOG_LEVEL=${LOG_LEVEL}
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6380
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       # File processing configuration
@@ -246,12 +256,12 @@ services:
     healthcheck:
       test: [
         "CMD-SHELL",
-        "curl -f http://localhost:8006/health || exit 1"
+        "curl -f -H 'Accept: application/json' -H 'X-API-Key: ${API_KEY}' http://localhost:7006/health && curl -f -H 'Accept: application/json' http://localhost:7006/automation/health && curl -f -H 'Accept: application/json' http://localhost:7006/files/health || exit 1"
       ]
       interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
 
   # SAGA Orchestrator - Distributed transaction coordination (Port 8008)
   saga-orchestrator:
@@ -260,7 +270,7 @@ services:
       context: ./saga-orchestrator
       dockerfile: Dockerfile
     ports:
-      - "8008:8008"
+      - "7008:7008"
     environment:
       # Service Configuration
       - ENVIRONMENT=${ENVIRONMENT:-development}
@@ -269,7 +279,7 @@ services:
       - REQUIRE_API_KEY=${REQUIRE_API_KEY:-true}
       # Database and Redis
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6380
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       # Event Bus Configuration
       - USE_REDIS_EVENT_BUS=true
@@ -278,14 +288,14 @@ services:
       - SAGA_RETRY_ATTEMPTS=${SAGA_RETRY_ATTEMPTS:-3}
       - SAGA_STEP_TIMEOUT_SECONDS=${SAGA_STEP_TIMEOUT_SECONDS:-300}
       # Service URLs for SAGA steps
-      - AUTH_SERVICE_URL=http://platform-services:8007
-      - USER_SERVICE_URL=http://platform-services:8007
-      - PERMISSION_SERVICE_URL=http://platform-services:8007
-      - NOTIFICATION_SERVICE_URL=http://automation-services:8006
-      - AIRTABLE_CONNECTOR_URL=http://airtable-gateway:8002
-      - SCHEMA_SERVICE_URL=http://platform-services:8007
-      - WEBHOOK_SERVICE_URL=http://automation-services:8006
-      - DATA_SYNC_SERVICE_URL=http://automation-services:8006
+      - AUTH_SERVICE_URL=http://platform-services:7007
+      - USER_SERVICE_URL=http://platform-services:7007
+      - PERMISSION_SERVICE_URL=http://platform-services:7007
+      - NOTIFICATION_SERVICE_URL=http://automation-services:7006
+      - AIRTABLE_CONNECTOR_URL=http://airtable-gateway:7002
+      - SCHEMA_SERVICE_URL=http://platform-services:7007
+      - WEBHOOK_SERVICE_URL=http://automation-services:7006
+      - DATA_SYNC_SERVICE_URL=http://automation-services:7006
       # Monitoring
       - ENABLE_METRICS=${ENABLE_METRICS:-true}
       - METRICS_PORT=9090
@@ -308,24 +318,42 @@ services:
     healthcheck:
       test: [
         "CMD-SHELL",
-        "curl -f http://localhost:8008/health/ || exit 1"
+        "curl -f -H 'Accept: application/json' -H 'X-API-Key: ${API_KEY}' http://localhost:7008/health/ && curl -f -H 'Accept: application/json' http://localhost:7008/saga/health && curl -f -H 'Accept: application/json' http://localhost:7008/transactions/health || exit 1"
       ]
       interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 90s
 
 
 
-  # Redis - Caching and session storage
+  # Redis - Secure caching and session storage
   redis:
     image: redis:7-alpine
-    # SECURITY: Remove exposed port - internal access only
-    # ports:
-    #   - "6379:6379"
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    # DEVELOPMENT: Expose port for testing (remove in production)
+    ports:
+      - "6380:6380"
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --port 6380
+      --bind 0.0.0.0
+      --protected-mode yes
+      --tcp-keepalive 60
+      --timeout 300
+      --maxclients 1000
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --rdbcompression yes
+      --rdbchecksum yes
+      --appendonly yes
+      --appendfsync everysec
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_PORT=6380
     volumes:
       - redis-data:/data
     restart: unless-stopped
@@ -336,24 +364,44 @@ services:
     healthcheck:
       test: [
         "CMD-SHELL",
-        "redis-cli --no-auth-warning -a $$REDIS_PASSWORD ping | grep PONG && redis-cli --no-auth-warning -a $$REDIS_PASSWORD set health_check_key health_check_value && redis-cli --no-auth-warning -a $$REDIS_PASSWORD get health_check_key | grep health_check_value && redis-cli --no-auth-warning -a $$REDIS_PASSWORD del health_check_key"
+        "redis-cli --no-auth-warning -p 6380 -a $$REDIS_PASSWORD ping | grep PONG && redis-cli --no-auth-warning -p 6380 -a $$REDIS_PASSWORD set health_check_key health_check_value && redis-cli --no-auth-warning -p 6380 -a $$REDIS_PASSWORD get health_check_key | grep health_check_value && redis-cli --no-auth-warning -p 6380 -a $$REDIS_PASSWORD del health_check_key"
       ]
-      interval: 10s
-      timeout: 5s
-      retries: 8
-      start_period: 15s
+      interval: 15s
+      timeout: 8s
+      retries: 5
+      start_period: 20s
 
-  # PostgreSQL - Database for sessions and metadata
+  # PostgreSQL - Secure database for sessions and metadata
   postgres:
     image: postgres:16-alpine
-    # SECURITY: Remove exposed port - internal access only
-    # ports:
-    #   - "5432:5432"
+    # SECURITY: Exposed port for development environment only
+    ports:
+      - "5433:5432"
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_INITDB_ARGS="--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+      - POSTGRES_INITDB_ARGS="--auth-host=scram-sha-256 --auth-local=scram-sha-256 --data-checksums"
+      - POSTGRES_HOST_AUTH_METHOD=scram-sha-256
+      - POSTGRES_PASSWORD_ENCRYPTION=scram-sha-256
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=200
+      -c shared_buffers=128MB
+      -c effective_cache_size=256MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=64MB
+      -c random_page_cost=1.1
+      -c temp_file_limit=2GB
+      -c log_min_duration_statement=1000
+      -c log_connections=on
+      -c log_disconnections=on
+      -c log_lock_waits=on
+      -c log_statement=mod
+      -c log_line_prefix='%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+      -c ssl=off
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
@@ -369,10 +417,10 @@ services:
         "CMD-SHELL",
         "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB -h localhost -p 5432 && PGPASSWORD=$$POSTGRES_PASSWORD psql -U $$POSTGRES_USER -d $$POSTGRES_DB -c 'SELECT 1;' >/dev/null 2>&1"
       ]
-      interval: 10s
-      timeout: 8s
-      retries: 8
-      start_period: 45s
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   # Next.js Frontend - Web interface
   frontend:
@@ -381,22 +429,22 @@ services:
       context: ./frontend-services/tenant-dashboard
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "5173:3000"
     environment:
       # API Gateway endpoint
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-      - NEXT_PUBLIC_API_GATEWAY_URL=http://api-gateway:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:7000
+      - NEXT_PUBLIC_API_GATEWAY_URL=http://api-gateway:7000
       # Internal service URLs (for SSR/API routes)
-      - LLM_ORCHESTRATOR_URL=http://llm-orchestrator:8003
-      - MCP_SERVER_URL=http://mcp-server:8001
-      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
-      - PLATFORM_SERVICES_URL=http://platform-services:8007
-      - AUTOMATION_SERVICES_URL=http://automation-services:8006
-      - SAGA_ORCHESTRATOR_URL=http://saga-orchestrator:8008
+      - LLM_ORCHESTRATOR_URL=http://llm-orchestrator:7003
+      - MCP_SERVER_URL=http://mcp-server:7001
+      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:7002
+      - PLATFORM_SERVICES_URL=http://platform-services:7007
+      - AUTOMATION_SERVICES_URL=http://automation-services:7006
+      - SAGA_ORCHESTRATOR_URL=http://saga-orchestrator:7008
       # Authentication and security
       - API_KEY=${API_KEY}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_URL=http://localhost:5173
       # Development configuration
       - NODE_ENV=${NODE_ENV:-development}
       - LOG_LEVEL=${LOG_LEVEL:-info}
@@ -404,7 +452,7 @@ services:
       - NEXT_PUBLIC_ENABLE_DEBUG=${ENABLE_DEBUG:-false}
       - NEXT_PUBLIC_SHOW_COST_TRACKING=${SHOW_COST_TRACKING:-true}
       # WebSocket configuration for real-time updates
-      - NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws
+      - NEXT_PUBLIC_WS_URL=ws://localhost:7000/ws
       # Database URL for API routes (not exposed externally)
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     volumes:
@@ -433,12 +481,49 @@ services:
     healthcheck:
       test: [
         "CMD-SHELL",
-        "curl -f http://localhost:3000/api/health && curl -f http://localhost:3000/health/ready || exit 1"
+        "curl -f -H 'Accept: application/json' http://localhost:3000/api/health && curl -f -H 'Accept: application/json' http://localhost:3000/health/ready && curl -f -H 'Accept: application/json' http://localhost:3000/_next/static/health.txt || exit 1"
       ]
       interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 90s
+
+  # Chat UI - Modern React Chat Interface
+  chat-ui:
+    build:
+      context: ./frontend/chat-ui
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5174:5173"  # Different port to avoid conflict
+    environment:
+      # API Configuration
+      - VITE_API_BASE_URL=http://localhost:7000
+      - VITE_WS_BASE_URL=ws://localhost:7000
+      - VITE_NODE_ENV=development
+      # Feature flags
+      - VITE_ENABLE_FILE_UPLOAD=true
+      - VITE_ENABLE_VOICE_MESSAGES=false
+      - VITE_ENABLE_DARK_MODE=true
+      - VITE_DEBUG_API=false
+    volumes:
+      # Enable hot reloading in development
+      - ./frontend/chat-ui:/app
+      - /app/node_modules
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    healthcheck:
+      test: [
+        "CMD-SHELL",
+        "curl -f -H 'Accept: text/html' http://localhost:5173 && curl -f -H 'Accept: application/json' http://localhost:5173/api/health || exit 1"
+      ]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 45s
 
 networks:
   pyairtable-network:
