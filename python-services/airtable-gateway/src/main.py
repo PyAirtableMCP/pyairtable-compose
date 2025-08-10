@@ -57,14 +57,42 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware
+# CORS middleware - SECURITY FIX: Remove wildcard origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.getenv("CORS_ORIGINS", "https://localhost:3000,https://127.0.0.1:3000").split(","),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key", "X-Requested-With"],
 )
+
+# Security middleware - Add comprehensive security headers and protections
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'shared'))
+try:
+    from security import add_security_middleware, add_rate_limiting
+    from dependencies import get_redis_client
+    
+    # Add security headers middleware
+    add_security_middleware(
+        app, 
+        environment=os.getenv("ENVIRONMENT", "development"),
+        max_request_size=10 * 1024 * 1024  # 10MB
+    )
+    
+    # Add rate limiting if Redis is available
+    redis_client = None
+    try:
+        import redis.asyncio as redis
+        redis_url = os.getenv("REDIS_URL")
+        if redis_url:
+            redis_client = redis.from_url(redis_url)
+            add_rate_limiting(app, redis_client, default_rate_limit=100, auth_rate_limit=5)
+    except Exception as redis_error:
+        logging.warning(f"Redis not available for rate limiting: {redis_error}")
+        
+    logging.info("Security middleware initialized for airtable-gateway")
+except ImportError as e:
+    logging.warning(f"Security middleware initialization failed: {e}")
 
 # Authentication middleware
 from middleware.auth import AuthMiddleware
@@ -72,13 +100,32 @@ from config import get_settings
 settings = get_settings()
 app.add_middleware(AuthMiddleware, internal_api_key=settings.internal_api_key)
 
-# Exception handler
+# Secure exception handler - Prevent information disclosure
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    return JSONResponse(
-        status_code=500,
-        content={"detail": str(exc)}
-    )
+    # Log the actual error for debugging
+    logger.error(f"Unhandled exception on {request.url.path}: {str(exc)}")
+    
+    # Return generic error message to prevent information disclosure
+    is_development = os.getenv("ENVIRONMENT", "development").lower() == "development"
+    
+    if is_development:
+        # Show detailed errors in development
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "Internal server error",
+                "detail": str(exc),
+                "path": str(request.url.path)
+            }
+        )
+    else:
+        # Generic error message in production
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal server error"},
+            headers={"X-Request-ID": request.headers.get("X-Request-ID", "unknown")}
+        )
 
 # Include routers
 app.include_router(health.router, tags=["health"])

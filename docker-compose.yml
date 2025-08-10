@@ -18,7 +18,7 @@ services:
       - SAGA_ORCHESTRATOR_URL=http://saga-orchestrator:8008
       - API_KEY=${API_KEY}
       - LOG_LEVEL=${LOG_LEVEL}
-      - CORS_ORIGINS=${CORS_ORIGINS}
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://localhost:3000,https://127.0.0.1:3000}
       - CORS_METHODS=${CORS_METHODS}
       - CORS_HEADERS=${CORS_HEADERS}
       - CORS_CREDENTIALS=${CORS_CREDENTIALS}
@@ -178,8 +178,8 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
-      # CORS and Security
-      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      # CORS and Security - FIXED: No wildcard origins in production
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://localhost:3000,https://127.0.0.1:3000}
       # Auth Settings
       - PASSWORD_MIN_LENGTH=${PASSWORD_MIN_LENGTH:-8}
       - PASSWORD_HASH_ROUNDS=${PASSWORD_HASH_ROUNDS:-12}
