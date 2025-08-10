@@ -207,9 +207,10 @@ services:
   # Automation Services - Unified file processing and workflow automation (Port 8006)
   automation-services:
     image: ghcr.io/reg-kris/pyairtable-automation-services:latest
-    build:
-      context: ./pyairtable-automation-services
-      dockerfile: Dockerfile
+    # Note: Build context removed - service needs to be built separately
+    # build:
+    #   context: ./pyairtable-automation-services
+    #   dockerfile: Dockerfile
     ports:
       - "8006:8006"
     environment:
