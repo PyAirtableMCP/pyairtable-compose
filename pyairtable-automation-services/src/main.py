@@ -1,38 +1,54 @@
 import logging
 import sys
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-# Initialize OpenTelemetry before importing other modules
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'python-services', 'shared'))
+# Initialize OpenTelemetry (optional, fallback gracefully if not available)
+tracer = None
 try:
-    from telemetry import initialize_telemetry
+    from opentelemetry import trace
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+    from opentelemetry.instrumentation.redis import RedisInstrumentor
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    from opentelemetry.sdk.resources import Resource
     
-    # Initialize telemetry for Automation Services (Port 8006)
-    tracer = initialize_telemetry(
-        service_name="automation-services",
-        service_version="1.0.0",
-        service_tier="automation",
-        otlp_endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317"),
-        resource_attributes={
-            "service.port": "8006",
-            "service.type": "automation-services",
-            "service.layer": "workflow-processing"
-        }
-    )
+    # Configure resource
+    resource = Resource.create({
+        "service.name": "automation-services",
+        "service.version": "1.0.0",
+        "service.port": "8006",
+        "service.type": "automation-services",
+        "service.layer": "workflow-processing"
+    })
+    
+    # Set up tracer provider
+    trace.set_tracer_provider(TracerProvider(resource=resource))
+    tracer = trace.get_tracer(__name__)
+    
+    # Configure OTLP exporter if endpoint is available
+    otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+    if otlp_endpoint:
+        otlp_exporter = OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True)
+        span_processor = BatchSpanProcessor(otlp_exporter)
+        trace.get_tracer_provider().add_span_processor(span_processor)
     
     logging.info("OpenTelemetry initialized for automation-services")
 except ImportError as e:
+    logging.warning(f"OpenTelemetry not available, skipping telemetry setup: {e}")
+except Exception as e:
     logging.warning(f"OpenTelemetry initialization failed: {e}")
-    tracer = None
 
 from .config import Settings
-from .database import Base, get_database_url
-from .routes import files, workflows, health
+from .database import Base, get_database_url, create_tables
+from .routes import files, workflows, health, templates
 from .services.scheduler import WorkflowScheduler
 from .utils.redis_client import init_redis
 
@@ -54,25 +70,59 @@ async def lifespan(app: FastAPI):
     logger.info("Starting PyAirtable Automation Services...")
     
     # Initialize database
-    engine = create_engine(get_database_url())
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database initialized")
+    try:
+        create_tables()
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {str(e)}")
+        raise
     
-    # Initialize Redis
-    await init_redis()
-    logger.info("Redis initialized")
+    # Initialize Redis (with retry logic)
+    redis_retry_count = 0
+    max_redis_retries = 5
+    while redis_retry_count < max_redis_retries:
+        try:
+            await init_redis()
+            logger.info("Redis initialized successfully")
+            break
+        except Exception as e:
+            redis_retry_count += 1
+            logger.warning(f"Redis initialization attempt {redis_retry_count} failed: {str(e)}")
+            if redis_retry_count >= max_redis_retries:
+                logger.error("Failed to initialize Redis after maximum retries")
+                raise
+            await asyncio.sleep(2)  # Wait before retry
     
     # Start workflow scheduler
-    scheduler = WorkflowScheduler()
-    await scheduler.start()
-    logger.info("Workflow scheduler started")
+    try:
+        scheduler = WorkflowScheduler()
+        await scheduler.start()
+        logger.info("Workflow scheduler started successfully")
+    except Exception as e:
+        logger.error(f"Failed to start workflow scheduler: {str(e)}")
+        raise
     
     yield
     
     # Shutdown
     logger.info("Shutting down PyAirtable Automation Services...")
+    
+    # Stop workflow scheduler
     if scheduler:
-        await scheduler.stop()
+        try:
+            await scheduler.stop()
+            logger.info("Workflow scheduler stopped")
+        except Exception as e:
+            logger.error(f"Error stopping scheduler: {str(e)}")
+    
+    # Close Redis connections
+    try:
+        from .utils.redis_client import close_redis
+        await close_redis()
+        logger.info("Redis connections closed")
+    except Exception as e:
+        logger.error(f"Error closing Redis connections: {str(e)}")
+    
     logger.info("Graceful shutdown completed")
 
 # Create FastAPI app
@@ -93,8 +143,9 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(files.router, prefix="/files", tags=["files"])
-app.include_router(workflows.router, prefix="/workflows", tags=["workflows"])
+app.include_router(files.router, prefix="/api/v1/files", tags=["files"])
+app.include_router(workflows.router, prefix="/api/v1/workflows", tags=["workflows"])
+app.include_router(templates.router, prefix="/api/v1/templates", tags=["templates"])
 app.include_router(health.router, tags=["health"])
 
 # Root endpoint
@@ -105,20 +156,46 @@ async def root():
         "version": "1.0.0",
         "description": "Unified file processing and workflow automation",
         "endpoints": {
-            "files": "/files",
-            "workflows": "/workflows", 
-            "executions": "/executions",
+            "files": "/api/v1/files",
+            "file_upload": "/api/v1/files/upload",
+            "multiple_upload": "/api/v1/files/upload-multiple", 
+            "file_download": "/api/v1/files/{file_id}/download",
+            "file_convert": "/api/v1/files/{file_id}/convert",
+            "image_optimize": "/api/v1/files/{file_id}/optimize-image",
+            "image_resize": "/api/v1/files/{file_id}/resize-image",
+            "workflows": "/api/v1/workflows", 
+            "executions": "/api/v1/workflows/executions",
+            "templates": "/api/v1/templates",
             "health": "/health"
-        }
+        },
+        "features": [
+            "Single and multiple file upload",
+            "File download with secure paths", 
+            "Virus scanning (placeholder)",
+            "Image processing (thumbnails, resize, optimize)",
+            "Document conversion (PDF, Office formats)",
+            "Content extraction and indexing",
+            "Workflow automation triggers",
+            "File type validation and security"
+        ]
     }
 
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
-    logger.error(f"Global exception: {str(exc)}", exc_info=True)
+    logger.error(f"Global exception in {request.url}: {str(exc)}", exc_info=True)
+    
+    # Don't wrap HTTPException in another HTTPException
+    if isinstance(exc, HTTPException):
+        return exc
+    
     return HTTPException(
         status_code=500,
-        detail="Internal server error"
+        detail={
+            "error": "Internal server error",
+            "message": "An unexpected error occurred",
+            "service": "automation-services"
+        }
     )
 
 if __name__ == "__main__":

@@ -9,14 +9,14 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     
     # Authentication
-    api_key: str
-    auth_service_url: str
+    api_key: str = "development-key"
+    auth_service_url: str = "http://platform-services:8007"
     
     # Database
-    database_url: str
+    database_url: str = "postgresql://user:password@postgres:5432/automation_db?sslmode=require"
     
     # Redis
-    redis_url: str
+    redis_url: str = "redis://redis:6379"
     redis_password: Optional[str] = None
     
     # File processing
@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     
     # External services
     mcp_server_url: Optional[str] = None
+    saga_orchestrator_url: Optional[str] = None
     
     class Config:
         env_file = ".env"
