@@ -1,0 +1,350 @@
+{
+  "config": {
+    "configFile": "/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/playwright.config.ts",
+    "rootDir": "/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/e2e",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": "/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/e2e/global-setup.ts",
+    "globalTeardown": "/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/e2e/global-teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "version": "1.0.0",
+      "environment": "test",
+      "browser": "multi",
+      "os": "darwin"
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "open": "on-failure",
+          "outputFolder": "playwright-report"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "version": "1.0.0",
+          "environment": "test",
+          "browser": "multi",
+          "os": "darwin"
+        },
+        "id": "chromium-core",
+        "name": "chromium-core",
+        "testDir": "/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/user-registration.spec.ts",
+          "**/user-login-journey.spec.ts",
+          "**/chat-interface-journey.spec.ts",
+          "**/complete-user-journey.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "version": "1.0.0",
+          "environment": "test",
+          "browser": "multi",
+          "os": "darwin"
+        },
+        "id": "chromium-extended",
+        "name": "chromium-extended",
+        "testDir": "/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/airtable-integration-journey.spec.ts",
+          "**/error-scenarios.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "version": "1.0.0",
+          "environment": "test",
+          "browser": "multi",
+          "os": "darwin"
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/complete-user-journey.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "version": "1.0.0",
+          "environment": "test",
+          "browser": "multi",
+          "os": "darwin"
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/complete-user-journey.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "version": "1.0.0",
+          "environment": "test",
+          "browser": "multi",
+          "os": "darwin"
+        },
+        "id": "mobile-chrome",
+        "name": "mobile-chrome",
+        "testDir": "/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/user-login-journey.spec.ts",
+          "**/chat-interface-journey.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "version": "1.0.0",
+          "environment": "test",
+          "browser": "multi",
+          "os": "darwin"
+        },
+        "id": "mobile-safari",
+        "name": "mobile-safari",
+        "testDir": "/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/user-login-journey.spec.ts",
+          "**/chat-interface-journey.spec.ts"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.54.2",
+    "workers": 4,
+    "webServer": {
+      "command": "npm run start",
+      "port": 3000,
+      "reuseExistingServer": true,
+      "timeout": 120000,
+      "env": {
+        "NODE_ENV": "production",
+        "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/pyairtable"
+      }
+    }
+  },
+  "suites": [
+    {
+      "title": "user-registration.spec.ts",
+      "file": "user-registration.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Complete User Registration",
+          "file": "user-registration.spec.ts",
+          "line": 12,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should complete new user registration journey",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-core",
+                  "projectName": "chromium-core",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "42744c8d4625b5a9894e-622010bec1fb8c03a796",
+              "file": "user-registration.spec.ts",
+              "line": 14,
+              "column": 7
+            },
+            {
+              "title": "should validate email format",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-core",
+                  "projectName": "chromium-core",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "42744c8d4625b5a9894e-139ce039617d80767317",
+              "file": "user-registration.spec.ts",
+              "line": 212,
+              "column": 7
+            },
+            {
+              "title": "should validate password requirements",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-core",
+                  "projectName": "chromium-core",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "42744c8d4625b5a9894e-4f93e914ec850db22f84",
+              "file": "user-registration.spec.ts",
+              "line": 238,
+              "column": 7
+            },
+            {
+              "title": "should handle registration with existing email",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-core",
+                  "projectName": "chromium-core",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "42744c8d4625b5a9894e-9d4334e36a5ab3e5e4cd",
+              "file": "user-registration.spec.ts",
+              "line": 263,
+              "column": 7
+            },
+            {
+              "title": "should handle special characters in email",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-core",
+                  "projectName": "chromium-core",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "42744c8d4625b5a9894e-d1d7963c558f67adba78",
+              "file": "user-registration.spec.ts",
+              "line": 297,
+              "column": 7
+            },
+            {
+              "title": "should validate terms and conditions acceptance",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-core",
+                  "projectName": "chromium-core",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "42744c8d4625b5a9894e-c6a2ac45b1a872ddb377",
+              "file": "user-registration.spec.ts",
+              "line": 318,
+              "column": 7
+            },
+            {
+              "title": "Registration Flow should be accessible via keyboard navigation",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-core",
+                  "projectName": "chromium-core",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "42744c8d4625b5a9894e-08d87cc523c4b238cd41",
+              "file": "user-registration.spec.ts",
+              "line": 353,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2025-08-10T18:31:57.031Z",
+    "duration": 14.033000000000015,
+    "expected": 0,
+    "skipped": 7,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

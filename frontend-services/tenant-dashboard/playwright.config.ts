@@ -29,11 +29,11 @@ export default defineConfig({
     ['github'],
     ['junit', { outputFile: 'test-results/junit.xml' }],
     ['json', { outputFile: 'test-results/results.json' }],
-    ['html', { open: 'never', outputFolder: 'test-results/html' }],
+    ['html', { open: 'never', outputFolder: 'playwright-report' }],
     ['blob', { outputDir: 'test-results/blob' }]
   ] : [
     ['list'],
-    ['html', { open: 'on-failure', outputFolder: 'test-results/html' }],
+    ['html', { open: 'on-failure', outputFolder: 'playwright-report' }],
     ['json', { outputFile: 'test-results/results.json' }]
   ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */

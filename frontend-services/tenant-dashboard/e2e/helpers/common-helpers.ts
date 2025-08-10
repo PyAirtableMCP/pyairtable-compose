@@ -257,17 +257,152 @@ export class CommonHelpers {
   }
 
   /**
+   * Verify login success using multiple indicators
+   */
+  static async verifyLoginSuccess(page: Page, options?: {
+    expectedUrls?: string[]
+    excludeUrls?: string[]
+    successSelectors?: string[]
+  }) {
+    const currentUrl = page.url()
+    
+    // Check URL-based success indicators
+    if (options?.expectedUrls) {
+      for (const expectedUrl of options.expectedUrls) {
+        if (currentUrl.includes(expectedUrl)) {
+          return true
+        }
+      }
+    }
+    
+    // Check URL exclusion indicators
+    if (options?.excludeUrls) {
+      const isOnExcludedUrl = options.excludeUrls.some(url => currentUrl.includes(url))
+      if (!isOnExcludedUrl) {
+        // Not on login page and no other exclusions - likely successful
+        return true
+      }
+    }
+    
+    // Check for success elements
+    if (options?.successSelectors) {
+      for (const selector of options.successSelectors) {
+        try {
+          if (await page.locator(selector).isVisible({ timeout: 3000 })) {
+            return true
+          }
+        } catch (e) {
+          // Continue checking
+        }
+      }
+    }
+    
+    // Default success indicators
+    const defaultSuccessChecks = [
+      // URL not containing login
+      () => !currentUrl.includes('/auth/login'),
+      
+      // Check for authenticated elements
+      async () => {
+        const authElements = [
+          page.locator('[data-testid="user-menu"]'),
+          page.locator('[data-testid="dashboard"]'),
+          page.getByText(/welcome.*back/i).first(),
+          page.locator('.user-avatar, [class*="avatar"]'),
+        ]
+        
+        for (const element of authElements) {
+          try {
+            if (await element.isVisible({ timeout: 2000 })) {
+              return true
+            }
+          } catch (e) {
+            // Continue checking
+          }
+        }
+        return false
+      }
+    ]
+    
+    // Check URL first
+    if (defaultSuccessChecks[0]()) {
+      // Then verify with element check
+      if (await defaultSuccessChecks[1]()) {
+        return true
+      }
+    }
+    
+    return false
+  }
+
+  /**
+   * Verify authenticated state
+   */
+  static async verifyAuthenticatedState(page: Page): Promise<boolean> {
+    const currentUrl = page.url()
+    
+    // If on auth pages, not authenticated
+    if (currentUrl.includes('/auth/')) {
+      return false
+    }
+    
+    // Check for authenticated elements
+    const authIndicators = [
+      page.locator('[data-testid="user-menu"]'),
+      page.locator('[data-testid="dashboard"]'),
+      page.getByText(/welcome.*back/i).first(),
+      page.locator('.user-avatar'),
+      page.locator('[class*="avatar"]')
+    ]
+    
+    for (const indicator of authIndicators) {
+      try {
+        if (await indicator.isVisible({ timeout: 2000 })) {
+          return true
+        }
+      } catch (e) {
+        // Continue checking
+      }
+    }
+    
+    // Check session API if available
+    try {
+      const sessionResponse = await page.request.get('/api/auth/session')
+      if (sessionResponse.status() === 200) {
+        const sessionData = await sessionResponse.json()
+        return !!(sessionData?.user?.email)
+      }
+    } catch (e) {
+      // Session check failed
+    }
+    
+    return false
+  }
+
+  /**
    * Cleanup test data
    */
-  static async cleanupTestData(page: Page, userEmail?: string) {
-    if (userEmail) {
+  static async cleanupTestData(page: Page, testUser?: { email: string; name?: string }) {
+    if (testUser?.email) {
       // Call cleanup API if available
       try {
         await page.request.delete('/api/test/cleanup', {
-          data: { email: userEmail }
+          data: { email: testUser.email }
         })
       } catch (error) {
         console.warn('Cleanup API not available or failed:', error)
+      }
+      
+      // Alternative cleanup via direct database calls if API exists
+      try {
+        await page.request.post('/api/test/cleanup', {
+          data: { 
+            action: 'delete_user',
+            email: testUser.email 
+          }
+        })
+      } catch (error) {
+        console.warn('Direct cleanup not available:', error)
       }
     }
   }
