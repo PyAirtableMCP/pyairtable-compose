@@ -1,4 +1,4 @@
-module github.com/Reg-Kris/pyairtable-auth-service
+module github.com/pyairtable-compose/auth-service
 
 go 1.23.0
 
@@ -29,4 +29,3 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
 )
-
