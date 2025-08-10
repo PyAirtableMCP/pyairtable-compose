@@ -14,14 +14,14 @@ test.describe('Complete User Login and Session Journey', () => {
   test('should complete full login journey from landing page to dashboard', async ({ page }) => {
     // Step 1: Navigate to login page
     await page.goto('/auth/login')
-    await expect(page.getByRole('heading', { name: /sign in|login/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /welcome back/i })).toBeVisible()
 
     // Step 2: Fill login credentials
-    await page.getByLabel(/email/i).fill(testUsers.standard.email)
-    await page.getByLabel(/password/i).fill(testUsers.standard.password)
+    await page.getByPlaceholder('Enter your email').fill(testUsers.standard.email)
+    await page.getByPlaceholder('Enter your password').fill(testUsers.standard.password)
 
     // Step 3: Submit login form
-    await page.getByRole('button', { name: /sign in|login/i }).click()
+    await page.getByRole('button', { name: /sign in/i }).click()
 
     // Step 4: Wait for successful login redirect
     await expect(page).toHaveURL(/\/(dashboard|chat|$)/, { timeout: 15000 })
@@ -33,7 +33,7 @@ test.describe('Complete User Login and Session Journey', () => {
     // Step 6: Test navigation to different sections
     // Navigate to chat
     await page.goto('/chat')
-    await expect(page.getByText(/pyairtable ai assistant|chat/i)).toBeVisible()
+    await expect(page.getByText(/PyAirtable Assistant/i).first()).toBeVisible()
 
     // Navigate to dashboard if available
     if (await page.locator('[href="/dashboard"], [href="/"]').first().isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -58,9 +58,9 @@ test.describe('Complete User Login and Session Journey', () => {
     }
 
     // Login
-    await page.getByLabel(/email/i).fill(testUsers.standard.email)
-    await page.getByLabel(/password/i).fill(testUsers.standard.password)
-    await page.getByRole('button', { name: /sign in|login/i }).click()
+    await page.getByPlaceholder('Enter your email').fill(testUsers.standard.email)
+    await page.getByPlaceholder('Enter your password').fill(testUsers.standard.password)
+    await page.getByRole('button', { name: /sign in/i }).click()
 
     await expect(page).toHaveURL(/\/(dashboard|chat|$)/, { timeout: 10000 })
 
@@ -89,13 +89,13 @@ test.describe('Complete User Login and Session Journey', () => {
     await expect(page).toHaveURL(/\/auth\/login.*/)
     
     // Step 2: Login
-    await page.getByLabel(/email/i).fill(testUsers.standard.email)
-    await page.getByLabel(/password/i).fill(testUsers.standard.password)
-    await page.getByRole('button', { name: /sign in|login/i }).click()
+    await page.getByPlaceholder('Enter your email').fill(testUsers.standard.email)
+    await page.getByPlaceholder('Enter your password').fill(testUsers.standard.password)
+    await page.getByRole('button', { name: /sign in/i }).click()
     
     // Step 3: Should redirect back to originally requested page
     await expect(page).toHaveURL(/\/chat/, { timeout: 10000 })
-    await expect(page.getByText(/pyairtable ai assistant/i)).toBeVisible()
+    await expect(page.getByText(/PyAirtable Assistant/i)).toBeVisible()
   })
 
   test('should handle session expiry gracefully', async ({ page }) => {
@@ -110,9 +110,9 @@ test.describe('Complete User Login and Session Journey', () => {
     await AuthHelpers.verifyNotAuthenticated(page)
     
     // Login again should work
-    await page.getByLabel(/email/i).fill(testUsers.standard.email)
-    await page.getByLabel(/password/i).fill(testUsers.standard.password)
-    await page.getByRole('button', { name: /sign in|login/i }).click()
+    await page.getByPlaceholder('Enter your email').fill(testUsers.standard.email)
+    await page.getByPlaceholder('Enter your password').fill(testUsers.standard.password)
+    await page.getByRole('button', { name: /sign in/i }).click()
     
     await expect(page).toHaveURL(/\/(dashboard|chat|$)/, { timeout: 10000 })
   })
@@ -140,9 +140,9 @@ test.describe('Complete User Login and Session Journey', () => {
     await page.goto('/auth/login')
     
     // Try login with wrong credentials
-    await page.getByLabel(/email/i).fill(testUsers.standard.email)
-    await page.getByLabel(/password/i).fill('wrongpassword')
-    await page.getByRole('button', { name: /sign in|login/i }).click()
+    await page.getByPlaceholder('Enter your email').fill(testUsers.standard.email)
+    await page.getByPlaceholder('Enter your password').fill('wrongpassword')
+    await page.getByRole('button', { name: /sign in/i }).click()
     
     // Should show error message
     await CommonHelpers.verifyErrorMessage(page, /invalid credentials|incorrect password|login failed/i)
@@ -154,9 +154,9 @@ test.describe('Complete User Login and Session Journey', () => {
   test('should handle non-existent user', async ({ page }) => {
     await page.goto('/auth/login')
     
-    await page.getByLabel(/email/i).fill('nonexistent@example.com')
-    await page.getByLabel(/password/i).fill('somepassword')
-    await page.getByRole('button', { name: /sign in|login/i }).click()
+    await page.getByPlaceholder('Enter your email').fill('nonexistent@example.com')
+    await page.getByPlaceholder('Enter your password').fill('somepassword')
+    await page.getByRole('button', { name: /sign in/i }).click()
     
     // Should show error message
     await CommonHelpers.verifyErrorMessage(page, /user not found|invalid credentials|login failed/i)
@@ -166,7 +166,7 @@ test.describe('Complete User Login and Session Journey', () => {
     await page.goto('/auth/login')
     
     // Try to submit empty form
-    await page.getByRole('button', { name: /sign in|login/i }).click()
+    await page.getByRole('button', { name: /sign in/i }).click()
     
     // Should show validation errors
     await CommonHelpers.verifyErrorMessage(page, /email.*required|required/i)
@@ -175,9 +175,9 @@ test.describe('Complete User Login and Session Journey', () => {
   test('should validate email format', async ({ page }) => {
     await page.goto('/auth/login')
     
-    await page.getByLabel(/email/i).fill('invalid-email')
-    await page.getByLabel(/password/i).fill('somepassword')
-    await page.getByRole('button', { name: /sign in|login/i }).click()
+    await page.getByPlaceholder('Enter your email').fill('invalid-email')
+    await page.getByPlaceholder('Enter your password').fill('somepassword')
+    await page.getByRole('button', { name: /sign in/i }).click()
     
     // Should show email format error
     await CommonHelpers.verifyErrorMessage(page, /valid email|email format/i)
@@ -197,7 +197,7 @@ test.describe('Complete User Login and Session Journey', () => {
       await expect(page.getByRole('heading', { name: /reset password|forgot password/i })).toBeVisible()
       
       // Fill email for password reset
-      await page.getByLabel(/email/i).fill(testUsers.standard.email)
+      await page.getByPlaceholder(/enter.*email/i).fill(testUsers.standard.email)
       await page.getByRole('button', { name: /send|reset|submit/i }).click()
       
       // Should show success message
@@ -210,17 +210,17 @@ test.describe('Complete User Login and Session Journey', () => {
     
     // Test keyboard navigation
     await page.keyboard.press('Tab')
-    await expect(page.getByLabel(/email/i)).toBeFocused()
+    await expect(page.getByPlaceholder('Enter your email')).toBeFocused()
     
     await page.keyboard.press('Tab')
-    await expect(page.getByLabel(/password/i)).toBeFocused()
+    await expect(page.getByPlaceholder('Enter your password')).toBeFocused()
     
     await page.keyboard.press('Tab')
-    await expect(page.getByRole('button', { name: /sign in|login/i })).toBeFocused()
+    await expect(page.getByRole('button', { name: /sign in/i })).toBeFocused()
     
     // Test form submission with Enter key
-    await page.getByLabel(/email/i).fill(testUsers.standard.email)
-    await page.getByLabel(/password/i).fill(testUsers.standard.password)
+    await page.getByPlaceholder('Enter your email').fill(testUsers.standard.email)
+    await page.getByPlaceholder('Enter your password').fill(testUsers.standard.password)
     await page.keyboard.press('Enter')
     
     await expect(page).toHaveURL(/\/(dashboard|chat|$)/, { timeout: 10000 })
@@ -237,19 +237,19 @@ test.describe('Complete User Login and Session Journey', () => {
     
     // Fill forms in both tabs
     await Promise.all([
-      page.getByLabel(/email/i).fill(testUsers.standard.email),
-      page2.getByLabel(/email/i).fill(testUsers.standard.email)
+      page.getByPlaceholder('Enter your email').fill(testUsers.standard.email),
+      page2.getByPlaceholder('Enter your email').fill(testUsers.standard.email)
     ])
     
     await Promise.all([
-      page.getByLabel(/password/i).fill(testUsers.standard.password),
-      page2.getByLabel(/password/i).fill(testUsers.standard.password)
+      page.getByPlaceholder('Enter your password').fill(testUsers.standard.password),
+      page2.getByPlaceholder('Enter your password').fill(testUsers.standard.password)
     ])
     
     // Submit both forms
     await Promise.all([
-      page.getByRole('button', { name: /sign in|login/i }).click(),
-      page2.getByRole('button', { name: /sign in|login/i }).click()
+      page.getByRole('button', { name: /sign in/i }).click(),
+      page2.getByRole('button', { name: /sign in/i }).click()
     ])
     
     // Both should succeed (or handle gracefully)
@@ -283,9 +283,9 @@ test.describe('Complete User Login and Session Journey', () => {
     const specialUser = testUsers.specialUser
     
     await page.goto('/auth/login')
-    await page.getByLabel(/email/i).fill(specialUser.email)
-    await page.getByLabel(/password/i).fill(specialUser.password)
-    await page.getByRole('button', { name: /sign in|login/i }).click()
+    await page.getByPlaceholder('Enter your email').fill(specialUser.email)
+    await page.getByPlaceholder('Enter your password').fill(specialUser.password)
+    await page.getByRole('button', { name: /sign in/i }).click()
     
     // Should handle special characters correctly
     // Note: This assumes the special user exists in the database

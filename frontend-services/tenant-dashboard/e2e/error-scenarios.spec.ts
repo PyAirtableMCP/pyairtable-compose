@@ -17,7 +17,7 @@ test.describe('Error Scenarios and Edge Cases', () => {
       await page.route('**/*', route => route.abort())
 
       // Try to send a message
-      const messageInput = page.getByPlaceholder(/ask anything|type your message/i)
+      const messageInput = page.getByPlaceholder(/Ask anything about your data/i)
       await messageInput.fill('This should fail due to network error')
       await messageInput.press('Enter')
 
@@ -191,7 +191,7 @@ test.describe('Error Scenarios and Edge Cases', () => {
       // Create very long message
       const longMessage = 'A'.repeat(10000)
       
-      const messageInput = page.getByPlaceholder(/ask anything|type your message/i)
+      const messageInput = page.getByPlaceholder(/Ask anything about your data/i)
       await messageInput.fill(longMessage)
 
       // Should either truncate or show error

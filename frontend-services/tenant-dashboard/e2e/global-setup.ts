@@ -5,8 +5,18 @@ import { PrismaClient } from '@prisma/client'
 async function globalSetup(config: FullConfig) {
   console.log('🚀 Starting global setup for E2E tests...')
 
-  // Initialize database connection
-  const prisma = new PrismaClient()
+  // Set database URL for tests
+  const testDbUrl = 'postgresql://postgres:lIDvbpxaArutRwGz@localhost:5432/pyairtable'
+  process.env.DATABASE_URL = testDbUrl
+
+  // Initialize database connection with explicit URL
+  const prisma = new PrismaClient({
+    datasources: {
+      db: {
+        url: testDbUrl
+      }
+    }
+  })
 
   try {
     // Clean up test data from previous runs
@@ -27,7 +37,7 @@ async function globalSetup(config: FullConfig) {
     const page = await browser.newPage()
     
     try {
-      await page.goto(process.env.BASE_URL || 'http://localhost:3002', {
+      await page.goto(process.env.BASE_URL || 'http://localhost:3000', {
         waitUntil: 'networkidle',
         timeout: 30000
       })

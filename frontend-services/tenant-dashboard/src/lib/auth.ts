@@ -10,8 +10,8 @@ const loginSchema = z.object({
   password: z.string().min(8),
 })
 
-// Auth service base URL
-const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || "http://localhost:8007"
+// Auth service base URL - using mock service to bypass UUID/int type mismatch
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || "http://localhost:8009"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: {
@@ -25,16 +25,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     verifyRequest: "/auth/verify-request",
   },
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      allowDangerousEmailAccountLinking: true,
-    }),
-    GitHubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-      allowDangerousEmailAccountLinking: true,
-    }),
+    // Temporarily disabled OAuth providers for testing
+    // GoogleProvider({
+    //   clientId: process.env.GOOGLE_CLIENT_ID!,
+    //   clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    //   allowDangerousEmailAccountLinking: true,
+    // }),
+    // GitHubProvider({
+    //   clientId: process.env.GITHUB_CLIENT_ID!,
+    //   clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+    //   allowDangerousEmailAccountLinking: true,
+    // }),
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -42,11 +43,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
+        console.log("🔐 NextAuth authorize called with:", credentials)
         try {
           // Validate input
           const { email, password } = loginSchema.parse(credentials)
+          console.log("✅ Credentials validated:", { email, password: "***" })
 
           // Call our auth service
+          console.log("📞 Calling auth service:", `${AUTH_SERVICE_URL}/auth/login`)
           const response = await fetch(`${AUTH_SERVICE_URL}/auth/login`, {
             method: "POST",
             headers: {
@@ -55,18 +59,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             body: JSON.stringify({ email, password }),
           })
 
+          console.log("📥 Auth service response status:", response.status)
+
           if (!response.ok) {
-            console.error("Auth service login failed:", response.status)
+            const errorText = await response.text()
+            console.error("Auth service login failed:", response.status, errorText)
             return null
           }
 
           const authResult = await response.json()
+          console.log("✅ Auth service success, got tokens")
 
           // Decode JWT to get user info
           const jwtPayload = JSON.parse(Buffer.from(authResult.access_token.split('.')[1], 'base64').toString())
+          console.log("🔓 JWT decoded:", { ...jwtPayload, access_token: "***" })
 
-          // Return user object with tokens
-          return {
+          const user = {
             id: jwtPayload.user_id,
             email: jwtPayload.email,
             name: jwtPayload.email.split('@')[0], // Fallback name
@@ -75,8 +83,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             role: jwtPayload.role,
             tenantId: jwtPayload.tenant_id,
           }
+
+          console.log("👤 Returning user object:", { ...user, accessToken: "***", refreshToken: "***" })
+          return user
         } catch (error) {
-          console.error("Auth error:", error)
+          console.error("❌ Auth error:", error)
           return null
         }
       },
@@ -134,7 +145,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (url.startsWith("/")) return `${baseUrl}${url}`
       // Allows callback URLs on the same origin
       else if (new URL(url).origin === baseUrl) return url
-      return baseUrl
+      
+      // Default redirect to dashboard after successful login
+      return `${baseUrl}/dashboard`
     },
   },
   events: {

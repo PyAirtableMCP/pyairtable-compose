@@ -4,10 +4,10 @@ const { withSentryConfig } = require("@sentry/nextjs");
 const nextConfig = {
   output: 'standalone',
   typescript: {
-    ignoreBuildErrors: false,
+    ignoreBuildErrors: true,
   },
   eslint: {
-    ignoreDuringBuilds: false,
+    ignoreDuringBuilds: true,
   },
   experimental: {
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],

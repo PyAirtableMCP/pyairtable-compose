@@ -3,9 +3,19 @@ import { PrismaClient } from '@prisma/client'
 
 // Global teardown for E2E tests
 async function globalTeardown(config: FullConfig) {
-  console.log('🧹 Starting global teardown for E2E tests...')
+  console.log('🧼 Starting global teardown for E2E tests...')
 
-  const prisma = new PrismaClient()
+  // Set database URL for tests
+  const testDbUrl = 'postgresql://postgres:lIDvbpxaArutRwGz@localhost:5432/pyairtable'
+  process.env.DATABASE_URL = testDbUrl
+
+  const prisma = new PrismaClient({
+    datasources: {
+      db: {
+        url: testDbUrl
+      }
+    }
+  })
 
   try {
     // Clean up test data

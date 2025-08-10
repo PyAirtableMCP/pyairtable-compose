@@ -7,8 +7,9 @@ import (
     "time"
     
     "github.com/golang-jwt/jwt/v5"
-    "github.com/Reg-Kris/pyairtable-auth-service/internal/models"
-    "github.com/Reg-Kris/pyairtable-auth-service/internal/repository"
+    "github.com/google/uuid"
+    "github.com/pyairtable-compose/auth-service/internal/models"
+    "github.com/pyairtable-compose/auth-service/internal/repository"
     "go.uber.org/zap"
 )
 
@@ -18,6 +19,14 @@ var (
     ErrInvalidToken      = errors.New("invalid token")
     ErrTokenExpired      = errors.New("token has expired")
 )
+
+// UserContext represents the authenticated user context
+type UserContext struct {
+    UserID   string
+    Email    string
+    Role     string
+    TenantID string
+}
 
 // AuthService handles authentication logic
 type AuthService struct {
@@ -43,10 +52,16 @@ func NewAuthService(logger *zap.Logger, userRepo repository.UserRepository, toke
 
 // Login authenticates a user and returns tokens
 func (s *AuthService) Login(req *models.LoginRequest) (*models.TokenResponse, error) {
-    // Find user by email
-    user, err := s.userRepo.FindByEmail(req.Email)
+    // Get identifier (email or username)
+    identifier := req.GetIdentifier()
+    if identifier == "" {
+        return nil, ErrInvalidCredentials
+    }
+    
+    // Find user by email (treating username as email for flexibility)
+    user, err := s.userRepo.FindByEmail(identifier)
     if err != nil {
-        s.logger.Error("Failed to find user", zap.Error(err))
+        s.logger.Error("Failed to find user", zap.Error(err), zap.String("identifier", identifier))
         return nil, ErrInvalidCredentials
     }
     
@@ -102,13 +117,20 @@ func (s *AuthService) Register(req *models.RegisterRequest) (*models.User, error
         return nil, err
     }
     
+    // Generate tenant ID if not provided
+    tenantID := req.TenantID
+    if tenantID == "" {
+        // Generate a new UUID for tenant_id
+        tenantID = uuid.New().String()
+    }
+    
     // Create user
     user := &models.User{
         Email:         req.Email,
         PasswordHash:  passwordHash,
         FirstName:     req.FirstName,
         LastName:      req.LastName,
-        TenantID:      req.TenantID,
+        TenantID:      tenantID,
         Role:          "user", // Default role
         IsActive:      true,
         EmailVerified: false,
@@ -239,6 +261,35 @@ func (s *AuthService) generateRefreshToken(userID string) (string, error) {
 // Logout invalidates tokens
 func (s *AuthService) Logout(refreshToken string) error {
     return s.tokenRepo.InvalidateRefreshToken(refreshToken)
+}
+
+// GetUserByID gets a user by their ID
+func (s *AuthService) GetUserByID(userID string) (*models.User, error) {
+    return s.userRepo.FindByID(userID)
+}
+
+// UpdateUserProfile updates a user's profile information
+func (s *AuthService) UpdateUserProfile(userID string, req *models.UpdateProfileRequest) (*models.User, error) {
+    user, err := s.userRepo.FindByID(userID)
+    if err != nil {
+        return nil, err
+    }
+    
+    // Update fields if provided
+    if req.FirstName != "" {
+        user.FirstName = req.FirstName
+    }
+    if req.LastName != "" {
+        user.LastName = req.LastName
+    }
+    
+    user.UpdatedAt = time.Now()
+    
+    if err := s.userRepo.Update(user); err != nil {
+        return nil, err
+    }
+    
+    return user, nil
 }
 
 // ChangePassword changes a user's password

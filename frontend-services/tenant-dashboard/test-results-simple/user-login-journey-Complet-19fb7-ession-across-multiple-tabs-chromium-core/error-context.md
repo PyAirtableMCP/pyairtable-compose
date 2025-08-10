@@ -1,0 +1,55 @@
+# Page snapshot
+
+```yaml
+- img
+- heading "PyAirtable AI Assistant" [level=1]
+- paragraph: Ask questions about your Airtable data, create formulas, and get AI-powered insights. Your intelligent companion for data analysis and automation.
+- img
+- text: Data Analysis
+- img
+- text: Formula Creation
+- img
+- text: Smart Insights
+- img
+- text: Natural Language
+- heading "PyAirtable Assistant" [level=3]:
+  - img
+  - text: PyAirtable Assistant
+- img
+- text: error WS
+- img
+- text: Hello! I'm your PyAirtable AI assistant. I can help you query your data, create formulas, and analyze information. What would you like to know?
+- alert:
+  - img
+  - text: Connection error. Please refresh the page.
+- 'textbox "Try asking: ''Analyze my Facebook posts table'' or ''Create a formula to calculate engagement rate''" [disabled]'
+- button [disabled]:
+  - img
+- text: 0/2000 characters
+- img
+- text: Powered by AI
+- heading "Try These Examples" [level=3]:
+  - img
+  - text: Try These Examples
+- heading "Data Analysis" [level=4]
+- paragraph: "\"Show me the top 10 posts by engagement\""
+- paragraph: "\"What's the average response time this month?\""
+- paragraph: "\"Find all records created last week\""
+- heading "Formula Creation" [level=4]
+- paragraph: "\"Create a formula to calculate ROI\""
+- paragraph: "\"Generate a status field based on conditions\""
+- paragraph: "\"Make a rollup formula for totals\""
+- heading "Automation Ideas" [level=4]
+- paragraph: "\"Set up alerts for high-priority items\""
+- paragraph: "\"Create a workflow for new leads\""
+- paragraph: "\"Automate status updates\""
+- heading "💡 Pro Tips" [level=3]
+- paragraph: • Be specific about which table or view you're referring to
+- paragraph: • Ask follow-up questions to refine your analysis
+- paragraph: • Request explanations of formulas and automations
+- paragraph: • Use natural language - no need for technical jargon
+- paragraph: • The AI can access your actual Airtable data securely
+- heading "🚀 System Status" [level=3]
+- text: API Gateway Online AI Orchestrator Ready Airtable Gateway Connected Real-time Features Enabled
+- alert
+```

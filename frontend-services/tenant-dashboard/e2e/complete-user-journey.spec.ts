@@ -82,7 +82,7 @@ test.describe('Complete End-to-End User Journey', () => {
       
       // If redirected to chat (as per application logic), verify it loads
       if (currentUrl === '/chat' || currentUrl === '/') {
-        await expect(page.getByText(/pyairtable ai assistant|welcome|chat/i)).toBeVisible()
+        await expect(page.getByText(/PyAirtable Assistant|welcome|chat/i)).toBeVisible()
       }
       
       console.log('✅ Dashboard access verified')
@@ -96,7 +96,7 @@ test.describe('Complete End-to-End User Journey', () => {
       await ChatHelpers.waitForChatInterface(page)
       
       // Verify interface is ready
-      await expect(page.getByText(/pyairtable ai assistant/i)).toBeVisible()
+      await expect(page.getByText(/PyAirtable Assistant/i)).toBeVisible()
       await ChatHelpers.verifyConnectionStatus(page, 'connected')
       
       // Send welcome message
@@ -340,7 +340,7 @@ test.describe('Complete End-to-End User Journey', () => {
       
       // Test keyboard-only navigation
       await page.keyboard.press('Tab')
-      const messageInput = page.getByPlaceholder(/ask anything|type your message/i)
+      const messageInput = page.getByPlaceholder(/Ask anything about your data/i)
       await expect(messageInput).toBeFocused()
       
       // Send message using only keyboard

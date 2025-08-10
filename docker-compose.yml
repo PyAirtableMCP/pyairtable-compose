@@ -24,22 +24,37 @@ services:
       - CORS_CREDENTIALS=${CORS_CREDENTIALS}
       - CORS_MAX_AGE=${CORS_MAX_AGE}
     depends_on:
-      - airtable-gateway
-      - mcp-server
-      - llm-orchestrator
-      - platform-services
-      - automation-services
-      - saga-orchestrator
+      airtable-gateway:
+        condition: service_healthy
+      mcp-server:
+        condition: service_healthy
+      llm-orchestrator:
+        condition: service_started
+      platform-services:
+        condition: service_healthy
+      automation-services:
+        condition: service_healthy
+      saga-orchestrator:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - pyairtable-network
+    healthcheck:
+      test: [
+        "CMD-SHELL",
+        "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\" || exit 1"
+      ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
 
   # LLM Orchestrator - Gemini 2.5 Flash integration
   llm-orchestrator:
-    image: ghcr.io/reg-kris/llm-orchestrator-py:latest
-    build:
-      context: ../llm-orchestrator-py
-      dockerfile: Dockerfile
+    image: llm-orchestrator-test:latest
+    # build:
+    #   context: ../llm-orchestrator-py
+    #   dockerfile: Dockerfile
     ports:
       - "8003:8003"
     environment:
@@ -50,7 +65,7 @@ services:
       - AIRTABLE_BASE=${AIRTABLE_BASE}
       - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
       # Redis session storage
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - USE_REDIS_SESSIONS=true
       # Legacy stdio config (fallback)
@@ -59,18 +74,29 @@ services:
       - THINKING_BUDGET=${THINKING_BUDGET}
       - LOG_LEVEL=${LOG_LEVEL}
     depends_on:
-      - mcp-server
-      - redis
+      mcp-server:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - pyairtable-network
+    healthcheck:
+      test: [
+        "CMD-SHELL",
+        "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8003/health')\" || exit 1"
+      ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   # MCP Server - Protocol implementation (HTTP mode for performance)
   mcp-server:
-    image: ghcr.io/reg-kris/mcp-server-py:latest
-    build:
-      context: ../mcp-server-py
-      dockerfile: Dockerfile
+    image: mcp-server-test:latest
+    # build:
+    #   context: ../mcp-server-py
+    #   dockerfile: Dockerfile
     ports:
       - "8001:8001"
     environment:
@@ -83,16 +109,26 @@ services:
       - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
       - LOG_LEVEL=${LOG_LEVEL}
     depends_on:
-      - airtable-gateway
+      airtable-gateway:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - pyairtable-network
+    healthcheck:
+      test: [
+        "CMD-SHELL",
+        "curl -f http://localhost:8001/health || exit 1"
+      ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
   # Airtable Gateway - Direct Airtable API integration
   airtable-gateway:
     image: ghcr.io/reg-kris/airtable-gateway-py:latest
     build:
-      context: ../airtable-gateway-py
+      context: ./python-services/airtable-gateway
       dockerfile: Dockerfile
     ports:
       - "8002:8002"
@@ -103,16 +139,26 @@ services:
       - API_KEY=${API_KEY}
       - LOG_LEVEL=${LOG_LEVEL}
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - pyairtable-network
+    healthcheck:
+      test: [
+        "CMD-SHELL",
+        "curl -f http://localhost:8002/health || exit 1"
+      ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
 
   # Phase 4 Consolidated Services
   # Platform Services - Unified Auth & Analytics (Port 8007) 
   platform-services:
-    image: ghcr.io/reg-kris/pyairtable-platform-services:latest
     build:
       context: ../pyairtable-platform-services
       dockerfile: Dockerfile
@@ -125,12 +171,12 @@ services:
       - API_KEY=${API_KEY}
       - REQUIRE_API_KEY=${REQUIRE_API_KEY:-true}
       # JWT Authentication
-      - JWT_SECRET=${JWT_SECRET:-default-jwt-secret-change-in-production}
+      - JWT_SECRET=${JWT_SECRET}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
       # Database and Redis
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       # CORS and Security
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
@@ -141,32 +187,38 @@ services:
       - ANALYTICS_RETENTION_DAYS=${ANALYTICS_RETENTION_DAYS:-90}
       - METRICS_BATCH_SIZE=${METRICS_BATCH_SIZE:-100}
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - pyairtable-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8007/health || exit 1"]
+      test: [
+        "CMD-SHELL",
+        "curl -f http://localhost:8007/health || exit 1"
+      ]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 20s
+      retries: 5
+      start_period: 30s
 
   # Automation Services - Unified file processing and workflow automation (Port 8006)
   automation-services:
     image: ghcr.io/reg-kris/pyairtable-automation-services:latest
     build:
-      context: ../pyairtable-automation-services
+      context: ./pyairtable-automation-services
       dockerfile: Dockerfile
     ports:
       - "8006:8006"
     environment:
       - MCP_SERVER_URL=http://mcp-server:8001
       - PLATFORM_SERVICES_URL=http://platform-services:8007
+      - AUTH_SERVICE_URL=http://platform-services:8007
       - API_KEY=${API_KEY}
       - LOG_LEVEL=${LOG_LEVEL}
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       # File processing configuration
@@ -178,21 +230,28 @@ services:
       - MAX_WORKFLOW_RETRIES=${MAX_WORKFLOW_RETRIES:-3}
       - SCHEDULER_CHECK_INTERVAL=${SCHEDULER_CHECK_INTERVAL:-30}
     depends_on:
-      - mcp-server
-      - platform-services
-      - redis
-      - postgres
+      mcp-server:
+        condition: service_healthy
+      platform-services:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - pyairtable-network
     volumes:
       - file-uploads:/tmp/uploads
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8006/health || exit 1"]
+      test: [
+        "CMD-SHELL",
+        "curl -f http://localhost:8006/health || exit 1"
+      ]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 20s
+      retries: 5
+      start_period: 30s
 
   # SAGA Orchestrator - Distributed transaction coordination (Port 8008)
   saga-orchestrator:
@@ -210,7 +269,7 @@ services:
       - REQUIRE_API_KEY=${REQUIRE_API_KEY:-true}
       # Database and Redis
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       # Event Bus Configuration
       - USE_REDIS_EVENT_BUS=true
@@ -233,20 +292,28 @@ services:
       # CORS
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
     depends_on:
-      - redis
-      - postgres
-      - platform-services
-      - automation-services
-      - airtable-gateway
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      platform-services:
+        condition: service_healthy
+      automation-services:
+        condition: service_healthy
+      airtable-gateway:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - pyairtable-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8008/health || exit 1"]
+      test: [
+        "CMD-SHELL",
+        "curl -f http://localhost:8008/health/ || exit 1"
+      ]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 60s
 
 
 
@@ -257,6 +324,8 @@ services:
     # ports:
     #   - "6379:6379"
     command: redis-server --requirepass ${REDIS_PASSWORD}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
       - redis-data:/data
     restart: unless-stopped
@@ -264,6 +333,15 @@ services:
       pyairtable-network:
         aliases:
           - redis
+    healthcheck:
+      test: [
+        "CMD-SHELL",
+        "redis-cli --no-auth-warning -a $$REDIS_PASSWORD ping | grep PONG && redis-cli --no-auth-warning -a $$REDIS_PASSWORD set health_check_key health_check_value && redis-cli --no-auth-warning -a $$REDIS_PASSWORD get health_check_key | grep health_check_value && redis-cli --no-auth-warning -a $$REDIS_PASSWORD del health_check_key"
+      ]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
 
   # PostgreSQL - Database for sessions and metadata
   postgres:
@@ -275,6 +353,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS="--auth-host=scram-sha-256 --auth-local=scram-sha-256"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
@@ -285,12 +364,21 @@ services:
         aliases:
           - postgres
           - db
+    healthcheck:
+      test: [
+        "CMD-SHELL",
+        "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB -h localhost -p 5432 && PGPASSWORD=$$POSTGRES_PASSWORD psql -U $$POSTGRES_USER -d $$POSTGRES_DB -c 'SELECT 1;' >/dev/null 2>&1"
+      ]
+      interval: 10s
+      timeout: 8s
+      retries: 8
+      start_period: 45s
 
   # Next.js Frontend - Web interface
   frontend:
-    image: ghcr.io/reg-kris/pyairtable-frontend:latest
+    image: ghcr.io/reg-kris/pyairtable-tenant-dashboard:latest
     build:
-      context: ../pyairtable-frontend
+      context: ./frontend-services/tenant-dashboard
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
@@ -307,7 +395,7 @@ services:
       - SAGA_ORCHESTRATOR_URL=http://saga-orchestrator:8008
       # Authentication and security
       - API_KEY=${API_KEY}
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-default-secret-change-in-production}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=http://localhost:3000
       # Development configuration
       - NODE_ENV=${NODE_ENV:-development}
@@ -315,28 +403,42 @@ services:
       # Feature flags
       - NEXT_PUBLIC_ENABLE_DEBUG=${ENABLE_DEBUG:-false}
       - NEXT_PUBLIC_SHOW_COST_TRACKING=${SHOW_COST_TRACKING:-true}
+      # WebSocket configuration for real-time updates
+      - NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws
+      # Database URL for API routes (not exposed externally)
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     volumes:
       # Enable hot reloading in development
-      - ../pyairtable-frontend:/app
+      - ./frontend-services/tenant-dashboard:/app
       - /app/node_modules
       - /app/.next
     depends_on:
-      - api-gateway
-      - llm-orchestrator
-      - mcp-server
-      - airtable-gateway
-      - platform-services
-      - automation-services
-      - saga-orchestrator
+      api-gateway:
+        condition: service_healthy
+      llm-orchestrator:
+        condition: service_healthy
+      mcp-server:
+        condition: service_healthy
+      airtable-gateway:
+        condition: service_healthy
+      platform-services:
+        condition: service_healthy
+      automation-services:
+        condition: service_healthy
+      saga-orchestrator:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - pyairtable-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      test: [
+        "CMD-SHELL",
+        "curl -f http://localhost:3000/api/health && curl -f http://localhost:3000/health/ready || exit 1"
+      ]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 60s
 
 networks:
   pyairtable-network:

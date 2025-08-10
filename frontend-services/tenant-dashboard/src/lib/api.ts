@@ -1,7 +1,22 @@
 import { ApiResponse, PaginatedResponse, ApiError, FilterOptions } from "@/types";
 
+// Custom API Error class
+class ApiErrorImpl extends Error implements ApiError {
+  constructor(
+    public code: string,
+    message: string,
+    public details?: Record<string, any>,
+    public timestamp: string = new Date().toISOString(),
+    public requestId: string = "",
+    public field?: string
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 // API Configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const API_VERSION = "v1";
 
 class ApiClient {
@@ -38,7 +53,7 @@ class ApiClient {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new ApiError(
+        throw new ApiErrorImpl(
           errorData.code || "API_ERROR",
           errorData.message || `HTTP ${response.status}: ${response.statusText}`,
           errorData.details,
@@ -51,11 +66,11 @@ class ApiClient {
       const data = await response.json();
       return data;
     } catch (error) {
-      if (error instanceof ApiError) {
+      if (error instanceof ApiErrorImpl) {
         throw error;
       }
       
-      throw new ApiError(
+      throw new ApiErrorImpl(
         "NETWORK_ERROR",
         "Network error occurred",
         { originalError: error },
@@ -153,7 +168,7 @@ class ApiClient {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new ApiError(
+      throw new ApiErrorImpl(
         errorData.code || "UPLOAD_ERROR",
         errorData.message || "File upload failed",
         errorData.details,
@@ -261,24 +276,9 @@ export const tenantApi = {
     apiClient.delete<any>(`/tenant/sessions/${sessionId}`),
 };
 
-// Error handling utility
-export class ApiError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-    public details?: Record<string, any>,
-    public timestamp: string = new Date().toISOString(),
-    public requestId: string = "",
-    public field?: string
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
-}
-
 // Response interceptor for handling common errors
 export const handleApiError = (error: any) => {
-  if (error instanceof ApiError) {
+  if (error instanceof ApiErrorImpl) {
     switch (error.code) {
       case "UNAUTHORIZED":
         // Redirect to login

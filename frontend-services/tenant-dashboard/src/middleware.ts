@@ -35,7 +35,7 @@ export async function middleware(req: NextRequest) {
 
   // Check authentication for protected routes
   if (isProtectedPath && !token) {
-    const loginUrl = new URL('/auth/signin', req.url)
+    const loginUrl = new URL('/auth/login', req.url)
     loginUrl.searchParams.set('callbackUrl', req.url)
     return NextResponse.redirect(loginUrl)
   }
@@ -43,7 +43,7 @@ export async function middleware(req: NextRequest) {
   // Check authorization for admin routes
   if (req.nextUrl.pathname.startsWith('/admin')) {
     if (!token) {
-      const loginUrl = new URL('/auth/signin', req.url)
+      const loginUrl = new URL('/auth/login', req.url)
       loginUrl.searchParams.set('callbackUrl', req.url)
       return NextResponse.redirect(loginUrl)
     }

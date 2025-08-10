@@ -1,0 +1,192 @@
+# Page snapshot
+
+```yaml
+- img
+- heading "Organization" [level=2]
+- paragraph: Management Hub
+- link "Overview":
+  - /url: /
+  - img
+  - text: Overview
+- link "Dashboard":
+  - /url: /dashboard
+  - img
+  - text: Dashboard
+- img
+- text: Team Management
+- img
+- img
+- text: Workspaces
+- img
+- img
+- text: Billing & Usage
+- img
+- img
+- text: Settings
+- img
+- img
+- text: Security & Compliance
+- img
+- banner:
+  - text: AC
+  - heading "Acme Corporation" [level=1]
+  - text: Pro
+  - button "Search commands... ⌘ K":
+    - img
+    - text: Search commands... ⌘ K
+  - button:
+    - img
+  - button "2":
+    - img
+    - text: "2"
+  - button:
+    - img
+  - button "SJ Sarah Johnson Owner":
+    - text: SJ Sarah Johnson Owner
+    - img
+- main:
+  - heading "Design System Demo" [level=1]
+  - paragraph: Demonstration of the unified design system with virtual scrolling data table
+  - paragraph: Total Records
+  - paragraph: 10,000
+  - paragraph: Across all tables
+  - paragraph: Active Users
+  - paragraph: 3.2K
+  - img
+  - text: 12.5%
+  - paragraph: vs last month
+  - paragraph: Pro Plans
+  - paragraph: 3.4K
+  - img
+  - text: 5.2%
+  - paragraph: vs last month
+  - paragraph: Enterprise
+  - paragraph: 3.3K
+  - img
+  - text: 2.1%
+  - paragraph: vs last month
+  - heading "Airtable Records" [level=2]
+  - paragraph: Manage your Airtable data with virtual scrolling for performance
+  - img
+  - textbox "Search records..."
+  - button "Status":
+    - img
+    - text: Status
+  - button:
+    - img
+  - button "Export":
+    - img
+    - text: Export
+  - button "Columns":
+    - text: Columns
+    - img
+  - table:
+    - rowgroup:
+      - row "Name Email Status Plan Usage Last Active":
+        - cell "Name":
+          - button "Name":
+            - text: Name
+            - img
+          - img
+          - img
+        - cell "Email":
+          - text: Email
+          - img
+          - img
+        - cell "Status":
+          - text: Status
+          - img
+          - img
+        - cell "Plan":
+          - text: Plan
+          - img
+          - img
+        - cell "Usage":
+          - button "Usage":
+            - text: Usage
+            - img
+          - img
+          - img
+        - cell "Last Active":
+          - text: Last Active
+          - img
+          - img
+        - cell
+    - rowgroup:
+      - row "User 1 user1@example.com pending pro 44% 7/15/2025 Open menu User 2 user2@example.com inactive pro 16% 7/11/2025 Open menu User 3 user3@example.com active enterprise 69% 7/21/2025 Open menu User 4 user4@example.com pending free 22% 7/29/2025 Open menu User 5 user5@example.com active pro 92% 7/20/2025 Open menu User 6 user6@example.com active enterprise 96% 7/31/2025 Open menu User 7 user7@example.com active free 73% 7/19/2025 Open menu User 8 user8@example.com active pro 68% 7/19/2025 Open menu User 9 user9@example.com pending free 3% 7/11/2025 Open menu User 10 user10@example.com active pro 80% 7/26/2025 Open menu User 11 user11@example.com pending free 18% 7/11/2025 Open menu User 12 user12@example.com pending free 99% 7/12/2025 Open menu User 13 user13@example.com inactive enterprise 53% 7/23/2025 Open menu":
+        - cell "User 1 user1@example.com pending pro 44% 7/15/2025 Open menu User 2 user2@example.com inactive pro 16% 7/11/2025 Open menu User 3 user3@example.com active enterprise 69% 7/21/2025 Open menu User 4 user4@example.com pending free 22% 7/29/2025 Open menu User 5 user5@example.com active pro 92% 7/20/2025 Open menu User 6 user6@example.com active enterprise 96% 7/31/2025 Open menu User 7 user7@example.com active free 73% 7/19/2025 Open menu User 8 user8@example.com active pro 68% 7/19/2025 Open menu User 9 user9@example.com pending free 3% 7/11/2025 Open menu User 10 user10@example.com active pro 80% 7/26/2025 Open menu User 11 user11@example.com pending free 18% 7/11/2025 Open menu User 12 user12@example.com pending free 99% 7/12/2025 Open menu User 13 user13@example.com inactive enterprise 53% 7/23/2025 Open menu":
+          - text: User 1 user1@example.com pending pro 44% 7/15/2025
+          - button "Open menu":
+            - text: Open menu
+            - img
+          - text: User 2 user2@example.com inactive pro 16% 7/11/2025
+          - button "Open menu":
+            - text: Open menu
+            - img
+          - text: User 3 user3@example.com active enterprise 69% 7/21/2025
+          - button "Open menu":
+            - text: Open menu
+            - img
+          - text: User 4 user4@example.com pending free 22% 7/29/2025
+          - button "Open menu":
+            - text: Open menu
+            - img
+          - text: User 5 user5@example.com active pro 92% 7/20/2025
+          - button "Open menu":
+            - text: Open menu
+            - img
+          - text: User 6 user6@example.com active enterprise 96% 7/31/2025
+          - button "Open menu":
+            - text: Open menu
+            - img
+          - text: User 7 user7@example.com active free 73% 7/19/2025
+          - button "Open menu":
+            - text: Open menu
+            - img
+          - text: User 8 user8@example.com active pro 68% 7/19/2025
+          - button "Open menu":
+            - text: Open menu
+            - img
+          - text: User 9 user9@example.com pending free 3% 7/11/2025
+          - button "Open menu":
+            - text: Open menu
+            - img
+          - text: User 10 user10@example.com active pro 80% 7/26/2025
+          - button "Open menu":
+            - text: Open menu
+            - img
+          - text: User 11 user11@example.com pending free 18% 7/11/2025
+          - button "Open menu":
+            - text: Open menu
+            - img
+          - text: User 12 user12@example.com pending free 99% 7/12/2025
+          - button "Open menu":
+            - text: Open menu
+            - img
+          - text: User 13 user13@example.com inactive enterprise 53% 7/23/2025
+          - button "Open menu":
+            - text: Open menu
+            - img
+  - heading "Virtual Scrolling" [level=3]
+  - paragraph: Handle thousands of records with smooth scrolling performance
+  - list:
+    - listitem: • Renders only visible rows
+    - listitem: • Smooth scrolling experience
+    - listitem: • Memory efficient
+    - listitem: • Handles 10,000+ records
+  - heading "Command Palette" [level=3]
+  - paragraph: Quick navigation and actions with keyboard shortcuts
+  - list:
+    - listitem: • Press Cmd/Ctrl + K to open
+    - listitem: • Navigate to any page
+    - listitem: • Theme switching
+    - listitem: • Keyboard shortcuts
+  - heading "PWA Features" [level=3]
+  - paragraph: Progressive web app with offline capabilities
+  - list:
+    - listitem: • Install as desktop app
+    - listitem: • Offline data access
+    - listitem: • Background sync
+    - listitem: • Push notifications
+- alert
+```

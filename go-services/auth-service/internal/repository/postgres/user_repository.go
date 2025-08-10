@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 	
-	"github.com/Reg-Kris/pyairtable-auth-service/internal/models"
+	"github.com/pyairtable-compose/auth-service/internal/models"
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 )

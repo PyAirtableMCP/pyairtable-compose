@@ -85,9 +85,10 @@ export function Providers({ children }: ProvidersProps) {
                 },
               }}
             />
-            {process.env.NODE_ENV === "development" && (
-              {/* <ReactQueryDevtools initialIsOpen={false} /> */}
-            )}
+            {/* Development tools disabled */}
+            {/* process.env.NODE_ENV === "development" && (
+              <ReactQueryDevtools initialIsOpen={false} />
+            ) */}
             
             {/* PWA Components */}
             <ConnectionStatus />
