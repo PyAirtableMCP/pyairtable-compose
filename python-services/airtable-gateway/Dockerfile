@@ -2,28 +2,40 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install build dependencies
+# Install build dependencies and curl for health checks
 RUN apt-get update && apt-get install -y \
     gcc \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
-COPY requirements.txt .
+# Copy requirements first for better caching
+COPY airtable-gateway/requirements.txt .
+COPY airtable-gateway/requirements-test.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY src/ ./src/
+# Copy shared telemetry code (required for OpenTelemetry)
+# Note: Build context should be set to python-services directory
+COPY shared/ ./shared/
 
-# Set Python path
-ENV PYTHONPATH=/app
+# Copy application code
+COPY airtable-gateway/src/ ./src/
+
+# Create __init__.py files to ensure proper package structure
+RUN touch /app/__init__.py && \
+    touch /app/src/__init__.py && \
+    touch /app/shared/__init__.py
+
+# Set Python path to include src directory first, then app root
+ENV PYTHONPATH=/app/src:/app
 
 EXPOSE 8002
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8002/health').raise_for_status()"
+# Health check using curl instead of httpx to avoid import issues
+HEALTHCHECK --interval=15s --timeout=10s --start-period=45s --retries=5 \
+    CMD curl -f http://localhost:8002/health || exit 1
 
-# Run the application
-CMD ["python", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8002"]
+# Change to src directory and run the application
+WORKDIR /app/src
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]

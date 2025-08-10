@@ -1,40 +1,66 @@
 version: '3.8'
 
-# Minimal Working PyAirtable Stack
-# Only includes successfully building services for customer deployment
-
 services:
-  # LLM Orchestrator - Gemini 2.5 Flash integration (Working)
-  # NOTE: API Gateway removed due to Go module issues - direct access to services
-  llm-orchestrator:
-    image: ghcr.io/reg-kris/llm-orchestrator-py:latest
-    build:
-      context: ../llm-orchestrator-py
-      dockerfile: Dockerfile
-    ports:
-      - "8003:8003"
+  # Infrastructure Services - These work
+  postgres:
+    image: postgres:16-alpine
+    container_name: pyairtable-postgres
     environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - MCP_SERVER_HTTP_URL=http://mcp-server:8001
-      - USE_HTTP_MCP=true
-      - REDIS_URL=redis://redis:6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - USE_REDIS_SESSIONS=true
-      - THINKING_BUDGET=${THINKING_BUDGET:-10}
+      POSTGRES_DB: pyairtable
+      POSTGRES_USER: pyairtable
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pyairtable}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pyairtable"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: pyairtable-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-pyairtable}
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Working Services - These have been fixed
+  airtable-gateway:
+    build:
+      context: ./python-services
+      dockerfile: airtable-gateway/Dockerfile
+    container_name: pyairtable-airtable-gateway
+    ports:
+      - "8002:8002"
+    environment:
+      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
+      - AIRTABLE_BASE=${AIRTABLE_BASE}
+      - API_KEY=${API_KEY}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-pyairtable}@redis:6379
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     depends_on:
-      - mcp-server
-      - redis
-    restart: unless-stopped
-    networks:
-      - pyairtable-network
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8002/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
-  # MCP Server - Protocol implementation (Working)
   mcp-server:
-    image: ghcr.io/reg-kris/mcp-server-py:latest
     build:
-      context: ../mcp-server-py
-      dockerfile: Dockerfile
+      context: ./python-services
+      dockerfile: mcp-server/Dockerfile
+    container_name: pyairtable-mcp-server
     ports:
       - "8001:8001"
     environment:
@@ -42,151 +68,45 @@ services:
       - AIRTABLE_GATEWAY_API_KEY=${API_KEY}
       - MCP_SERVER_MODE=http
       - MCP_SERVER_PORT=8001
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    depends_on:
-      - airtable-gateway
-    restart: unless-stopped
-    networks:
-      - pyairtable-network
-
-  # Airtable Gateway - Direct Airtable API integration (Working)
-  airtable-gateway:
-    build:
-      context: ./python-services/airtable-gateway
-      dockerfile: Dockerfile
-    ports:
-      - "8002:8002"
-    environment:
-      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
-      - AIRTABLE_PAT=${AIRTABLE_TOKEN}
       - AIRTABLE_BASE=${AIRTABLE_BASE}
-      - API_KEY=${API_KEY}
+      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     depends_on:
-      - redis
-      - postgres
-    restart: unless-stopped
-    networks:
-      - pyairtable-network
-
-  # Platform Services - Unified Auth & Analytics (Fixed Python service)
-  platform-services:
-    image: ghcr.io/reg-kris/pyairtable-platform-services:latest
-    build:
-      context: ../pyairtable-platform-services
-      dockerfile: Dockerfile
-      target: production
-    ports:
-      - "8007:8007"
-    environment:
-      - ENVIRONMENT=${ENVIRONMENT:-production}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - API_KEY=${API_KEY}
-      - REQUIRE_API_KEY=${REQUIRE_API_KEY:-true}
-      - JWT_SECRET=${JWT_SECRET:-default-jwt-secret-change-in-production}
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://redis:6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - CORS_ORIGINS=${CORS_ORIGINS:-*}
-      - PASSWORD_MIN_LENGTH=${PASSWORD_MIN_LENGTH:-12}
-      - PASSWORD_HASH_ROUNDS=${PASSWORD_HASH_ROUNDS:-12}
-      - ANALYTICS_RETENTION_DAYS=${ANALYTICS_RETENTION_DAYS:-365}
-      - METRICS_BATCH_SIZE=${METRICS_BATCH_SIZE:-100}
-    depends_on:
-      - redis
-      - postgres
-    restart: unless-stopped
-    networks:
-      - pyairtable-network
+      airtable-gateway:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8007/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 20s
+      retries: 5
 
-  # Automation Services - File processing and workflows (Fixed Python service)
-  automation-services:
-    image: ghcr.io/reg-kris/pyairtable-automation-services:latest
-    build:
-      context: ../pyairtable-automation-services
-      dockerfile: Dockerfile
-      target: production
+  # LLM Orchestrator - This one already works
+  llm-orchestrator:
+    image: llm-orchestrator-test:latest
+    container_name: pyairtable-llm-orchestrator
     ports:
-      - "8006:8006"
+      - "8003:8003"
     environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
       - MCP_SERVER_URL=http://mcp-server:8001
-      - PLATFORM_SERVICES_URL=http://platform-services:8007
       - API_KEY=${API_KEY}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - REDIS_URL=redis://redis:6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-25MB}
-      - ALLOWED_EXTENSIONS=${ALLOWED_EXTENSIONS:-pdf,doc,docx,txt,csv,xlsx}
-      - UPLOAD_DIR=${UPLOAD_DIR:-/tmp/uploads}
-      - DEFAULT_WORKFLOW_TIMEOUT=${DEFAULT_WORKFLOW_TIMEOUT:-600}
-      - MAX_WORKFLOW_RETRIES=${MAX_WORKFLOW_RETRIES:-3}
-      - SCHEDULER_CHECK_INTERVAL=${SCHEDULER_CHECK_INTERVAL:-30}
     depends_on:
-      - mcp-server
-      - platform-services
-      - redis
-      - postgres
-    restart: unless-stopped
-    networks:
-      - pyairtable-network
-    volumes:
-      - file-uploads:/tmp/uploads
+      airtable-gateway:
+        condition: service_healthy
+      mcp-server:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8006/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8003/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 20s
-
-  # Redis - Caching and session storage
-  redis:
-    image: redis:7-alpine
-    command: redis-server --requirepass ${REDIS_PASSWORD}
-    volumes:
-      - redis-data:/data
-    restart: unless-stopped
-    networks:
-      - pyairtable-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # PostgreSQL - Database for sessions and metadata
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
-    restart: unless-stopped
-    networks:
-      - pyairtable-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-networks:
-  pyairtable-network:
-    driver: bridge
+      retries: 5
 
 volumes:
-  redis-data:
-    driver: local
-  postgres-data:
-    driver: local
-  file-uploads:
-    driver: local
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: pyairtable-network

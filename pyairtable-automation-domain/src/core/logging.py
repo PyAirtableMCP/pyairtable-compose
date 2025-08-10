@@ -17,13 +17,18 @@ def configure_logging() -> None:
     settings = get_settings()
     
     # Configure standard library logging
-    logging.basicConfig(
-        format="%(message)s",
-        stream=sys.stdout,
-        level=getattr(logging, settings.observability.log_level.upper()),
-        handlers=[RichHandler(console=Console(stderr=False), rich_tracebacks=True)]
-        if settings.is_development else [],
-    )
+    if settings.is_development:
+        logging.basicConfig(
+            format="%(message)s",
+            level=getattr(logging, settings.observability.log_level.upper()),
+            handlers=[RichHandler(console=Console(stderr=False), rich_tracebacks=True)]
+        )
+    else:
+        logging.basicConfig(
+            format="%(message)s",
+            stream=sys.stdout,
+            level=getattr(logging, settings.observability.log_level.upper()),
+        )
     
     # Configure structlog
     processors = [

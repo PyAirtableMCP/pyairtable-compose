@@ -12,14 +12,14 @@ class Settings(BaseSettings):
     
     # Server config
     host: str = "0.0.0.0"
-    port: int = 8092
+    port: int = 8001
     
     # MCP config
     mcp_mode: str = "http"  # http or stdio
     
     # Service URLs
-    airtable_gateway_url: str = "http://airtable-gateway:8093"
-    llm_orchestrator_url: str = "http://llm-orchestrator:8091"
+    airtable_gateway_url: str = "http://airtable-gateway:8002"
+    llm_orchestrator_url: str = "http://llm-orchestrator:8003"
     
     # Database config
     database_url: str = "postgresql://admin:changeme@localhost:5432/pyairtable?sslmode=require"

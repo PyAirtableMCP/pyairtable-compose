@@ -11,7 +11,16 @@ from fastapi.responses import JSONResponse
 import uvicorn
 
 # Initialize OpenTelemetry before importing other modules
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'shared'))
+# Add multiple potential paths for shared module
+shared_paths = [
+    os.path.join(os.path.dirname(__file__), '..', '..', 'shared'),
+    os.path.join(os.path.dirname(__file__), '..', 'shared'),
+    '/app/shared'
+]
+
+for path in shared_paths:
+    if os.path.exists(path) and path not in sys.path:
+        sys.path.insert(0, path)
 try:
     from telemetry import initialize_telemetry
     
@@ -33,20 +42,20 @@ except ImportError as e:
     logging.warning(f"OpenTelemetry initialization failed: {e}")
     tracer = None
 
-from src.routes import health
+from routes import health
 
 # App lifespan
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     print(f"Starting airtable-gateway...")
-    from src.dependencies import get_redis_client
+    from dependencies import get_redis_client
     # Initialize Redis connection
     await get_redis_client()
     yield
     # Shutdown
     print(f"Shutting down airtable-gateway...")
-    from src.dependencies import close_redis_client
+    from dependencies import close_redis_client
     await close_redis_client()
 
 # Create FastAPI app
@@ -67,8 +76,8 @@ app.add_middleware(
 )
 
 # Authentication middleware
-from src.middleware.auth import AuthMiddleware
-from src.config import get_settings
+from middleware.auth import AuthMiddleware
+from config import get_settings
 settings = get_settings()
 app.add_middleware(AuthMiddleware, internal_api_key=settings.internal_api_key)
 
@@ -82,8 +91,23 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Include routers
 app.include_router(health.router, tags=["health"])
-from src.routes.airtable import router as airtable_router
-app.include_router(airtable_router)
+
+# Import and include Airtable router with error handling
+try:
+    from routes.airtable import router as airtable_router
+    app.include_router(airtable_router)
+    logging.info("Airtable router loaded successfully")
+except ImportError as e:
+    logging.error(f"Failed to load Airtable router: {e}")
+    # Create minimal fallback router
+    from fastapi import APIRouter
+    fallback_router = APIRouter(prefix="/api/v1/airtable", tags=["airtable"])
+    
+    @fallback_router.get("/status")
+    async def fallback_status():
+        return {"status": "error", "message": "Airtable service unavailable"}
+    
+    app.include_router(fallback_router)
 
 # Root endpoint
 @app.get("/")
@@ -97,7 +121,7 @@ async def root():
 # Service info endpoint
 @app.get("/api/v1/info")
 async def info():
-    from src.config import get_settings
+    from config import get_settings
     settings = get_settings()
     return {
         "service": settings.service_name,

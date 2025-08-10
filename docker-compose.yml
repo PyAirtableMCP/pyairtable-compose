@@ -206,14 +206,15 @@ services:
 
   # Automation Services - Unified file processing and workflow automation (Port 8006)
   automation-services:
-    image: ghcr.io/reg-kris/pyairtable-automation-services:latest
-    # Note: Build context removed - service needs to be built separately
-    # build:
-    #   context: ./pyairtable-automation-services
-    #   dockerfile: Dockerfile
+    # image: ghcr.io/reg-kris/pyairtable-automation-services:latest
+    # Note: Using local build context
+    build:
+      context: ./pyairtable-automation-domain
+      dockerfile: Dockerfile
     ports:
       - "8006:8006"
     environment:
+      - PORT=8006
       - MCP_SERVER_URL=http://mcp-server:8001
       - PLATFORM_SERVICES_URL=http://platform-services:8007
       - AUTH_SERVICE_URL=http://platform-services:8007
@@ -221,7 +222,12 @@ services:
       - LOG_LEVEL=${LOG_LEVEL}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # Security settings
+      - SECURITY_INTERNAL_API_KEY=${API_KEY}
+      - SECURITY_JWT_SECRET_KEY=${JWT_SECRET}
+      # Webhook settings
+      - WEBHOOK_SECRET_KEY=${JWT_SECRET}
       # File processing configuration
       - MAX_FILE_SIZE=${MAX_FILE_SIZE:-10MB}
       - ALLOWED_EXTENSIONS=${ALLOWED_EXTENSIONS:-pdf,doc,docx,txt,csv,xlsx}
@@ -264,12 +270,13 @@ services:
       - "8008:8008"
     environment:
       # Service Configuration
-      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - ENVIRONMENT=production
       - LOG_LEVEL=${LOG_LEVEL}
       - API_KEY=${API_KEY}
       - REQUIRE_API_KEY=${REQUIRE_API_KEY:-true}
+      - CORS_ORIGINS=["http://localhost:3000","http://localhost:8000"]
       # Database and Redis
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       # Event Bus Configuration
@@ -290,8 +297,6 @@ services:
       # Monitoring
       - ENABLE_METRICS=${ENABLE_METRICS:-true}
       - METRICS_PORT=9090
-      # CORS
-      - CORS_ORIGINS=${CORS_ORIGINS:-*}
     depends_on:
       redis:
         condition: service_healthy
@@ -354,7 +359,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_INITDB_ARGS="--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+      - POSTGRES_INITDB_ARGS="--auth-host=scram-sha-256"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro

@@ -33,7 +33,7 @@ except ImportError as e:
     logging.warning(f"OpenTelemetry initialization failed: {e}")
     tracer = None
 
-from routes import health
+from .routes import health
 
 # App lifespan
 @asynccontextmanager
@@ -71,7 +71,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Include routers
 app.include_router(health.router, tags=["health"])
-from routes.mcp import router as mcp_router
+from .routes.mcp import router as mcp_router
 app.include_router(mcp_router)
 
 # Root endpoint
@@ -86,8 +86,8 @@ async def root():
 # Service info endpoint
 @app.get("/api/v1/info")
 async def info():
-    from config import get_settings
-    from models.mcp import AVAILABLE_TOOLS
+    from .config import get_settings
+    from .models.mcp import AVAILABLE_TOOLS
     settings = get_settings()
     return {
         "service": settings.service_name,
@@ -106,7 +106,7 @@ async def info():
     }
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", "8092"))
+    port = int(os.getenv("PORT", "8001"))
     uvicorn.run(
         "main:app",
         host="0.0.0.0",

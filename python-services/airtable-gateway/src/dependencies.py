@@ -1,6 +1,6 @@
 """Dependencies for Airtable Gateway"""
 from redis import asyncio as aioredis
-from .config import get_settings
+from config import get_settings
 
 # Redis client instance
 redis_client = None

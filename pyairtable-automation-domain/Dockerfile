@@ -13,20 +13,15 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
-RUN pip install poetry
-
 # Set work directory
 WORKDIR /app
 
-# Copy poetry files
-COPY pyproject.toml poetry.lock* ./
+# Copy requirements and source code
+COPY pyproject.toml README.md ./
+COPY src/ ./src/
 
-# Configure poetry: Don't create a virtual environment
-RUN poetry config virtualenvs.create false
-
-# Install dependencies
-RUN poetry install --only=main --no-dev
+# Install dependencies directly with pip from pyproject.toml
+RUN pip install --no-cache-dir .
 
 # Production stage
 FROM python:3.11-slim as production
@@ -63,8 +58,8 @@ USER app
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8090}/health || exit 1
 
-# Expose port
-EXPOSE 8090
+# Expose port (dynamic based on PORT environment variable)
+EXPOSE ${PORT:-8090}
 
 # Default command (can be overridden)
 CMD ["python", "-m", "src.main"]

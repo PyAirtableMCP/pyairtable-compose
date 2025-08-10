@@ -2,7 +2,6 @@
 
 from typing import Any, Optional
 
-import aioredis
 from redis.asyncio import Redis
 
 from ..core.config import get_settings
