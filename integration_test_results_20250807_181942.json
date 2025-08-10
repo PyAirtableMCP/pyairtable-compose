@@ -1,0 +1,556 @@
+{
+  "test_execution_summary": {
+    "timestamp": "2025-08-07T18:19:42.562176",
+    "total_duration_seconds": 190.11,
+    "total_tests": 35,
+    "passed": 6,
+    "failed": 12,
+    "skipped": 17,
+    "overall_success_rate": 17.1
+  },
+  "category_results": {
+    "Service Health": {
+      "category": "Service Health",
+      "total_tests": 10,
+      "passed": 2,
+      "failed": 8,
+      "skipped": 0,
+      "success_rate": 20.0,
+      "avg_response_time_ms": 4186.4,
+      "performance_metrics": {
+        "response_time_ms": [
+          316,
+          5095
+        ]
+      }
+    },
+    "Authentication Flow": {
+      "category": "Authentication Flow",
+      "total_tests": 4,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 4,
+      "success_rate": 0.0,
+      "avg_response_time_ms": 7786.0,
+      "performance_metrics": {}
+    },
+    "Airtable Operations": {
+      "category": "Airtable Operations",
+      "total_tests": 6,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 5,
+      "success_rate": 16.666666666666664,
+      "avg_response_time_ms": 6488.833333333333,
+      "performance_metrics": {
+        "response_time_ms": [
+          1
+        ]
+      }
+    },
+    "Workflow Management": {
+      "category": "Workflow Management",
+      "total_tests": 3,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 3,
+      "success_rate": 0.0,
+      "avg_response_time_ms": 7786.0,
+      "performance_metrics": {}
+    },
+    "File Operations": {
+      "category": "File Operations",
+      "total_tests": 3,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 2,
+      "success_rate": 33.33333333333333,
+      "avg_response_time_ms": 5202.333333333333,
+      "performance_metrics": {
+        "response_time_ms": [
+          21
+        ]
+      }
+    },
+    "SAGA Transactions": {
+      "category": "SAGA Transactions",
+      "total_tests": 3,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 3,
+      "success_rate": 0.0,
+      "avg_response_time_ms": 7806.0,
+      "performance_metrics": {}
+    },
+    "Frontend Integration": {
+      "category": "Frontend Integration",
+      "total_tests": 3,
+      "passed": 1,
+      "failed": 2,
+      "skipped": 0,
+      "success_rate": 33.33333333333333,
+      "avg_response_time_ms": 189.0,
+      "performance_metrics": {
+        "response_time_ms": [
+          201
+        ]
+      }
+    },
+    "Performance Metrics": {
+      "category": "Performance Metrics",
+      "total_tests": 3,
+      "passed": 1,
+      "failed": 2,
+      "skipped": 0,
+      "success_rate": 33.33333333333333,
+      "avg_response_time_ms": 10254.666666666666,
+      "performance_metrics": {
+        "avg_response_time_ms": [
+          5026.0
+        ],
+        "max_response_time_ms": [
+          5026
+        ],
+        "min_response_time_ms": [
+          5026
+        ],
+        "endpoints_tested": [
+          1
+        ],
+        "concurrent_requests": [
+          10
+        ],
+        "successful_requests": [
+          10
+        ],
+        "success_rate_percent": [
+          100.0
+        ],
+        "total_requests": [
+          3
+        ],
+        "error_count": [
+          2
+        ],
+        "error_rate_percent": [
+          66.66666666666666
+        ]
+      }
+    }
+  },
+  "detailed_results": [
+    {
+      "test_name": "frontend_health",
+      "category": "Service Health",
+      "status": "PASS",
+      "duration_ms": 316,
+      "details": "Service frontend is healthy",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 316
+      }
+    },
+    {
+      "test_name": "api_gateway_health",
+      "category": "Service Health",
+      "status": "PASS",
+      "duration_ms": 5095,
+      "details": "Service api_gateway is healthy",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 5095
+      }
+    },
+    {
+      "test_name": "auth_service_connectivity",
+      "category": "Service Health",
+      "status": "FAIL",
+      "duration_ms": 6,
+      "details": "Service auth_service is not accessible",
+      "error_message": "Cannot connect to host localhost:8001 ssl:default [Multiple exceptions: [Errno 61] Connect call failed ('::1', 8001, 0, 0), [Errno 61] Connect call failed ('127.0.0.1', 8001)]",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_service_connectivity",
+      "category": "Service Health",
+      "status": "FAIL",
+      "duration_ms": 3,
+      "details": "Service airtable_service is not accessible",
+      "error_message": "Cannot connect to host localhost:8002 ssl:default [Multiple exceptions: [Errno 61] Connect call failed ('::1', 8002, 0, 0), [Errno 61] Connect call failed ('127.0.0.1', 8002)]",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "workflow_service_connectivity",
+      "category": "Service Health",
+      "status": "FAIL",
+      "duration_ms": 3,
+      "details": "Service workflow_service is not accessible",
+      "error_message": "Cannot connect to host localhost:8003 ssl:default [Multiple exceptions: [Errno 61] Connect call failed ('::1', 8003, 0, 0), [Errno 61] Connect call failed ('127.0.0.1', 8003)]",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "file_service_connectivity",
+      "category": "Service Health",
+      "status": "FAIL",
+      "duration_ms": 2,
+      "details": "Service file_service is not accessible",
+      "error_message": "Cannot connect to host localhost:8004 ssl:default [Multiple exceptions: [Errno 61] Connect call failed ('::1', 8004, 0, 0), [Errno 61] Connect call failed ('127.0.0.1', 8004)]",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "saga_service_connectivity",
+      "category": "Service Health",
+      "status": "FAIL",
+      "duration_ms": 1,
+      "details": "Service saga_service is not accessible",
+      "error_message": "Cannot connect to host localhost:8005 ssl:default [Multiple exceptions: [Errno 61] Connect call failed ('::1', 8005, 0, 0), [Errno 61] Connect call failed ('127.0.0.1', 8005)]",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "notification_service_connectivity",
+      "category": "Service Health",
+      "status": "FAIL",
+      "duration_ms": 2,
+      "details": "Service notification_service is not accessible",
+      "error_message": "Cannot connect to host localhost:8006 ssl:default [Multiple exceptions: [Errno 61] Connect call failed ('::1', 8006, 0, 0), [Errno 61] Connect call failed ('127.0.0.1', 8006)]",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "platform_service_connectivity",
+      "category": "Service Health",
+      "status": "FAIL",
+      "duration_ms": 36433,
+      "details": "Service platform_service is not accessible",
+      "error_message": "",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "user_service_connectivity",
+      "category": "Service Health",
+      "status": "FAIL",
+      "duration_ms": 3,
+      "details": "Service user_service is not accessible",
+      "error_message": "Cannot connect to host localhost:8008 ssl:default [Multiple exceptions: [Errno 61] Connect call failed ('::1', 8008, 0, 0), [Errno 61] Connect call failed ('127.0.0.1', 8008)]",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "user_registration",
+      "category": "Authentication Flow",
+      "status": "SKIP",
+      "duration_ms": 7788,
+      "details": "No accessible registration endpoint found",
+      "error_message": "All registration endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "user_login",
+      "category": "Authentication Flow",
+      "status": "SKIP",
+      "duration_ms": 7784,
+      "details": "No accessible login endpoint found",
+      "error_message": "All login endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "jwt_validation",
+      "category": "Authentication Flow",
+      "status": "SKIP",
+      "duration_ms": 0,
+      "details": "No session token available for validation",
+      "error_message": "Login test did not provide token",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "session_management",
+      "category": "Authentication Flow",
+      "status": "SKIP",
+      "duration_ms": 0,
+      "details": "No session token available for session management tests",
+      "error_message": "Login test did not provide token",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_list_tables",
+      "category": "Airtable Operations",
+      "status": "SKIP",
+      "duration_ms": 7787,
+      "details": "No accessible Airtable tables endpoint found",
+      "error_message": "All Airtable endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_create_record",
+      "category": "Airtable Operations",
+      "status": "SKIP",
+      "duration_ms": 7782,
+      "details": "No accessible Airtable create endpoint found",
+      "error_message": "All Airtable endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_read_records",
+      "category": "Airtable Operations",
+      "status": "SKIP",
+      "duration_ms": 7790,
+      "details": "No accessible Airtable read endpoint found",
+      "error_message": "All Airtable endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_update_record",
+      "category": "Airtable Operations",
+      "status": "SKIP",
+      "duration_ms": 7788,
+      "details": "No accessible Airtable update endpoint found",
+      "error_message": "All Airtable endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_delete_record",
+      "category": "Airtable Operations",
+      "status": "PASS",
+      "duration_ms": 1,
+      "details": "Delete endpoint accessible (record not found is expected)",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 1
+      }
+    },
+    {
+      "test_name": "airtable_schema_retrieval",
+      "category": "Airtable Operations",
+      "status": "SKIP",
+      "duration_ms": 7785,
+      "details": "No accessible Airtable schema endpoint found",
+      "error_message": "All Airtable endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "workflow_create",
+      "category": "Workflow Management",
+      "status": "SKIP",
+      "duration_ms": 7783,
+      "details": "No accessible workflow create endpoint found",
+      "error_message": "All workflow endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "workflow_execute",
+      "category": "Workflow Management",
+      "status": "SKIP",
+      "duration_ms": 7787,
+      "details": "No accessible workflow execute endpoint found",
+      "error_message": "All workflow endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "workflow_history",
+      "category": "Workflow Management",
+      "status": "SKIP",
+      "duration_ms": 7788,
+      "details": "No accessible workflow history endpoint found",
+      "error_message": "All workflow endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "file_upload",
+      "category": "File Operations",
+      "status": "SKIP",
+      "duration_ms": 7798,
+      "details": "No accessible file upload endpoint found",
+      "error_message": "All file upload endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "file_list",
+      "category": "File Operations",
+      "status": "SKIP",
+      "duration_ms": 7788,
+      "details": "No accessible file list endpoint found",
+      "error_message": "All file endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "file_download",
+      "category": "File Operations",
+      "status": "PASS",
+      "duration_ms": 21,
+      "details": "Download endpoint accessible (file not found is expected)",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 21
+      }
+    },
+    {
+      "test_name": "saga_start_transaction",
+      "category": "SAGA Transactions",
+      "status": "SKIP",
+      "duration_ms": 7825,
+      "details": "No accessible SAGA start endpoint found",
+      "error_message": "All SAGA endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "saga_execute_steps",
+      "category": "SAGA Transactions",
+      "status": "SKIP",
+      "duration_ms": 7807,
+      "details": "No accessible SAGA execute endpoint found",
+      "error_message": "All SAGA endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "saga_compensation",
+      "category": "SAGA Transactions",
+      "status": "SKIP",
+      "duration_ms": 7786,
+      "details": "No accessible SAGA compensation endpoint found",
+      "error_message": "All SAGA endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "frontend_api_integration",
+      "category": "Frontend Integration",
+      "status": "PASS",
+      "duration_ms": 201,
+      "details": "Frontend is accessible and can handle API calls",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 201
+      }
+    },
+    {
+      "test_name": "frontend_auth_flow",
+      "category": "Frontend Integration",
+      "status": "FAIL",
+      "duration_ms": 330,
+      "details": "Frontend auth pages issue: status 500",
+      "error_message": "<!DOCTYPE html><html id=\"__next_error__\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks/webpack.js\"/><script src=\"/_next/static/chunks/main-app.js\" async=\"\"></script><script src=\"/_next/static/chunks/app-pages-internals.js\" async=\"\"></script><script src=\"/_next/static/chunks/app/global-error.js\" async=\"\"></script><meta name=\"next-error\" content=\"not-found\"/><meta name=\"robots\" content=\"noindex\"/><title>Tenant Dashboard - PyAirtable</title><meta name=\"description\" content=\"Comprehensive tenant management dashboard for PyAirtable organizations\"/><meta name=\"author\" content=\"PyAirtable Team\"/><link rel=\"manifest\" href=\"/manifest.json\" crossorigin=\"use-credentials\"/><meta name=\"keywords\" content=\"PyAirtable,tenant management,organization,dashboard\"/><meta name=\"robots\" content=\"noindex, nofollow\"/><meta name=\"msapplication-TileColor\" content=\"#3b82f6\"/><meta name=\"msapplication-config\" content=\"/browserconfig.xml\"/><meta name=\"theme-color\" content=\"#ffffff\"/><meta name=\"format-detection\" content=\"telephone=no\"/><meta name=\"apple-mobile-web-app-capable\" content=\"yes\"/><meta name=\"apple-mobile-web-app-title\" content=\"PyAirtable Dashboard\"/><meta name=\"apple-mobile-web-app-status-bar-style\" content=\"default\"/><link rel=\"icon\" href=\"/icons/icon-192x192.png\" sizes=\"192x192\" type=\"image/png\"/><link rel=\"icon\" href=\"/icons/icon-512x512.png\" sizes=\"512x512\" type=\"image/png\"/><link rel=\"apple-touch-icon\" href=\"/icons/icon-152x152.png\" sizes=\"152x152\" type=\"image/png\"/><meta name=\"next-size-adjust\"/><script src=\"/_next/static/chunks/polyfills.js\" noModule=\"\"></script></head><body><script src=\"/_next/static/chunks/webpack.js\" async=\"\"></script><script>(self.__next_f=self.__next_f||[]).push([0]);self.__next_f.push([2,null])</script><script>self.__next_f.push([1,\"1:HL[\\\"/_next/static/media/e4af272ccee01ff0-s.p.woff2\\\",\\\"font\\\",{\\\"crossOrigin\\\":\\\"\\\",\\\"type\\\":\\\"font/woff2\\\"}]\\n2:HL[\\\"/_next/static/css/app/layout.css?v=1754579951630\\\",\\\"style\\\"]\\n0:D{\\\"name\\\":\\\"r2\\\",\\\"env\\\":\\\"Server\\\"}\\n\"])</script><script>self.__next_f.push([1,\"3:I[\\\"(app-pages-browser)/./node_modules/next/dist/client/components/app-router.js\\\",[\\\"app-pages-internals\\\",\\\"static/chunks/app-pages-internals.js\\\"],\\\"\\\"]\\n5:I[\\\"(app-pages-browser)/./node_modules/next/dist/client/components/client-page.js\\\",[\\\"app-pages-internals\\\",\\\"static/chunks/app-pages-internals.js\\\"],\\\"ClientPageRoot\\\"]\\n6:I[\\\"(app-pages-browser)/./src/app/auth/login/page.tsx\\\",[\\\"app/auth/login/page\\\",\\\"static/chunks/app/auth/login/page.js\\\"],\\\"default\\\",1]\\n7:I[\\\"(app-pages-browser)/./node_modules/next/dist/client/components/layout-router.js\\\",[\\\"app-pages-internals\\\",\\\"static/chunks/app-pages-internals.js\\\"],\\\"\\\"]\\n8:I[\\\"(app-pages-browser)/./node_modules/next/dist/client/components/render-from-template-context.js\\\",[\\\"app-pages-internals\\\",\\\"static/chunks/app-pages-internals.js\\\"],\\\"\\\"]\\na:I[\\\"(app-pages-browser)/./src/app/providers.tsx\\\",[\\\"app/layout\\\",\\\"static/chunks/app/layout.js\\\"],\\\"Providers\\\"]\\ne:I[\\\"(app-pages-browser)/./src/app/global-error.tsx\\\",[\\\"app/global-error\\\",\\\"static/chunks/app/global-error.js\\\"],\\\"default\\\"]\\n4:D{\\\"name\\\":\\\"\\\",\\\"env\\\":\\\"Server\\\"}\\n9:D{\\\"name\\\":\\\"RootLayout\\\",\\\"env\\\":\\\"Server\\\"}\\nb:D{\\\"name\\\":\\\"NotFound\\\",\\\"env\\\":\\\"Server\\\"}\\nb:[[\\\"$\\\",\\\"title\\\",null,{\\\"children\\\":\\\"404: This page could not be found.\\\"}],[\\\"$\\\",\\\"div\\\",null,{\\\"style\\\":{\\\"fontFamily\\\":\\\"system-ui,\\\\\\\"Segoe UI\\\\\\\",Roboto,Helvetica,Arial,sans-serif,\\\\\\\"Apple Color Emoji\\\\\\\",\\\\\\\"Segoe UI Emoji\\\\\\\"\\\",\\\"height\\\":\\\"100vh\\\",\\\"textAlign\\\":\\\"center\\\",\\\"display\\\":\\\"flex\\\",\\\"flexDirection\\\":\\\"column\\\",\\\"alignItems\\\":\\\"center\\\",\\\"justifyContent\\\":\\\"center\\\"},\\\"children\\\":[\\\"$\\\",\\\"div\\\",null,{\\\"children\\\":[[\\\"$\\\",\\\"style\\\",null,{\\\"dangerouslySetInnerHTML\\\":{\\\"__html\\\":\\\"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}\\\"}}],[\\\"$\\\",\\\"h1\\\",null,{\\\"className\\\":\\\"next-error-h1\\\",\\\"style\\\":{\\\"display\\\":\\\"inline-block\\\",\\\"margin\\\":\\\"0 20px 0 0\\\",\\\"padding\\\":\\\"0 23px 0 0\\\",\\\"fontSize\\\":24,\\\"fontWeight\\\":500,\\\"verticalAlign\\\":\\\"top\\\",\\\"lineHeight\\\":\\\"49px\\\"},\\\"children\\\":\\\"404\\\"}],[\\\"$\\\",\\\"div\\\",null,{\\\"style\\\":{\\\"display\\\":\\\"inline-block\\\"},\\\"children\\\":[\\\"\"])</script><script>self.__next_f.push([1,\"$\\\",\\\"h2\\\",null,{\\\"style\\\":{\\\"fontSize\\\":14,\\\"fontWeight\\\":400,\\\"lineHeight\\\":\\\"49px\\\",\\\"margin\\\":0},\\\"children\\\":\\\"This page could not be found.\\\"}]}]]}]}]]\\n9:[\\\"$\\\",\\\"html\\\",null,{\\\"lang\\\":\\\"en\\\",\\\"suppressHydrationWarning\\\":true,\\\"children\\\":[\\\"$\\\",\\\"body\\\",null,{\\\"className\\\":\\\"__className_e8ce0c\\\",\\\"children\\\":[\\\"$\\\",\\\"$La\\\",null,{\\\"children\\\":[\\\"$\\\",\\\"$L7\\\",null,{\\\"parallelRouterKey\\\":\\\"children\\\",\\\"segmentPath\\\":[\\\"children\\\"],\\\"error\\\":\\\"$undefined\\\",\\\"errorStyles\\\":\\\"$undefined\\\",\\\"errorScripts\\\":\\\"$undefined\\\",\\\"template\\\":[\\\"$\\\",\\\"$L8\\\",null,{}],\\\"templateStyles\\\":\\\"$undefined\\\",\\\"templateScripts\\\":\\\"$undefined\\\",\\\"notFound\\\":\\\"$b\\\",\\\"notFoundStyles\\\":[]}]}]}]}]\\nc:D{\\\"name\\\":\\\"rQ\\\",\\\"env\\\":\\\"Server\\\"}\\nc:null\\nd:D{\\\"name\\\":\\\"\\\",\\\"env\\\":\\\"Server\\\"}\\nf:[]\\n0:[\\\"$\\\",\\\"$L3\\\",null,{\\\"buildId\\\":\\\"development\\\",\\\"assetPrefix\\\":\\\"\\\",\\\"urlParts\\\":[\\\"\\\",\\\"auth\\\",\\\"login\\\"],\\\"initialTree\\\":[\\\"\\\",{\\\"children\\\":[\\\"auth\\\",{\\\"children\\\":[\\\"login\\\",{\\\"children\\\":[\\\"__PAGE__\\\",{}]}]}]},\\\"$undefined\\\",\\\"$undefined\\\",true],\\\"initialSeedData\\\":[\\\"\\\",{\\\"children\\\":[\\\"auth\\\",{\\\"children\\\":[\\\"login\\\",{\\\"children\\\":[\\\"__PAGE__\\\",{},[[\\\"$L4\\\",[\\\"$\\\",\\\"$L5\\\",null,{\\\"props\\\":{\\\"params\\\":{},\\\"searchParams\\\":{}},\\\"Component\\\":\\\"$6\\\"}],null],null],null]},[null,[\\\"$\\\",\\\"$L7\\\",null,{\\\"parallelRouterKey\\\":\\\"children\\\",\\\"segmentPath\\\":[\\\"children\\\",\\\"auth\\\",\\\"children\\\",\\\"login\\\",\\\"children\\\"],\\\"error\\\":\\\"$undefined\\\",\\\"errorStyles\\\":\\\"$undefined\\\",\\\"errorScripts\\\":\\\"$undefined\\\",\\\"template\\\":[\\\"$\\\",\\\"$L8\\\",null,{}],\\\"templateStyles\\\":\\\"$undefined\\\",\\\"templateScripts\\\":\\\"$undefined\\\",\\\"notFound\\\":\\\"$undefined\\\",\\\"notFoundStyles\\\":\\\"$undefined\\\"}]],null]},[null,[\\\"$\\\",\\\"$L7\\\",null,{\\\"parallelRouterKey\\\":\\\"children\\\",\\\"segmentPath\\\":[\\\"children\\\",\\\"auth\\\",\\\"children\\\"],\\\"error\\\":\\\"$undefined\\\",\\\"errorStyles\\\":\\\"$undefined\\\",\\\"errorScripts\\\":\\\"$undefined\\\",\\\"template\\\":[\\\"$\\\",\\\"$L8\\\",null,{}],\\\"templateStyles\\\":\\\"$undefined\\\",\\\"templateScripts\\\":\\\"$undefined\\\",\\\"notFound\\\":\\\"$undefined\\\",\\\"notFoundStyles\\\":\\\"$undefined\\\"}]],null]},[[[[\\\"$\\\",\\\"link\\\",\\\"0\\\",{\\\"rel\\\":\\\"stylesheet\\\",\\\"href\\\":\\\"/_next/static/css/app/layout.css?v=1754579951630\\\",\\\"precedence\\\":\\\"next_static/css/app/layout.css\\\",\\\"crossOrigin\\\":\\\"$undefined\\\"}]],\\\"$9\\\"],null],null],\\\"couldBeIntercepted\\\":false,\\\"initialHead\\\":[\\\"$c\\\",\\\"$Ld\\\"],\\\"globalErrorComponent\\\":\\\"$e\\\",\\\"missingSlots\\\":\\\"$Wf\\\"}\"])</script><script>self.__next_f.push([1,\"]\\n\"])</script><script>self.__next_f.push([1,\"d:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"name\\\":\\\"viewport\\\",\\\"content\\\":\\\"width=device-width, initial-scale=1\\\"}],[\\\"$\\\",\\\"meta\\\",\\\"1\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",\\\"title\\\",\\\"2\\\",{\\\"children\\\":\\\"Tenant Dashboard - PyAirtable\\\"}],[\\\"$\\\",\\\"meta\\\",\\\"3\\\",{\\\"name\\\":\\\"description\\\",\\\"content\\\":\\\"Comprehensive tenant management dashboard for PyAirtable organizations\\\"}],[\\\"$\\\",\\\"meta\\\",\\\"4\\\",{\\\"name\\\":\\\"author\\\",\\\"content\\\":\\\"PyAirtable Team\\\"}],[\\\"$\\\",\\\"link\\\",\\\"5\\\",{\\\"rel\\\":\\\"manifest\\\",\\\"href\\\":\\\"/manifest.json\\\",\\\"crossOrigin\\\":\\\"use-credentials\\\"}],[\\\"$\\\",\\\"meta\\\",\\\"6\\\",{\\\"name\\\":\\\"keywords\\\",\\\"content\\\":\\\"PyAirtable,tenant management,organization,dashboard\\\"}],[\\\"$\\\",\\\"meta\\\",\\\"7\\\",{\\\"name\\\":\\\"robots\\\",\\\"content\\\":\\\"noindex, nofollow\\\"}],[\\\"$\\\",\\\"meta\\\",\\\"8\\\",{\\\"name\\\":\\\"msapplication-TileColor\\\",\\\"content\\\":\\\"#3b82f6\\\"}],[\\\"$\\\",\\\"meta\\\",\\\"9\\\",{\\\"name\\\":\\\"msapplication-config\\\",\\\"content\\\":\\\"/browserconfig.xml\\\"}],[\\\"$\\\",\\\"meta\\\",\\\"10\\\",{\\\"name\\\":\\\"theme-color\\\",\\\"content\\\":\\\"#ffffff\\\"}],[\\\"$\\\",\\\"meta\\\",\\\"11\\\",{\\\"name\\\":\\\"format-detection\\\",\\\"content\\\":\\\"telephone=no\\\"}],[\\\"$\\\",\\\"meta\\\",\\\"12\\\",{\\\"name\\\":\\\"apple-mobile-web-app-capable\\\",\\\"content\\\":\\\"yes\\\"}],[\\\"$\\\",\\\"meta\\\",\\\"13\\\",{\\\"name\\\":\\\"apple-mobile-web-app-title\\\",\\\"content\\\":\\\"PyAirtable Dashboard\\\"}],[\\\"$\\\",\\\"meta\\\",\\\"14\\\",{\\\"name\\\":\\\"apple-mobile-web-app-status-bar-style\\\",\\\"content\\\":\\\"default\\\"}],[\\\"$\\\",\\\"link\\\",\\\"15\\\",{\\\"rel\\\":\\\"icon\\\",\\\"href\\\":\\\"/icons/icon-192x192.png\\\",\\\"sizes\\\":\\\"192x192\\\",\\\"type\\\":\\\"image/png\\\"}],[\\\"$\\\",\\\"link\\\",\\\"16\\\",{\\\"rel\\\":\\\"icon\\\",\\\"href\\\":\\\"/icons/icon-512x512.png\\\",\\\"sizes\\\":\\\"512x512\\\",\\\"type\\\":\\\"image/png\\\"}],[\\\"$\\\",\\\"link\\\",\\\"17\\\",{\\\"rel\\\":\\\"apple-touch-icon\\\",\\\"href\\\":\\\"/icons/icon-152x152.png\\\",\\\"sizes\\\":\\\"152x152\\\",\\\"type\\\":\\\"image/png\\\"}],[\\\"$\\\",\\\"meta\\\",\\\"18\\\",{\\\"name\\\":\\\"next-size-adjust\\\"}]]\\n4:null\\n\"])</script></body></html>",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "frontend_data_flow",
+      "category": "Frontend Integration",
+      "status": "FAIL",
+      "duration_ms": 36,
+      "details": "Frontend data flow issue: status 500",
+      "error_message": "<!DOCTYPE html><html id=\"__next_error__\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks/webpack.js\"/><script src=\"/_next/static/chunks/main-app.js\" async=\"\"></script><script src=\"/_next/static/chunks/app-pages-internals.js\" async=\"\"></script><script src=\"/_next/static/chunks/app/global-error.js\" async=\"\"></script><meta name=\"next-error\" content=\"not-found\"/><meta name",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "system_response_times",
+      "category": "Performance Metrics",
+      "status": "FAIL",
+      "duration_ms": 12812,
+      "details": "Slow response times - avg: 5026.0ms, max: 5026ms",
+      "error_message": null,
+      "performance_metrics": {
+        "avg_response_time_ms": 5026.0,
+        "max_response_time_ms": 5026,
+        "min_response_time_ms": 5026,
+        "endpoints_tested": 1
+      }
+    },
+    {
+      "test_name": "concurrent_requests",
+      "category": "Performance Metrics",
+      "status": "PASS",
+      "duration_ms": 5113,
+      "details": "Handled 10 concurrent requests - 100.0% success rate",
+      "error_message": null,
+      "performance_metrics": {
+        "concurrent_requests": 10,
+        "successful_requests": 10,
+        "success_rate_percent": 100.0
+      }
+    },
+    {
+      "test_name": "system_error_rates",
+      "category": "Performance Metrics",
+      "status": "FAIL",
+      "duration_ms": 12839,
+      "details": "High error rate: 66.7%",
+      "error_message": null,
+      "performance_metrics": {
+        "total_requests": 3,
+        "error_count": 2,
+        "error_rate_percent": 66.66666666666666
+      }
+    }
+  ],
+  "production_readiness_assessment": {
+    "readiness_level": "NOT_READY",
+    "readiness_message": "System has critical issues that must be resolved before production",
+    "critical_issues": [
+      "Service Health: 20.0% success rate (too low)",
+      "Authentication Flow: 0.0% success rate (too low)",
+      "Frontend Integration: 33.3% success rate (too low)",
+      "Overall success rate 17.1% is below production threshold"
+    ],
+    "warnings": [],
+    "overall_success_rate": 17.1
+  },
+  "recommendations": [
+    {
+      "category": "Service Health",
+      "priority": "HIGH",
+      "issue": "8 failed tests in Service Health",
+      "recommendation": "Investigate and fix the 8 failing test(s) in Service Health",
+      "impact": "May cause production issues"
+    },
+    {
+      "category": "Authentication Flow",
+      "priority": "MEDIUM",
+      "issue": "4 tests skipped in Authentication Flow",
+      "recommendation": "Ensure services for Authentication Flow are properly deployed and accessible",
+      "impact": "Incomplete test coverage"
+    },
+    {
+      "category": "Airtable Operations",
+      "priority": "MEDIUM",
+      "issue": "5 tests skipped in Airtable Operations",
+      "recommendation": "Ensure services for Airtable Operations are properly deployed and accessible",
+      "impact": "Incomplete test coverage"
+    },
+    {
+      "category": "Workflow Management",
+      "priority": "MEDIUM",
+      "issue": "3 tests skipped in Workflow Management",
+      "recommendation": "Ensure services for Workflow Management are properly deployed and accessible",
+      "impact": "Incomplete test coverage"
+    },
+    {
+      "category": "File Operations",
+      "priority": "MEDIUM",
+      "issue": "2 tests skipped in File Operations",
+      "recommendation": "Ensure services for File Operations are properly deployed and accessible",
+      "impact": "Incomplete test coverage"
+    },
+    {
+      "category": "SAGA Transactions",
+      "priority": "MEDIUM",
+      "issue": "3 tests skipped in SAGA Transactions",
+      "recommendation": "Ensure services for SAGA Transactions are properly deployed and accessible",
+      "impact": "Incomplete test coverage"
+    },
+    {
+      "category": "Frontend Integration",
+      "priority": "MEDIUM",
+      "issue": "2 failed tests in Frontend Integration",
+      "recommendation": "Investigate and fix the 2 failing test(s) in Frontend Integration",
+      "impact": "Should be addressed before production"
+    },
+    {
+      "category": "Performance Metrics",
+      "priority": "MEDIUM",
+      "issue": "2 failed tests in Performance Metrics",
+      "recommendation": "Investigate and fix the 2 failing test(s) in Performance Metrics",
+      "impact": "Should be addressed before production"
+    }
+  ],
+  "performance_summary": {
+    "average_response_time_ms": 6212.4,
+    "total_requests_tested": 35,
+    "performance_rating": "Needs Improvement"
+  }
+}

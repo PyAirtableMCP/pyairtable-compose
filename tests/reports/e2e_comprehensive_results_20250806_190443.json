@@ -1,0 +1,45 @@
+{
+  "status": "passed",
+  "duration": 0.2026522159576416,
+  "total_tests": 2,
+  "passed_tests": 2,
+  "failed_tests": 0,
+  "health_status": {
+    "API Gateway": true,
+    "LLM Orchestrator": true,
+    "MCP Server": true,
+    "Airtable Gateway": true
+  },
+  "test_results": {
+    "connectivity": {
+      "test": "service_connectivity",
+      "status": "passed",
+      "services": {
+        "llm_orchestrator": true,
+        "mcp_server": true,
+        "airtable_gateway": true
+      }
+    },
+    "gemini_integration": {
+      "test": "gemini_integration",
+      "status": "passed",
+      "response_length": 106,
+      "ai_response_detected": true
+    },
+    "error": "Response should mention facebook posts"
+  },
+  "timestamp": 1754496283,
+  "session_id": "e2e_test_session",
+  "metadata": {
+    "timestamp": "2025-08-06T19:04:43.713604",
+    "config": {
+      "api_gateway_url": "http://localhost:8000",
+      "llm_orchestrator_url": "http://localhost:8003",
+      "mcp_server_url": "http://localhost:8001",
+      "airtable_gateway_url": "http://localhost:8002",
+      "airtable_base": "appVLUAubH5cFWhMV",
+      "timeout": 60,
+      "retry_attempts": 3
+    }
+  }
+}

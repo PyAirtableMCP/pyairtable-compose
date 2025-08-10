@@ -1,0 +1,137 @@
+{
+  "overall_success": false,
+  "success_rate": 66.66666666666666,
+  "total_tests": 15,
+  "passed_tests": 10,
+  "failed_tests": 5,
+  "duration": 6.990274906158447,
+  "components": {
+    "service_health": true,
+    "environment_config": false,
+    "direct_gateway": true,
+    "api_gateway_proxy": true,
+    "authentication": true
+  },
+  "test_results": [
+    {
+      "test": "Airtable Gateway Health",
+      "success": true,
+      "details": "Status: healthy",
+      "response_data": {
+        "status": "healthy",
+        "service": "airtable-gateway",
+        "timestamp": "2025-08-08T09:28:39.049081"
+      },
+      "timestamp": "2025-08-08 12:28:38"
+    },
+    {
+      "test": "API Gateway Health",
+      "success": true,
+      "details": "Status: healthy",
+      "response_data": {
+        "status": "healthy",
+        "timestamp": "2025-08-07T12:00:00Z",
+        "services": {
+          "platform_services": "healthy",
+          "airtable_gateway": "healthy"
+        }
+      },
+      "timestamp": "2025-08-08 12:28:39"
+    },
+    {
+      "test": "MCP Server Health",
+      "success": true,
+      "details": "Status: healthy",
+      "response_data": {
+        "status": "healthy",
+        "service": "mcp-server",
+        "timestamp": "2025-08-08T09:28:39.167601"
+      },
+      "timestamp": "2025-08-08 12:28:39"
+    },
+    {
+      "test": "Environment - AIRTABLE_TOKEN",
+      "success": false,
+      "details": "Variable not found",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:28:39"
+    },
+    {
+      "test": "Environment - AIRTABLE_BASE",
+      "success": false,
+      "details": "Variable not found",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:28:39"
+    },
+    {
+      "test": "Environment - API_KEY",
+      "success": false,
+      "details": "Variable not found",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:28:39"
+    },
+    {
+      "test": "Direct Gateway - List Tables",
+      "success": true,
+      "details": "Found 35 tables",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:28:40"
+    },
+    {
+      "test": "Direct Gateway - Read Records",
+      "success": true,
+      "details": "Retrieved 3 records",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:28:40"
+    },
+    {
+      "test": "Direct Gateway - Create Record",
+      "success": true,
+      "details": "Created record: recQCGXut9AeDlxmh",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:28:41"
+    },
+    {
+      "test": "Direct Gateway - Update Record",
+      "success": true,
+      "details": "Updated record: recQCGXut9AeDlxmh",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:28:42"
+    },
+    {
+      "test": "Direct Gateway - Delete Record",
+      "success": true,
+      "details": "Deleted record: recQCGXut9AeDlxmh",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:28:43"
+    },
+    {
+      "test": "API Gateway Proxy - List Tables",
+      "success": true,
+      "details": "Found 35 tables",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:28:43"
+    },
+    {
+      "test": "API Gateway Proxy - Read Records",
+      "success": true,
+      "details": "Retrieved 3 records",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:28:44"
+    },
+    {
+      "test": "Auth - No API Key",
+      "success": false,
+      "details": "HTTP 200 (Expected 401/403)",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:28:45"
+    },
+    {
+      "test": "Auth - Invalid API Key",
+      "success": false,
+      "details": "HTTP 200 (Expected 401/403)",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:28:45"
+    }
+  ]
+}

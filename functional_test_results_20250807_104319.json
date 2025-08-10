@@ -1,0 +1,81 @@
+{
+  "airtable_operations": {
+    "get_bases": {
+      "status_code": 401,
+      "success": true,
+      "response_time_ms": 33.976
+    },
+    "create_record": {
+      "status_code": 404,
+      "success": false,
+      "response_time_ms": 5.436
+    }
+  },
+  "authentication": {
+    "register": {
+      "status_code": 500,
+      "success": false,
+      "response_time_ms": 89.397
+    },
+    "login": {
+      "status_code": 500,
+      "success": false,
+      "response_time_ms": 8.414
+    },
+    "profile": {
+      "status_code": 500,
+      "success": false,
+      "response_time_ms": 5.896
+    }
+  },
+  "llm_orchestrator": {
+    "process_prompt": {
+      "status_code": 404,
+      "success": true,
+      "response_time_ms": 37.681
+    },
+    "get_models": {
+      "status_code": 404,
+      "success": true,
+      "response_time_ms": 4.460999999999999
+    }
+  },
+  "workflow_automation": {
+    "get_workflows": {
+      "status_code": 401,
+      "success": false,
+      "response_time_ms": 25.714000000000002
+    },
+    "create_workflow": {
+      "status_code": 401,
+      "success": false,
+      "response_time_ms": 9.422
+    }
+  },
+  "saga_orchestration": {
+    "capabilities": {
+      "status_code": 404,
+      "success": true,
+      "response_time_ms": 14.026
+    },
+    "create_saga": {
+      "status_code": 405,
+      "success": false,
+      "response_time_ms": 1.674
+    }
+  },
+  "analytics": {
+    "metrics": {
+      "status_code": 500,
+      "success": false,
+      "response_time_ms": 5.233
+    },
+    "usage": {
+      "status_code": 404,
+      "success": false,
+      "response_time_ms": 9.998
+    }
+  },
+  "test_duration": "0:00:00.270160",
+  "timestamp": "2025-08-07T10:43:19.299858"
+}

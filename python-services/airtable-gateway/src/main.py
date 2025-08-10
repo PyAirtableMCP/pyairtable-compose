@@ -33,20 +33,20 @@ except ImportError as e:
     logging.warning(f"OpenTelemetry initialization failed: {e}")
     tracer = None
 
-from routes import health
+from src.routes import health
 
 # App lifespan
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     print(f"Starting airtable-gateway...")
-    from dependencies import get_redis_client
+    from src.dependencies import get_redis_client
     # Initialize Redis connection
     await get_redis_client()
     yield
     # Shutdown
     print(f"Shutting down airtable-gateway...")
-    from dependencies import close_redis_client
+    from src.dependencies import close_redis_client
     await close_redis_client()
 
 # Create FastAPI app
@@ -67,8 +67,8 @@ app.add_middleware(
 )
 
 # Authentication middleware
-from middleware.auth import AuthMiddleware
-from config import get_settings
+from src.middleware.auth import AuthMiddleware
+from src.config import get_settings
 settings = get_settings()
 app.add_middleware(AuthMiddleware, internal_api_key=settings.internal_api_key)
 
@@ -82,7 +82,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Include routers
 app.include_router(health.router, tags=["health"])
-from routes.airtable import router as airtable_router
+from src.routes.airtable import router as airtable_router
 app.include_router(airtable_router)
 
 # Root endpoint
@@ -97,7 +97,7 @@ async def root():
 # Service info endpoint
 @app.get("/api/v1/info")
 async def info():
-    from config import get_settings
+    from src.config import get_settings
     settings = get_settings()
     return {
         "service": settings.service_name,

@@ -1,0 +1,32 @@
+NAMES                                      STATUS                          PORTS
+happy_tesla                                Up 3 minutes                    
+pyairtable-compose-automation-services-1   Restarting (1) 48 seconds ago   
+pyairtable-compose-llm-orchestrator-1      Up 12 minutes                   0.0.0.0:8003->8003/tcp
+pyairtable-compose-mcp-server-1            Up 12 minutes                   0.0.0.0:8001->8001/tcp
+pyairtable-compose-saga-orchestrator-1     Restarting (3) 46 seconds ago   
+pyairtable-compose-airtable-gateway-1      Restarting (1) 48 seconds ago   
+pyairtable-compose-postgres-1              Up 12 minutes                   5432/tcp
+pyairtable-compose-redis-1                 Up 12 minutes                   6379/tcp
+grafana-basic                              Up 15 minutes (healthy)         0.0.0.0:3002->3000/tcp
+promtail-basic                             Restarting (1) 15 seconds ago   
+blackbox-exporter-basic                    Up 16 minutes                   0.0.0.0:9116->9115/tcp
+prometheus-basic                           Up 16 minutes (healthy)         0.0.0.0:9091->9090/tcp
+alertmanager-basic                         Up 16 minutes (healthy)         0.0.0.0:9094->9093/tcp
+cadvisor-basic                             Up 16 minutes (healthy)         0.0.0.0:8082->8080/tcp
+node-exporter-basic                        Up 16 minutes                   0.0.0.0:9101->9100/tcp
+loki-basic                                 Up 16 minutes (healthy)         0.0.0.0:3101->3100/tcp
+content-engine-nginx                       Restarting (1) 22 seconds ago   
+content-engine-admin                       Up 3 hours (unhealthy)          0.0.0.0:3001->3000/tcp
+content-engine-api                         Up 3 hours (unhealthy)          0.0.0.0:8000->8000/tcp
+content-engine-grafana                     Up 4 hours (healthy)            0.0.0.0:3000->3000/tcp
+content-engine-prometheus                  Up 4 hours (healthy)            0.0.0.0:9090->9090/tcp
+content-engine-minio                       Up 4 hours (healthy)            0.0.0.0:9000-9001->9000-9001/tcp
+content-engine-postgres                    Up 4 hours (healthy)            0.0.0.0:5432->5432/tcp
+content-engine-redis                       Up 4 hours (healthy)            0.0.0.0:6379->6379/tcp
+loki                                       Up 7 hours                      0.0.0.0:3100->3100/tcp
+strange_almeida                            Up 23 hours                     
+otel-collector                             Up 31 hours                     0.0.0.0:8889->8889/tcp, 0.0.0.0:13133->13133/tcp, 55678-55679/tcp, 0.0.0.0:4320->4317/tcp, 0.0.0.0:4319->4318/tcp
+tempo                                      Up 31 hours                     0.0.0.0:3200->3200/tcp, 0.0.0.0:4317-4318->4317-4318/tcp, 0.0.0.0:14268->14268/tcp
+mimir                                      Up 31 hours                     0.0.0.0:7946->7946/tcp, 0.0.0.0:8081->8080/tcp
+go-services-api-gateway-1                  Up 2 days (unhealthy)           0.0.0.0:8080->8080/tcp
+go-services-permission-service-1           Up 2 days (unhealthy)           0.0.0.0:8085->8085/tcp

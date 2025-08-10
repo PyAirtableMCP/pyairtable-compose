@@ -1,0 +1,10 @@
+# HELP synthetic_tests_total Total number of synthetic tests executed
+# TYPE synthetic_tests_total counter
+synthetic_tests_total{environment="test",status="passed"} 0 1754517405935
+synthetic_tests_total{environment="test",status="failed"} 0 1754517405935
+synthetic_tests_total{environment="test",status="skipped"} 0 1754517405935
+# HELP synthetic_test_duration_seconds Duration of test execution in seconds
+# TYPE synthetic_test_duration_seconds histogram
+# HELP synthetic_success_rate Success rate of synthetic tests
+# TYPE synthetic_success_rate gauge
+synthetic_success_rate{environment="test"} 0 1754517405935

@@ -1,0 +1,126 @@
+{
+  "overall_success": false,
+  "success_rate": 86.66666666666667,
+  "total_tests": 15,
+  "passed_tests": 13,
+  "failed_tests": 2,
+  "duration": 9.882716178894043,
+  "components": {
+    "service_health": false,
+    "environment_config": true,
+    "direct_gateway": true,
+    "api_gateway_proxy": true,
+    "authentication": true
+  },
+  "test_results": [
+    {
+      "test": "Airtable Gateway Health",
+      "success": true,
+      "details": "Status: healthy",
+      "response_data": {
+        "status": "healthy",
+        "service": "airtable-gateway",
+        "timestamp": "2025-08-08T09:37:45.876359"
+      },
+      "timestamp": "2025-08-08 12:37:45"
+    },
+    {
+      "test": "API Gateway Health",
+      "success": false,
+      "details": "Connection error: HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=5)",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:37:50"
+    },
+    {
+      "test": "MCP Server Health",
+      "success": false,
+      "details": "Connection error: HTTPConnectionPool(host='localhost', port=8001): Max retries exceeded with url: /health (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x103cdf390>: Failed to establish a new connection: [Errno 61] Connection refused'))",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:37:50"
+    },
+    {
+      "test": "Environment - AIRTABLE_TOKEN",
+      "success": true,
+      "details": "Variable is set",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:37:50"
+    },
+    {
+      "test": "Environment - AIRTABLE_BASE",
+      "success": true,
+      "details": "Variable is set",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:37:50"
+    },
+    {
+      "test": "Environment - API_KEY",
+      "success": true,
+      "details": "Variable is set",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:37:50"
+    },
+    {
+      "test": "Direct Gateway - List Tables",
+      "success": true,
+      "details": "Found 35 tables",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:37:51"
+    },
+    {
+      "test": "Direct Gateway - Read Records",
+      "success": true,
+      "details": "Retrieved 3 records",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:37:52"
+    },
+    {
+      "test": "Direct Gateway - Create Record",
+      "success": true,
+      "details": "Created record: recQE1YVdoGc1cpfQ",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:37:52"
+    },
+    {
+      "test": "Direct Gateway - Update Record",
+      "success": true,
+      "details": "Updated record: recQE1YVdoGc1cpfQ",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:37:53"
+    },
+    {
+      "test": "Direct Gateway - Delete Record",
+      "success": true,
+      "details": "Deleted record: recQE1YVdoGc1cpfQ",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:37:54"
+    },
+    {
+      "test": "API Gateway Proxy - List Tables",
+      "success": true,
+      "details": "Found 35 tables",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:37:55"
+    },
+    {
+      "test": "API Gateway Proxy - Read Records",
+      "success": true,
+      "details": "Retrieved 3 records",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:37:55"
+    },
+    {
+      "test": "Auth - No API Key",
+      "success": true,
+      "details": "HTTP 401 (Expected 401/403)",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:37:55"
+    },
+    {
+      "test": "Auth - Invalid API Key",
+      "success": true,
+      "details": "HTTP 403 (Expected 401/403)",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:37:55"
+    }
+  ]
+}

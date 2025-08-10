@@ -1,0 +1,55 @@
+# Core FastAPI and web framework dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-dotenv==1.0.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# HTTP clients and networking
+httpx==0.25.2
+aiohttp==3.9.1
+
+# Database support
+sqlalchemy==2.0.23
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+alembic==1.13.0
+
+# Redis support
+redis[hiredis]==5.0.1
+
+# Security and authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Monitoring and metrics
+prometheus-client==0.19.0
+
+# Logging
+structlog==23.2.0
+
+# File processing basics
+python-multipart==0.0.6
+
+# Testing frameworks
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+
+# OpenTelemetry core dependencies
+opentelemetry-api==1.21.0
+opentelemetry-sdk==1.21.0
+opentelemetry-exporter-otlp==1.21.0
+opentelemetry-exporter-jaeger==1.21.0
+opentelemetry-instrumentation==0.42b0
+opentelemetry-instrumentation-fastapi==0.42b0
+opentelemetry-instrumentation-httpx==0.42b0
+opentelemetry-instrumentation-redis==0.42b0
+opentelemetry-instrumentation-sqlalchemy==0.42b0
+opentelemetry-instrumentation-asyncpg==0.42b0
+opentelemetry-instrumentation-logging==0.42b0
+opentelemetry-instrumentation-system-metrics==0.42b0
+opentelemetry-distro==0.42b0
+opentelemetry-propagator-b3==1.21.0
+opentelemetry-propagator-jaeger==1.21.0
+opentelemetry-semantic-conventions==0.42b0

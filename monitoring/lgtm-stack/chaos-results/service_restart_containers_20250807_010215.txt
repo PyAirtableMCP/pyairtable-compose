@@ -1,0 +1,6 @@
+pyairtable-compose-airtable-gateway-1: Up 1 second (health: starting)
+pyairtable-compose-postgres-1: Up 12 minutes
+pyairtable-compose-redis-1: Up 12 minutes
+content-engine-postgres: Up 4 hours (healthy)
+content-engine-redis: Up 4 hours (healthy)
+go-services-api-gateway-1: Up 2 days (unhealthy)

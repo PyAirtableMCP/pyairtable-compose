@@ -3,8 +3,8 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from redis import asyncio as aioredis
 
-from ..services.airtable import AirtableService
-from ..dependencies import get_redis_client
+from src.services.airtable import AirtableService
+from src.dependencies import get_redis_client
 
 router = APIRouter(prefix="/api/v1/airtable", tags=["airtable"])
 

@@ -1,0 +1,271 @@
+# AWS Load Balancer Controller ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: aws-load-balancer-controller
+  namespace: kube-system
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/AmazonEKSLoadBalancerControllerRole"
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+    app.kubernetes.io/component: controller
+---
+# SSL Certificate for HTTPS termination (create via ACM)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ssl-config
+  namespace: pyairtable-production
+data:
+  # Replace with your actual ACM certificate ARN
+  certificate-arn: "arn:aws:acm:us-west-2:ACCOUNT_ID:certificate/CERTIFICATE_ID"
+  domain-name: "pyairtable.com"
+  api-domain: "api.pyairtable.com"
+---
+# Application Load Balancer Ingress for Frontend
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pyairtable-frontend-ingress
+  namespace: pyairtable-production
+  annotations:
+    # AWS Load Balancer Controller annotations
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/load-balancer-name: pyairtable-frontend-alb
+    
+    # SSL/TLS Configuration
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-west-2:ACCOUNT_ID:certificate/CERTIFICATE_ID"
+    
+    # Health checks
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/healthcheck-path: /api/health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+    
+    # Load balancer attributes
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      routing.http2.enabled=true,
+      idle_timeout.timeout_seconds=60,
+      deletion_protection.enabled=true,
+      access_logs.s3.enabled=true,
+      access_logs.s3.bucket=pyairtable-alb-logs,
+      access_logs.s3.prefix=frontend
+    
+    # Security
+    alb.ingress.kubernetes.io/security-groups: sg-frontend-alb
+    
+    # Tags
+    alb.ingress.kubernetes.io/tags: |
+      Environment=production,
+      Project=pyairtable,
+      Service=frontend,
+      ManagedBy=kubernetes
+spec:
+  tls:
+  - hosts:
+    - pyairtable.com
+    - www.pyairtable.com
+  rules:
+  - host: pyairtable.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 3000
+  - host: www.pyairtable.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 3000
+---
+# Application Load Balancer Ingress for API Gateway
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pyairtable-api-ingress
+  namespace: pyairtable-production
+  annotations:
+    # AWS Load Balancer Controller annotations
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/load-balancer-name: pyairtable-api-alb
+    
+    # SSL/TLS Configuration
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-west-2:ACCOUNT_ID:certificate/CERTIFICATE_ID"
+    
+    # Health checks
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+    
+    # Rate limiting and security
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      routing.http2.enabled=true,
+      idle_timeout.timeout_seconds=60,
+      deletion_protection.enabled=true,
+      access_logs.s3.enabled=true,
+      access_logs.s3.bucket=pyairtable-alb-logs,
+      access_logs.s3.prefix=api
+    
+    # CORS headers
+    alb.ingress.kubernetes.io/actions.response-headers: |
+      {
+        "type": "fixed-response",
+        "fixedResponseConfig": {
+          "contentType": "text/plain",
+          "statusCode": "200",
+          "messageBody": "OK"
+        },
+        "responseHeaders": {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS,PATCH",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Requested-With"
+        }
+      }
+    
+    # Security
+    alb.ingress.kubernetes.io/security-groups: sg-api-alb
+    
+    # Tags
+    alb.ingress.kubernetes.io/tags: |
+      Environment=production,
+      Project=pyairtable,
+      Service=api-gateway,
+      ManagedBy=kubernetes
+spec:
+  tls:
+  - hosts:
+    - api.pyairtable.com
+  rules:
+  - host: api.pyairtable.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway
+            port:
+              number: 8000
+---
+# Internal Load Balancer for Service-to-Service Communication
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pyairtable-internal-ingress
+  namespace: pyairtable-production
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/load-balancer-name: pyairtable-internal-alb
+    
+    # Security - only accessible from within VPC
+    alb.ingress.kubernetes.io/security-groups: sg-internal-alb
+    
+    # Health checks
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '30'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    
+    # Load balancer attributes
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      routing.http2.enabled=true,
+      idle_timeout.timeout_seconds=30
+    
+    # Tags
+    alb.ingress.kubernetes.io/tags: |
+      Environment=production,
+      Project=pyairtable,
+      Type=internal,
+      ManagedBy=kubernetes
+spec:
+  rules:
+  - host: internal.pyairtable.local
+    http:
+      paths:
+      - path: /mcp
+        pathType: Prefix
+        backend:
+          service:
+            name: mcp-server
+            port:
+              number: 8001
+      - path: /llm
+        pathType: Prefix
+        backend:
+          service:
+            name: llm-orchestrator
+            port:
+              number: 8003
+      - path: /airtable
+        pathType: Prefix
+        backend:
+          service:
+            name: airtable-gateway
+            port:
+              number: 8002
+      - path: /platform
+        pathType: Prefix
+        backend:
+          service:
+            name: platform-services
+            port:
+              number: 8007
+      - path: /automation
+        pathType: Prefix
+        backend:
+          service:
+            name: automation-services
+            port:
+              number: 8006
+      - path: /saga
+        pathType: Prefix
+        backend:
+          service:
+            name: saga-orchestrator
+            port:
+              number: 8008
+---
+# WAF Web ACL for API Protection
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: waf-config
+  namespace: pyairtable-production
+data:
+  web-acl-arn: "arn:aws:wafv2:us-west-2:ACCOUNT_ID:regional/webacl/pyairtable-production/WEB_ACL_ID"
+  # Rules include:
+  rules: |
+    - Rate limiting: 2000 requests per 5 minutes per IP
+    - AWS Core Rule Set: OWASP Top 10 protection
+    - AWS Known Bad Inputs: Common attack patterns
+    - AWS Anonymous IP List: Tor, VPN, hosting providers
+    - Geo-blocking: Block traffic from high-risk countries
+    - SQL Injection protection
+    - XSS protection
+    - Custom rules for API protection

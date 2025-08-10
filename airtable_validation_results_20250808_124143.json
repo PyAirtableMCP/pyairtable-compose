@@ -1,0 +1,138 @@
+{
+  "overall_success": false,
+  "success_rate": 85.71428571428571,
+  "total_tests": 14,
+  "passed_tests": 12,
+  "failed_tests": 2,
+  "duration": 4.271876096725464,
+  "components": {
+    "service_health": false,
+    "environment_config": true,
+    "direct_gateway": true,
+    "api_gateway_proxy": false,
+    "authentication": true
+  },
+  "test_results": [
+    {
+      "test": "Airtable Gateway Health",
+      "success": true,
+      "details": "Status: healthy",
+      "response_data": {
+        "status": "healthy",
+        "service": "airtable-gateway",
+        "timestamp": "2025-08-08T09:41:38.867697"
+      },
+      "timestamp": "2025-08-08 12:41:38"
+    },
+    {
+      "test": "API Gateway Health",
+      "success": false,
+      "details": "HTTP 404",
+      "response_data": {
+        "error": "{\"error\":\"Endpoint not found\",\"path\":\"/health\",\"available_endpoints\":[\"/api/health\",\"/api/chat\",\"/api/tools\",\"/api/airtable/*\",\"/api/execute-tool\",\"/api/sessions/{session_id}/history\",\"/ws\",\"/api/websocket/stats\"]}"
+      },
+      "timestamp": "2025-08-08 12:41:38"
+    },
+    {
+      "test": "MCP Server Health",
+      "success": true,
+      "details": "Status: healthy",
+      "response_data": {
+        "status": "healthy",
+        "service": "mcp-server",
+        "timestamp": "2025-08-08T09:41:38.916906"
+      },
+      "timestamp": "2025-08-08 12:41:38"
+    },
+    {
+      "test": "Environment - AIRTABLE_TOKEN",
+      "success": true,
+      "details": "Variable is set",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:41:38"
+    },
+    {
+      "test": "Environment - AIRTABLE_BASE",
+      "success": true,
+      "details": "Variable is set",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:41:38"
+    },
+    {
+      "test": "Environment - API_KEY",
+      "success": true,
+      "details": "Variable is set",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:41:38"
+    },
+    {
+      "test": "Direct Gateway - List Tables",
+      "success": true,
+      "details": "Found 35 tables",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:41:40"
+    },
+    {
+      "test": "Direct Gateway - Read Records",
+      "success": true,
+      "details": "Retrieved 3 records",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:41:40"
+    },
+    {
+      "test": "Direct Gateway - Create Record",
+      "success": true,
+      "details": "Created record: recKGhelBQF0ZQ2sb",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:41:41"
+    },
+    {
+      "test": "Direct Gateway - Update Record",
+      "success": true,
+      "details": "Updated record: recKGhelBQF0ZQ2sb",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:41:42"
+    },
+    {
+      "test": "Direct Gateway - Delete Record",
+      "success": true,
+      "details": "Deleted record: recKGhelBQF0ZQ2sb",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:41:42"
+    },
+    {
+      "test": "API Gateway Proxy - List Tables",
+      "success": false,
+      "details": "HTTP 404",
+      "response_data": {
+        "error": "Endpoint not found",
+        "path": "/airtable/api/v1/tables",
+        "available_endpoints": [
+          "/api/health",
+          "/api/chat",
+          "/api/tools",
+          "/api/airtable/*",
+          "/api/execute-tool",
+          "/api/sessions/{session_id}/history",
+          "/ws",
+          "/api/websocket/stats"
+        ]
+      },
+      "timestamp": "2025-08-08 12:41:43"
+    },
+    {
+      "test": "Auth - No API Key",
+      "success": true,
+      "details": "HTTP 401 (Expected 401/403)",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:41:43"
+    },
+    {
+      "test": "Auth - Invalid API Key",
+      "success": true,
+      "details": "HTTP 403 (Expected 401/403)",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:41:43"
+    }
+  ]
+}

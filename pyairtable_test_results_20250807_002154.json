@@ -1,0 +1,104 @@
+{
+  "test_start": "2025-08-07T00:21:53.221374",
+  "infrastructure": {
+    "postgresql": {
+      "status": "unhealthy",
+      "details": "Error response from daemon: No such container: pyairtable-compose-postgres-1"
+    },
+    "redis": {
+      "status": "unhealthy",
+      "details": "Error response from daemon: No such container: pyairtable-compose-redis-1"
+    }
+  },
+  "services": {},
+  "endpoints": {
+    "airtable-gateway": {
+      "status": "connection_refused",
+      "healthy": false,
+      "error": "Service not accepting connections"
+    },
+    "mcp-server": {
+      "status": "connection_refused",
+      "healthy": false,
+      "error": "Service not accepting connections"
+    },
+    "llm-orchestrator": {
+      "status": "connection_refused",
+      "healthy": false,
+      "error": "Service not accepting connections"
+    },
+    "automation-services": {
+      "status": "connection_refused",
+      "healthy": false,
+      "error": "Service not accepting connections"
+    },
+    "saga-orchestrator": {
+      "status": "connection_refused",
+      "healthy": false,
+      "error": "Service not accepting connections"
+    }
+  },
+  "monitoring": {
+    "grafana-basic": {
+      "healthy": false,
+      "available": false,
+      "error": "HTTPConnectionPool(host='localhost', port=3002): Max retries exceeded with url: /api/health (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x105d4e570>: Failed to establish a new connection: [Errno 61] Connection refused'))"
+    },
+    "prometheus-basic": {
+      "healthy": false,
+      "available": false,
+      "error": "HTTPConnectionPool(host='localhost', port=9091): Max retries exceeded with url: /api/v1/status/config (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x105d1fbd0>: Failed to establish a new connection: [Errno 61] Connection refused'))"
+    },
+    "loki-basic": {
+      "healthy": false,
+      "available": false,
+      "error": "HTTPConnectionPool(host='localhost', port=3101): Max retries exceeded with url: /ready (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x105dac380>: Failed to establish a new connection: [Errno 61] Connection refused'))"
+    }
+  },
+  "errors": [],
+  "summary": {
+    "test_completion": "2025-08-07T00:21:54.043458",
+    "infrastructure_health": "0/2",
+    "endpoints_health": "0/5",
+    "monitoring_health": "0/3",
+    "overall_status": "FAILED",
+    "recommendations": [
+      "Fix infrastructure services (PostgreSQL/Redis)",
+      "Investigate application service startup issues",
+      "Check Docker logs for import/configuration errors",
+      "Verify monitoring stack configuration"
+    ]
+  },
+  "logs": {
+    "pyairtable-compose-airtable-gateway-1": {
+      "recent_logs": "Error response from daemon: No such container: pyairtable-compose-airtable-gateway-1\n",
+      "has_errors": true
+    },
+    "pyairtable-compose-mcp-server-1": {
+      "recent_logs": "Error response from daemon: No such container: pyairtable-compose-mcp-server-1\n",
+      "has_errors": true
+    },
+    "pyairtable-compose-llm-orchestrator-1": {
+      "recent_logs": "Error response from daemon: No such container: pyairtable-compose-llm-orchestrator-1\n",
+      "has_errors": true
+    },
+    "pyairtable-compose-automation-services-1": {
+      "recent_logs": "Error response from daemon: No such container: pyairtable-compose-automation-services-1\n",
+      "has_errors": true
+    },
+    "pyairtable-compose-saga-orchestrator-1": {
+      "recent_logs": "Error response from daemon: No such container: pyairtable-compose-saga-orchestrator-1\n",
+      "has_errors": true
+    }
+  },
+  "database": {
+    "connection": {
+      "successful": false,
+      "version_info": "Error response from daemon: No such container: pyairtable-compose-postgres-1"
+    },
+    "table_creation": {
+      "successful": false,
+      "details": "Error response from daemon: No such container: pyairtable-compose-postgres-1"
+    }
+  }
+}

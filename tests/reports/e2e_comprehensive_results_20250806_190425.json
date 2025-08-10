@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "duration": 0.22718191146850586,
+  "total_tests": 1,
+  "passed_tests": 1,
+  "failed_tests": 0,
+  "health_status": {
+    "API Gateway": true,
+    "LLM Orchestrator": true,
+    "MCP Server": true,
+    "Airtable Gateway": true
+  },
+  "test_results": {
+    "connectivity": {
+      "test": "service_connectivity",
+      "status": "passed",
+      "services": {
+        "llm_orchestrator": true,
+        "mcp_server": true,
+        "airtable_gateway": true
+      }
+    },
+    "error": "Chat request failed after 3 attempts"
+  },
+  "timestamp": 1754496265,
+  "session_id": null,
+  "metadata": {
+    "timestamp": "2025-08-06T19:04:25.577061",
+    "config": {
+      "api_gateway_url": "http://localhost:8000",
+      "llm_orchestrator_url": "http://localhost:8003",
+      "mcp_server_url": "http://localhost:8001",
+      "airtable_gateway_url": "http://localhost:8002",
+      "airtable_base": "appVLUAubH5cFWhMV",
+      "timeout": 60,
+      "retry_attempts": 3
+    }
+  }
+}

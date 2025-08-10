@@ -1,0 +1,171 @@
+{
+  "overall_success": false,
+  "success_rate": 92.85714285714286,
+  "total_tests": 14,
+  "passed_tests": 13,
+  "failed_tests": 1,
+  "duration": 3.7066071033477783,
+  "components": {
+    "service_health": true,
+    "environment_config": true,
+    "direct_gateway": true,
+    "api_gateway_proxy": false,
+    "authentication": true
+  },
+  "test_results": [
+    {
+      "test": "Airtable Gateway Health",
+      "success": true,
+      "details": "Status: healthy",
+      "response_data": {
+        "status": "healthy",
+        "service": "airtable-gateway",
+        "timestamp": "2025-08-08T09:42:12.612115"
+      },
+      "timestamp": "2025-08-08 12:42:12"
+    },
+    {
+      "test": "API Gateway Health",
+      "success": true,
+      "details": "Status: healthy",
+      "response_data": {
+        "status": "healthy",
+        "gateway": "healthy",
+        "services": [
+          {
+            "name": "airtable-gateway",
+            "status": "healthy",
+            "url": "http://airtable-gateway:8002",
+            "response_time": 0.022221
+          },
+          {
+            "name": "mcp-server",
+            "status": "healthy",
+            "url": "http://mcp-server:8001",
+            "response_time": 0.022577
+          },
+          {
+            "name": "llm-orchestrator",
+            "status": "healthy",
+            "url": "http://llm-orchestrator:8003",
+            "response_time": 0.023612
+          }
+        ],
+        "websocket_stats": {
+          "total_connections": 0,
+          "active_connections": 0,
+          "messages_sent": 0,
+          "messages_queued": 0,
+          "rate_limit_violations": 0,
+          "authentication_failures": 0,
+          "active_sessions": 0,
+          "queued_messages_total": 0,
+          "average_messages_per_connection": 0.0
+        },
+        "timestamp": "2025-07-31T19:30:00Z"
+      },
+      "timestamp": "2025-08-08 12:42:12"
+    },
+    {
+      "test": "MCP Server Health",
+      "success": true,
+      "details": "Status: healthy",
+      "response_data": {
+        "status": "healthy",
+        "service": "mcp-server",
+        "timestamp": "2025-08-08T09:42:12.676943"
+      },
+      "timestamp": "2025-08-08 12:42:12"
+    },
+    {
+      "test": "Environment - AIRTABLE_TOKEN",
+      "success": true,
+      "details": "Variable is set",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:42:12"
+    },
+    {
+      "test": "Environment - AIRTABLE_BASE",
+      "success": true,
+      "details": "Variable is set",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:42:12"
+    },
+    {
+      "test": "Environment - API_KEY",
+      "success": true,
+      "details": "Variable is set",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:42:12"
+    },
+    {
+      "test": "Direct Gateway - List Tables",
+      "success": true,
+      "details": "Found 35 tables",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:42:13"
+    },
+    {
+      "test": "Direct Gateway - Read Records",
+      "success": true,
+      "details": "Retrieved 3 records",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:42:14"
+    },
+    {
+      "test": "Direct Gateway - Create Record",
+      "success": true,
+      "details": "Created record: recDipIVFemAIMZxT",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:42:14"
+    },
+    {
+      "test": "Direct Gateway - Update Record",
+      "success": true,
+      "details": "Updated record: recDipIVFemAIMZxT",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:42:15"
+    },
+    {
+      "test": "Direct Gateway - Delete Record",
+      "success": true,
+      "details": "Deleted record: recDipIVFemAIMZxT",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:42:16"
+    },
+    {
+      "test": "API Gateway Proxy - List Tables",
+      "success": false,
+      "details": "HTTP 404",
+      "response_data": {
+        "error": "Endpoint not found",
+        "path": "/api/airtable/tables",
+        "available_endpoints": [
+          "/api/health",
+          "/api/chat",
+          "/api/tools",
+          "/api/airtable/*",
+          "/api/execute-tool",
+          "/api/sessions/{session_id}/history",
+          "/ws",
+          "/api/websocket/stats"
+        ]
+      },
+      "timestamp": "2025-08-08 12:42:16"
+    },
+    {
+      "test": "Auth - No API Key",
+      "success": true,
+      "details": "HTTP 401 (Expected 401/403)",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:42:16"
+    },
+    {
+      "test": "Auth - Invalid API Key",
+      "success": true,
+      "details": "HTTP 403 (Expected 401/403)",
+      "response_data": null,
+      "timestamp": "2025-08-08 12:42:16"
+    }
+  ]
+}

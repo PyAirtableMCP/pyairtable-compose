@@ -1,0 +1,131 @@
+{
+  "test_start": "2025-08-07T00:06:04.231653",
+  "infrastructure": {
+    "postgresql": {
+      "status": "healthy",
+      "details": "/var/run/postgresql:5432 - accepting connections"
+    },
+    "redis": {
+      "status": "healthy",
+      "details": "PONG"
+    }
+  },
+  "services": {
+    "automation-services-1": {
+      "docker_status": "Restarting (1) 6 seconds ago",
+      "container_name": "pyairtable-compose-automation-services-1"
+    },
+    "llm-orchestrator-1": {
+      "docker_status": "Restarting (1) 12 seconds ago",
+      "container_name": "pyairtable-compose-llm-orchestrator-1"
+    },
+    "mcp-server-1": {
+      "docker_status": "Restarting (1) 12 seconds ago",
+      "container_name": "pyairtable-compose-mcp-server-1"
+    },
+    "saga-orchestrator-1": {
+      "docker_status": "Up Less than a second (health: starting)",
+      "container_name": "pyairtable-compose-saga-orchestrator-1"
+    },
+    "airtable-gateway-1": {
+      "docker_status": "Restarting (1) 7 seconds ago",
+      "container_name": "pyairtable-compose-airtable-gateway-1"
+    },
+    "redis-1": {
+      "docker_status": "Up About a minute",
+      "container_name": "pyairtable-compose-redis-1"
+    },
+    "postgres-1": {
+      "docker_status": "Up About a minute",
+      "container_name": "pyairtable-compose-postgres-1"
+    }
+  },
+  "endpoints": {
+    "airtable-gateway": {
+      "status": "connection_refused",
+      "healthy": false,
+      "error": "Service not accepting connections"
+    },
+    "mcp-server": {
+      "status": "connection_refused",
+      "healthy": false,
+      "error": "Service not accepting connections"
+    },
+    "llm-orchestrator": {
+      "status": "connection_refused",
+      "healthy": false,
+      "error": "Service not accepting connections"
+    },
+    "automation-services": {
+      "status": "connection_refused",
+      "healthy": false,
+      "error": "Service not accepting connections"
+    },
+    "saga-orchestrator": {
+      "status": "connection_refused",
+      "healthy": false,
+      "error": "Service not accepting connections"
+    }
+  },
+  "monitoring": {
+    "grafana-basic": {
+      "status_code": 200,
+      "healthy": true,
+      "available": true
+    },
+    "prometheus-basic": {
+      "status_code": 200,
+      "healthy": true,
+      "available": true
+    },
+    "loki-basic": {
+      "status_code": 200,
+      "healthy": true,
+      "available": true
+    }
+  },
+  "errors": [],
+  "summary": {
+    "test_completion": "2025-08-07T00:06:05.079193",
+    "infrastructure_health": "2/2",
+    "endpoints_health": "0/5",
+    "monitoring_health": "3/3",
+    "overall_status": "PARTIAL",
+    "recommendations": [
+      "Investigate application service startup issues",
+      "Check Docker logs for import/configuration errors"
+    ]
+  },
+  "logs": {
+    "pyairtable-compose-airtable-gateway-1": {
+      "recent_logs": " File \"<frozen importlib._bootstrap>\", line 690, in _load_unlocked\n  File \"<frozen importlib._bootstrap_external>\", line 940, in exec_module\n  File \"<frozen importlib._bootstrap>\", line 241, in _call_with_frames_removed\n  File \"/app/src/main.py\", line 85, in <module>\n    from routes.airtable import router as airtable_router\n  File \"/app/src/routes/airtable.py\", line 6, in <module>\n    from ..services.airtable import AirtableService\nImportError: attempted relative import beyond top-level package\n",
+      "has_errors": true
+    },
+    "pyairtable-compose-mcp-server-1": {
+      "recent_logs": "e 1147, in _find_and_load_unlocked\n  File \"<frozen importlib._bootstrap>\", line 690, in _load_unlocked\n  File \"<frozen importlib._bootstrap_external>\", line 940, in exec_module\n  File \"<frozen importlib._bootstrap>\", line 241, in _call_with_frames_removed\n  File \"/app/src/main.py\", line 74, in <module>\n    from routes.mcp import router as mcp_router\n  File \"/app/src/routes/mcp.py\", line 6, in <module>\n    from ..models.mcp import (\nImportError: attempted relative import beyond top-level package\n",
+      "has_errors": true
+    },
+    "pyairtable-compose-llm-orchestrator-1": {
+      "recent_logs": "ozen importlib._bootstrap>\", line 690, in _load_unlocked\n  File \"<frozen importlib._bootstrap_external>\", line 940, in exec_module\n  File \"<frozen importlib._bootstrap>\", line 241, in _call_with_frames_removed\n  File \"/app/src/main.py\", line 79, in <module>\n    from routes.chat import router as chat_router\n  File \"/app/src/routes/chat.py\", line 7, in <module>\n    from ..models.chat import ChatRequest, ChatResponse, Message, Session\nImportError: attempted relative import beyond top-level package\n",
+      "has_errors": true
+    },
+    "pyairtable-compose-automation-services-1": {
+      "recent_logs": "__\n    super().__init__(\n  File \"/usr/local/lib/python3.11/site-packages/pydantic/main.py\", line 164, in __init__\n    __pydantic_self__.__pydantic_validator__.validate_python(data, self_instance=__pydantic_self__)\npydantic_core._pydantic_core.ValidationError: 1 validation error for Settings\nauth_service_url\n  Field required [type=missing, input_value={'log_level': 'DEBUG', 'a...http://mcp-server:8001'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.5/v/missing\n",
+      "has_errors": true
+    },
+    "pyairtable-compose-saga-orchestrator-1": {
+      "recent_logs": "packages/psycopg2/__init__.py\", line 122, in connect\n    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nsqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to server at \"postgres\" (172.19.0.3), port 5432 failed: FATAL:  password authentication failed for user \"postgres\"\n\n(Background on this error at: https://sqlalche.me/e/20/e3q8)\n\nERROR:    Application startup failed. Exiting.\n",
+      "has_errors": true
+    }
+  },
+  "database": {
+    "connection": {
+      "successful": true,
+      "version_info": "version                                            \n-----------------------------------------------------------------------------------------------\n PostgreSQL 16.9 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 14.2.0) 14.2.0, 64-bit\n(1 row)"
+    },
+    "table_creation": {
+      "successful": true,
+      "details": "Table created successfully"
+    }
+  }
+}

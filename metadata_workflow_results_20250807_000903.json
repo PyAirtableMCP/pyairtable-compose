@@ -1,0 +1,189 @@
+{
+  "test_start": "2025-08-07T00:08:58.709571",
+  "workflow_tests": {
+    "schema_setup": {
+      "workspaces_table": {
+        "success": true,
+        "execution_time_ms": 74.94,
+        "output": "CREATE TABLE",
+        "error": "",
+        "description": "Create workspaces table for organization structure"
+      },
+      "bases_table": {
+        "success": true,
+        "execution_time_ms": 86.18,
+        "output": "CREATE TABLE",
+        "error": "",
+        "description": "Create bases table for Airtable base metadata"
+      },
+      "tables_table": {
+        "success": true,
+        "execution_time_ms": 78.54,
+        "output": "CREATE TABLE",
+        "error": "",
+        "description": "Create tables metadata"
+      },
+      "field_mappings_table": {
+        "success": true,
+        "execution_time_ms": 96.47,
+        "output": "CREATE TABLE",
+        "error": "",
+        "description": "Create field mappings for data structure"
+      },
+      "sync_logs_table": {
+        "success": true,
+        "execution_time_ms": 83.63,
+        "output": "CREATE TABLE",
+        "error": "",
+        "description": "Create sync logs for operation tracking"
+      }
+    },
+    "crud_operations": {
+      "create_workspace": {
+        "success": true,
+        "execution_time_ms": 81.28,
+        "output": "INSERT 0 1",
+        "error": "",
+        "description": "Create test workspace"
+      },
+      "create_base": {
+        "success": true,
+        "execution_time_ms": 72.47,
+        "output": "INSERT 0 1",
+        "error": "",
+        "description": "Create test base"
+      },
+      "create_tables": {
+        "success": true,
+        "execution_time_ms": 72.01,
+        "output": "INSERT 0 3",
+        "error": "",
+        "description": "Create test tables"
+      },
+      "create_fields": {
+        "success": true,
+        "execution_time_ms": 75.06,
+        "output": "INSERT 0 5",
+        "error": "",
+        "description": "Create field mappings"
+      }
+    },
+    "sync_simulation": {
+      "start_full_sync": {
+        "success": true,
+        "execution_time_ms": 164.53,
+        "output": "INSERT 0 1",
+        "error": "",
+        "description": "Start full sync simulation"
+      },
+      "update_sync_progress": {
+        "success": true,
+        "execution_time_ms": 79.13,
+        "output": "UPDATE 1",
+        "error": "",
+        "description": "Complete sync with results"
+      },
+      "start_incremental_sync": {
+        "success": true,
+        "execution_time_ms": 66.0,
+        "output": "INSERT 0 1",
+        "error": "",
+        "description": "Simulate incremental sync"
+      },
+      "simulate_failed_sync": {
+        "success": true,
+        "execution_time_ms": 68.14,
+        "output": "INSERT 0 1",
+        "error": "",
+        "description": "Simulate failed sync for error handling"
+      }
+    },
+    "analytical_queries": {
+      "workspace_summary": {
+        "success": true,
+        "execution_time_ms": 66.11,
+        "output": "workspace_name | total_bases | total_records | total_tables \n----------------+-------------+---------------+--------------\n Test Workspace |           3 |           750 |            3\n(1 row)",
+        "error": "",
+        "description": "Get workspace analytics summary"
+      },
+      "sync_performance_analysis": {
+        "success": true,
+        "execution_time_ms": 64.05,
+        "output": "sync_type  | sync_status | sync_count |    avg_duration     |      avg_records       |         last_sync          \n-------------+-------------+------------+---------------------+------------------------+----------------------------\n full        | completed   |          1 | 45.0000000000000000 |   150.0000000000000000 | 2025-08-06 21:09:00.699429\n full        | failed      |          1 |                     | 0.00000000000000000000 | 2025-08-06 21:09:00.92284\n incremental | completed   |          1 |                     |    25.0000000000000000 | 2025-08-06 21:09:00.843029\n(3 rows)",
+        "error": "",
+        "description": "Analyze sync performance patterns"
+      },
+      "base_health_check": {
+        "success": true,
+        "execution_time_ms": 69.6,
+        "output": "base_name |   base_id   | table_count | total_records |      last_table_sync       | total_fields \n-----------+-------------+-------------+---------------+----------------------------+--------------\n Test Base | app_test123 |          15 |          3750 | 2025-08-06 21:09:00.980811 |           15\n(1 row)",
+        "error": "",
+        "description": "Base health and activity check"
+      },
+      "recent_sync_activity": {
+        "success": true,
+        "execution_time_ms": 80.9,
+        "output": "sync_id  | base_name |  sync_type  | sync_status | records_processed |         started_at         | duration_seconds \n----------+-----------+-------------+-------------+-------------------+----------------------------+------------------\n sync_003 | Test Base | full        | failed      |                 0 | 2025-08-06 21:09:00.92284  |                 \n sync_002 | Test Base | incremental | completed   |                25 | 2025-08-06 21:09:00.843029 |                 \n sync_001 | Test Base | full        | completed   |               150 | 2025-08-06 21:09:00.699429 |               45\n(3 rows)",
+        "error": "",
+        "description": "Recent sync activity monitoring"
+      }
+    }
+  },
+  "performance_metrics": {
+    "workspace_lookup": {
+      "avg_time_ms": 77.15,
+      "min_time_ms": 58.23,
+      "max_time_ms": 91.79,
+      "runs": 10
+    },
+    "field_mapping_complex": {
+      "avg_time_ms": 89.03,
+      "min_time_ms": 66.69,
+      "max_time_ms": 115.46,
+      "runs": 5
+    }
+  },
+  "data_validation": {
+    "referential_integrity": {
+      "success": true,
+      "execution_time_ms": 105.69,
+      "output": "orphaned_bases | orphaned_tables | orphaned_fields \n----------------+-----------------+-----------------\n              0 |               0 |               0\n(1 row)",
+      "error": "",
+      "description": "Check for referential integrity violations"
+    },
+    "data_consistency": {
+      "success": true,
+      "execution_time_ms": 75.29,
+      "output": "total_tables | tables_with_fields | tables_with_records | synced_tables \n--------------+--------------------+---------------------+---------------\n            3 |                  3 |                   3 |             1\n(1 row)",
+      "error": "",
+      "description": "Check data consistency metrics"
+    },
+    "sync_status_health": {
+      "success": true,
+      "execution_time_ms": 68.76,
+      "output": "sync_status | count | percentage \n-------------+-------+------------\n completed   |     2 |      66.67\n failed      |     1 |      33.33\n(2 rows)",
+      "error": "",
+      "description": "Analyze sync success rates"
+    }
+  },
+  "summary": {
+    "test_completion": "2025-08-07T00:09:03.127151",
+    "total_operations": 20,
+    "successful_operations": 20,
+    "success_rate": 100.0,
+    "schema_operations": "5/5",
+    "crud_operations": "4/4",
+    "sync_operations": "4/4",
+    "analytical_queries": "4/4",
+    "data_validation": "3/3",
+    "workflow_status": "OPERATIONAL",
+    "key_capabilities": [
+      "\u2713 Metadata schema management",
+      "\u2713 Workspace and base operations",
+      "\u2713 Sync workflow simulation",
+      "\u2713 Analytical reporting",
+      "\u2713 Data integrity validation"
+    ],
+    "avg_query_performance_ms": 83.09
+  }
+}

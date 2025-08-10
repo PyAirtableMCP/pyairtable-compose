@@ -1,0 +1,169 @@
+version: '3.8'
+
+services:
+  # LLM Orchestrator - Local implementation
+  llm-orchestrator:
+    build:
+      context: ./python-services/llm-orchestrator
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MCP_SERVER_HTTP_URL=http://mcp-server:8001
+      - USE_HTTP_MCP=true
+      - AIRTABLE_BASE=${AIRTABLE_BASE}
+      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - THINKING_BUDGET=${THINKING_BUDGET}
+      - LOG_LEVEL=${LOG_LEVEL}
+    depends_on:
+      - mcp-server
+      - redis
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+
+  # MCP Server - Local implementation
+  mcp-server:
+    build:
+      context: ./python-services/mcp-server
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
+      - AIRTABLE_GATEWAY_API_KEY=${API_KEY}
+      - MCP_SERVER_MODE=http
+      - MCP_SERVER_PORT=8001
+      - AIRTABLE_BASE=${AIRTABLE_BASE}
+      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
+      - LOG_LEVEL=${LOG_LEVEL}
+    depends_on:
+      - airtable-gateway
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+
+  # Airtable Gateway - Local implementation
+  airtable-gateway:
+    build:
+      context: ./python-services/airtable-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
+      - AIRTABLE_PAT=${AIRTABLE_TOKEN}
+      - AIRTABLE_BASE=${AIRTABLE_BASE}
+      - API_KEY=${API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL}
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+
+  # Automation Services - Local implementation
+  automation-services:
+    build:
+      context: ./pyairtable-automation-services
+      dockerfile: Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      - MCP_SERVER_URL=http://mcp-server:8001
+      - API_KEY=${API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-10MB}
+      - ALLOWED_EXTENSIONS=${ALLOWED_EXTENSIONS:-pdf,doc,docx,txt,csv,xlsx}
+      - UPLOAD_DIR=${UPLOAD_DIR:-/tmp/uploads}
+      - DEFAULT_WORKFLOW_TIMEOUT=${DEFAULT_WORKFLOW_TIMEOUT:-300}
+      - MAX_WORKFLOW_RETRIES=${MAX_WORKFLOW_RETRIES:-3}
+      - SCHEDULER_CHECK_INTERVAL=${SCHEDULER_CHECK_INTERVAL:-30}
+    depends_on:
+      - mcp-server
+      - redis
+      - postgres
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    volumes:
+      - file-uploads:/tmp/uploads
+
+  # SAGA Orchestrator - Local implementation
+  saga-orchestrator:
+    build:
+      context: ./saga-orchestrator
+      dockerfile: Dockerfile
+    ports:
+      - "8008:8008"
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - API_KEY=${API_KEY}
+      - REQUIRE_API_KEY=${REQUIRE_API_KEY:-true}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - USE_REDIS_EVENT_BUS=true
+      - SAGA_TIMEOUT_SECONDS=${SAGA_TIMEOUT_SECONDS:-3600}
+      - SAGA_RETRY_ATTEMPTS=${SAGA_RETRY_ATTEMPTS:-3}
+      - SAGA_STEP_TIMEOUT_SECONDS=${SAGA_STEP_TIMEOUT_SECONDS:-300}
+      - AIRTABLE_CONNECTOR_URL=http://airtable-gateway:8002
+      - ENABLE_METRICS=${ENABLE_METRICS:-true}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+    depends_on:
+      - redis
+      - postgres
+      - airtable-gateway
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+
+  # Redis - Caching and session storage
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      pyairtable-network:
+        aliases:
+          - redis
+
+  # PostgreSQL - Database for sessions and metadata
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      - ./migrations:/docker-entrypoint-initdb.d/migrations:ro
+    restart: unless-stopped
+    networks:
+      pyairtable-network:
+        aliases:
+          - postgres
+          - db
+
+networks:
+  pyairtable-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local
+  file-uploads:
+    driver: local

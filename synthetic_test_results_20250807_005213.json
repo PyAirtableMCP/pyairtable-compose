@@ -1,0 +1,183 @@
+{
+  "test_start": "2025-08-07T00:52:10.500531",
+  "grafana_tests": {
+    "health": {
+      "status_code": 200,
+      "response_time": 11.4,
+      "success": true,
+      "content_length": 71
+    },
+    "datasources": {
+      "status_code": 401,
+      "response_time": 48.04,
+      "success": true,
+      "content_length": 56
+    },
+    "dashboards": {
+      "status_code": 401,
+      "response_time": 7.85,
+      "success": true,
+      "content_length": 56
+    },
+    "admin_stats": {
+      "status_code": 401,
+      "response_time": 7.68,
+      "success": true,
+      "content_length": 56
+    }
+  },
+  "prometheus_tests": {
+    "config": {
+      "status_code": 200,
+      "response_time": 46.22,
+      "success": true,
+      "content_length": 4699
+    },
+    "targets": {
+      "status_code": 200,
+      "response_time": 14.01,
+      "success": true,
+      "content_length": 9908,
+      "active_targets": 9
+    },
+    "rules": {
+      "status_code": 200,
+      "response_time": 8.95,
+      "success": true,
+      "content_length": 12851
+    },
+    "labels": {
+      "status_code": 200,
+      "response_time": 10.49,
+      "success": true,
+      "content_length": 738
+    },
+    "metrics": {
+      "status_code": 200,
+      "response_time": 18.38,
+      "success": true,
+      "content_length": 19666,
+      "metric_count": 554
+    }
+  },
+  "loki_tests": {
+    "ready": {
+      "status_code": 200,
+      "response_time": 2.76,
+      "success": true,
+      "content_length": 6
+    },
+    "metrics": {
+      "status_code": 200,
+      "response_time": 26.7,
+      "success": true,
+      "content_length": 152204
+    },
+    "labels": {
+      "status_code": 200,
+      "response_time": 37.17,
+      "success": true,
+      "content_length": 21
+    },
+    "query_range": {
+      "status_code": 400,
+      "response_time": 7.0,
+      "success": false,
+      "content_length": 80
+    }
+  },
+  "database_tests": {
+    "create_metadata_table": {
+      "success": true,
+      "output": "CREATE TABLE",
+      "error": "NOTICE:  relation \"pyairtable_metadata\" already exists, skipping"
+    },
+    "insert_test_data": {
+      "success": true,
+      "output": "INSERT 0 1",
+      "error": ""
+    },
+    "query_test_data": {
+      "success": true,
+      "output": "total_records \n---------------\n             4\n(1 row)",
+      "error": ""
+    },
+    "create_session_table": {
+      "success": true,
+      "output": "CREATE TABLE",
+      "error": "NOTICE:  relation \"user_sessions\" already exists, skipping"
+    },
+    "test_indexes": {
+      "success": true,
+      "output": "CREATE INDEX",
+      "error": "NOTICE:  relation \"idx_sessions_user_id\" already exists, skipping"
+    },
+    "performance": {
+      "average_query_time": 60.24
+    }
+  },
+  "performance_metrics": {
+    "docker_stats": {},
+    "disk_usage": "Filesystem        Size    Used   Avail Capacity iused ifree %iused  Mounted on\n/dev/disk3s1s1   460Gi    14Gi   116Gi    11%    426k  1.2G    0%   /\ndevfs            201Ki   201Ki     0Bi   100%     694     0  100%   /dev\n/dev/disk3s6     460Gi   6.0Gi   116Gi     5%       6  1.2G    0%   /System/Volumes/VM\n/dev/disk3s2     460Gi    13Gi   116Gi    11%    1.8k  1.2G    0%   /System/Volumes/Preboot\n/dev/disk3s4     460Gi   684Mi   116Gi     1%     331  1.2G    0%   /System/Volumes/Update\n/dev/disk1s2     500Mi   6.0Mi   483Mi     2%       1  4.9M    0%   /System/Volumes/xarts\n/dev/disk1s1     500Mi   5.6Mi   483Mi     2%      34  4.9M    0%   /System/Volumes/iSCPreboot\n/dev/disk1s3     500Mi   928Ki   483Mi     1%      70  4.9M    0%   /System/Volumes/Hardware\n/dev/disk3s5     460Gi   309Gi   116Gi    73%    3.6M  1.2G    0%   /System/Volumes/Data\nmap auto_home      0Bi     0Bi     0Bi   100%       0     0     -   /System/Volumes/Data/home\n/dev/disk4s1     684Mi   448Mi   236Mi    66%     240  4.3G    0%   /Volumes/Discord\n/dev/disk2s1     5.0Gi   1.8Gi   3.1Gi    38%      65   33M    0%   /System/Volumes/Update/SFR/mnt1\n/dev/disk3s1     460Gi    14Gi   116Gi    11%    426k  1.2G    0%   /System/Volumes/Update/mnt1\n"
+  },
+  "summary": {
+    "test_completion": "2025-08-07T00:52:13.743675",
+    "total_tests": 25,
+    "total_successes": 23,
+    "success_rate": 92.0,
+    "grafana_health": "4/4",
+    "prometheus_health": "5/5",
+    "loki_health": "3/4",
+    "database_health": "5/6",
+    "redis_health": "6/6",
+    "infrastructure_status": "OPERATIONAL",
+    "monitoring_stack_status": "OPERATIONAL",
+    "key_findings": [
+      "Infrastructure is highly available and performing well",
+      "Database operations are functional - ready for metadata workflow testing",
+      "Redis caching layer is operational",
+      "Grafana monitoring dashboard is accessible",
+      "Prometheus metrics collection is active",
+      "Application services have import/configuration issues requiring fixes",
+      "Monitoring stack is fully operational for observability"
+    ]
+  },
+  "redis_tests": {
+    "set_test_key": {
+      "success": true,
+      "response_time": 51.91,
+      "output": "OK",
+      "error": "Warning: Using a password with '-a' or '-u' option on the command line interface may not be safe."
+    },
+    "get_test_key": {
+      "success": true,
+      "response_time": 44.77,
+      "output": "test_value",
+      "error": "Warning: Using a password with '-a' or '-u' option on the command line interface may not be safe."
+    },
+    "set_session": {
+      "success": true,
+      "response_time": 52.72,
+      "output": "OK",
+      "error": "Warning: Using a password with '-a' or '-u' option on the command line interface may not be safe."
+    },
+    "get_session": {
+      "success": true,
+      "response_time": 49.05,
+      "output": "user_data",
+      "error": "Warning: Using a password with '-a' or '-u' option on the command line interface may not be safe."
+    },
+    "list_keys": {
+      "success": true,
+      "response_time": 46.63,
+      "output": "pyairtable.user.user.registered\ntest:key\npyairtable.saga.step_response\nairtable:sync_config\nsession:123\npyairtable.command.response",
+      "error": "Warning: Using a password with '-a' or '-u' option on the command line interface may not be safe."
+    },
+    "info": {
+      "success": true,
+      "response_time": 44.04,
+      "output": "# Server\nredis_version:7.4.5\nredis_git_sha1:00000000\nredis_git_dirty:0\nredis_build_id:921351e8a62ba254\nredis_mode:standalone\nos:Linux 6.5.11-linuxkit aarch64\narch_bits:64\nmonotonic_clock:POSIX clock_gettime\nmultiplexing_api:epoll\natomicvar_api:c11-builtin\ngcc_version:14.2.0\nprocess_id:1\nprocess_supervised:no\nrun_id:f2247a74c60b1827c6229b80303c1066ae88c995\ntcp_port:6379\nserver_time_usec:1754517131727700\nuptime_in_seconds:152\nuptime_in_days:0\nhz:10\nconfigured_hz:10\nlru_clock:9686667\nexecutable:/data/redis-server\nconfig_file:\nio_threads_active:0\nlistener0:name=tcp,bind=*,bind=-::*,port=6379",
+      "error": "Warning: Using a password with '-a' or '-u' option on the command line interface may not be safe."
+    }
+  }
+}

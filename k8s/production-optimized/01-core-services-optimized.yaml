@@ -1,0 +1,601 @@
+# Production-Optimized Core Services with HPA, Circuit Breakers, and Advanced Configuration
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pyairtable
+  labels:
+    istio-injection: enabled
+    cost-center: "production"
+    environment: "production"
+
+---
+# Airtable Gateway - Optimized
+apiVersion: v1
+kind: Service
+metadata:
+  name: airtable-gateway
+  namespace: pyairtable
+  labels:
+    app: airtable-gateway
+    version: v1
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8093"
+    prometheus.io/path: "/metrics"
+spec:
+  selector:
+    app: airtable-gateway
+  ports:
+    - name: http
+      port: 8093
+      targetPort: 8093
+      protocol: TCP
+  type: ClusterIP
+  sessionAffinity: None
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airtable-gateway
+  namespace: pyairtable
+  labels:
+    app: airtable-gateway
+    version: v1
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: airtable-gateway
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: airtable-gateway
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8093"
+        prometheus.io/path: "/metrics"
+        sidecar.istio.io/inject: "true"
+    spec:
+      serviceAccountName: pyairtable-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+      - name: airtable-gateway
+        image: pyairtable/airtable-gateway:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8093
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "8093"
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres-service:5432/$(POSTGRES_DB)"
+        - name: AIRTABLE_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: pyairtable-secrets
+              key: airtable-token
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: pyairtable-secrets
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: pyairtable-secrets
+              key: postgres-password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: pyairtable-secrets
+              key: postgres-db
+        - name: CACHE_TTL
+          value: "300"
+        - name: MAX_CONNECTIONS
+          value: "100"
+        - name: CONNECTION_TIMEOUT
+          value: "30"
+        envFrom:
+        - configMapRef:
+            name: pyairtable-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+            ephemeral-storage: "1Gi"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+            ephemeral-storage: "2Gi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8093
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8093
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8093
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 30
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/cache
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: airtable-gateway
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: airtable-gateway
+              topologyKey: kubernetes.io/hostname
+
+---
+# HPA for Airtable Gateway
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: airtable-gateway-hpa
+  namespace: pyairtable
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: airtable-gateway
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+
+---
+# LLM Orchestrator - Optimized
+apiVersion: v1
+kind: Service
+metadata:
+  name: llm-orchestrator
+  namespace: pyairtable
+  labels:
+    app: llm-orchestrator
+    version: v1
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8091"
+    prometheus.io/path: "/metrics"
+spec:
+  selector:
+    app: llm-orchestrator
+  ports:
+    - name: http
+      port: 8091
+      targetPort: 8091
+      protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llm-orchestrator
+  namespace: pyairtable
+  labels:
+    app: llm-orchestrator
+    version: v1
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 2
+  selector:
+    matchLabels:
+      app: llm-orchestrator
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: llm-orchestrator
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8091"
+        prometheus.io/path: "/metrics"
+        sidecar.istio.io/inject: "true"
+    spec:
+      serviceAccountName: pyairtable-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+      - name: llm-orchestrator
+        image: pyairtable/llm-orchestrator:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8091
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "8091"
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: pyairtable-secrets
+              key: gemini-api-key
+        - name: MODEL_TIMEOUT
+          value: "30"
+        - name: MAX_TOKENS
+          value: "8192"
+        - name: TEMPERATURE
+          value: "0.7"
+        - name: CIRCUIT_BREAKER_THRESHOLD
+          value: "5"
+        - name: CIRCUIT_BREAKER_TIMEOUT
+          value: "60"
+        envFrom:
+        - configMapRef:
+            name: pyairtable-config
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "300m"
+            ephemeral-storage: "2Gi"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+            ephemeral-storage: "4Gi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8091
+          initialDelaySeconds: 45
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8091
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: models-cache
+          mountPath: /app/models
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: models-cache
+        emptyDir:
+          sizeLimit: 2Gi
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: llm-orchestrator
+            topologyKey: kubernetes.io/hostname
+
+---
+# HPA for LLM Orchestrator  
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: llm-orchestrator-hpa
+  namespace: pyairtable
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: llm-orchestrator
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 75
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600  # Slower scale-down for LLM workloads
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 120
+    scaleUp:
+      stabilizationWindowSeconds: 120
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+
+---
+# MCP Server - Optimized
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-server
+  namespace: pyairtable
+  labels:
+    app: mcp-server
+    version: v1
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8092"
+    prometheus.io/path: "/metrics"
+spec:
+  selector:
+    app: mcp-server
+  ports:
+    - name: http
+      port: 8092
+      targetPort: 8092
+      protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-server
+  namespace: pyairtable
+  labels:
+    app: mcp-server
+    version: v1
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: mcp-server
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: mcp-server
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8092"
+        prometheus.io/path: "/metrics"
+        sidecar.istio.io/inject: "true"
+    spec:
+      serviceAccountName: pyairtable-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+      - name: mcp-server
+        image: pyairtable/mcp-server:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8092
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "8092"
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: AIRTABLE_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: pyairtable-secrets
+              key: airtable-token
+        - name: MCP_PROTOCOL_VERSION
+          value: "1.0"
+        - name: MAX_CONCURRENT_REQUESTS
+          value: "50"
+        envFrom:
+        - configMapRef:
+            name: pyairtable-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+            ephemeral-storage: "1Gi"
+          limits:
+            memory: "512Mi"
+            cpu: "400m"
+            ephemeral-storage: "2Gi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8092
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8092
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: mcp-server
+              topologyKey: kubernetes.io/hostname
+
+---
+# Pod Disruption Budget for Core Services
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airtable-gateway-pdb
+  namespace: pyairtable
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: airtable-gateway
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: llm-orchestrator-pdb
+  namespace: pyairtable
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: llm-orchestrator
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mcp-server-pdb
+  namespace: pyairtable
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: mcp-server
+
+---
+# Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pyairtable-sa
+  namespace: pyairtable
+  labels:
+    app: pyairtable

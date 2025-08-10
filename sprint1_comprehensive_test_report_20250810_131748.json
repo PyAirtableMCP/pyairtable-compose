@@ -1,0 +1,357 @@
+{
+  "sprint": "Sprint 1",
+  "test_execution_date": "2025-08-10T13:16:58.193859",
+  "total_duration_seconds": 50.162228,
+  "overall_summary": {
+    "total_branches_tested": 5,
+    "total_tests_executed": 21,
+    "total_tests_passed": 4,
+    "total_tests_failed": 17,
+    "overall_success_rate": 0.19047619047619047
+  },
+  "branch_summaries": {
+    "feature/SCRUM-15-fix-authentication": {
+      "service_type": "go",
+      "service_name": "auth-service",
+      "total_tests": 4,
+      "passed_tests": 2,
+      "failed_tests": 2,
+      "success_rate": 0.5,
+      "average_coverage": 0.0,
+      "security_findings": [],
+      "recommendation": "BLOCK - Multiple test failures"
+    },
+    "feature/SCRUM-16-repair-airtable": {
+      "service_type": "python",
+      "service_name": "airtable-gateway",
+      "total_tests": 4,
+      "passed_tests": 0,
+      "failed_tests": 4,
+      "success_rate": 0.0,
+      "average_coverage": null,
+      "security_findings": [],
+      "recommendation": "BLOCK - Multiple test failures"
+    },
+    "feature/SCRUM-17-deploy-frontend": {
+      "service_type": "typescript",
+      "service_name": "tenant-dashboard",
+      "total_tests": 5,
+      "passed_tests": 2,
+      "failed_tests": 3,
+      "success_rate": 0.4,
+      "average_coverage": null,
+      "security_findings": [
+        "@auth/core: low",
+        "cookie: low",
+        "next-auth: low"
+      ],
+      "recommendation": "BLOCK - Security vulnerabilities detected"
+    },
+    "feature/SCRUM-18-fix-automation": {
+      "service_type": "python",
+      "service_name": "automation-services",
+      "total_tests": 4,
+      "passed_tests": 0,
+      "failed_tests": 4,
+      "success_rate": 0.0,
+      "average_coverage": null,
+      "security_findings": [],
+      "recommendation": "BLOCK - Multiple test failures"
+    },
+    "feature/SCRUM-19-stabilize-saga": {
+      "service_type": "python",
+      "service_name": "saga-orchestrator",
+      "total_tests": 4,
+      "passed_tests": 0,
+      "failed_tests": 4,
+      "success_rate": 0.0,
+      "average_coverage": null,
+      "security_findings": [],
+      "recommendation": "BLOCK - Multiple test failures"
+    }
+  },
+  "detailed_results": [
+    {
+      "branch": "feature/SCRUM-15-fix-authentication",
+      "service_type": "go",
+      "test_type": "unit",
+      "status": "pass",
+      "duration": 5.794878005981445,
+      "coverage": 0.0,
+      "security_findings": null,
+      "details": {
+        "output": "\tgithub.com/pyairtable-compose/auth-service/cmd/auth-service\t\tcoverage: 0.0% of statements\n\tgithub.com/pyairtable-compose/auth-service/internal/config\t\tcoverage: 0.0% of statements\n\tgithub.com/pyairtable-compose/auth-service/internal/handlers\t\tcoverage: 0.0% of statements\n\tgithub.com/pyairtable-compose/auth-service/internal/middleware\t\tcoverage: 0.0% of statements\n=== RUN   TestHashPassword\n--- PASS: TestHashPassword (0.07s)\n=== RUN   TestCheckPassword\n--- PASS: TestCheckPassword (0.30s)\n=== RUN   TestLoginRequest_GetIdentifier\n=== RUN   TestLoginRequest_GetIdentifier/Email_provided\n=== RUN   TestLoginRequest_GetIdentifier/Username_provided\n=== RUN   TestLoginRequest_GetIdentifier/Both_email_and_username_provided_-_email_takes_precedence\n=== RUN   TestLoginRequest_GetIdentifier/Neither_email_nor_username_provided\n--- PASS: TestLoginRequest_GetIdentifier (0.00s)\n    --- PASS: TestLoginRequest_GetIdentifier/Email_provided (0.00s)\n    --- PASS: TestLoginRequest_GetIdentifier/Username_provided (0.00s)\n    --- PASS: TestLoginRequest_GetIdentifier/Both_email_and_username_provided_-_email_takes_precedence (0.00s)\n    --- PASS: TestLoginRequest_GetIdentifier/Neither_email_nor_username_provided (0.00s)\n=== RUN   TestPasswordValidation\n=== RUN   TestPasswordValidation/Valid_password\n=== RUN   TestPasswordValidation/Short_password\n=== RUN   TestPasswordValidation/Empty_password\n=== RUN   TestPasswordValidation/Long_password_(within_bcrypt_limit)\n=== RUN   TestPasswordValidation/Too_long_password_(exceeds_bcrypt_limit)\n--- PASS: TestPasswordValidation (0.58s)\n    --- PASS: TestPasswordValidation/Valid_password (0.15s)\n    --- PASS: TestPasswordValidation/Short_password (0.15s)\n    --- PASS: TestPasswordValidation/Empty_password (0.14s)\n    --- PASS: TestPasswordValidation/Long_password_(within_bcrypt_limit) (0.15s)\n    --- PASS: TestPasswordValidation/Too_long_password_(exceeds_bcrypt_limit) (0.00s)\nPASS\ncoverage: 100.0% of statements\nok  \tgithub.com/pyairtable-compose/auth-service/internal/models\t1.642s\tcoverage: 100.0% of statements\n?   \tgithub.com/pyairtable-compose/auth-service/internal/repository\t[no test files]\n\tgithub.com/pyairtable-compose/auth-service/internal/repository/postgres\t\tcoverage: 0.0% of statements\n\tgithub.com/pyairtable-compose/auth-service/internal/repository/redis\t\tcoverage: 0.0% of statements\n=== RUN   TestAuthService_Register\n--- PASS: TestAuthService_Register (0.15s)\n=== RUN   TestAuthService_Register_DuplicateEmail\n--- PASS: TestAuthService_Register_DuplicateEmail (0.07s)\n=== RUN   TestAuthService_Login\n--- PASS: TestAuthService_Login (0.15s)\n=== RUN   TestAuthService_Login_InvalidCredentials\n    logger.go:146: 2025-08-10T13:17:02.829+0300\tERROR\tFailed to find user\t{\"error\": \"user not found\", \"identifier\": \"nonexistent@example.com\"}\n--- PASS: TestAuthService_Login_InvalidCredentials (0.15s)\n=== RUN   TestAuthService_ValidateToken\n--- PASS: TestAuthService_ValidateToken (0.15s)\n=== RUN   TestAuthService_ValidateToken_Invalid\n--- PASS: TestAuthService_ValidateToken_Invalid (0.00s)\n=== RUN   TestAuthService_ChangePassword\n--- PASS: TestAuthService_ChangePassword (0.35s)\n=== RUN   TestAuthService_ChangePassword_WrongCurrentPassword\n--- PASS: TestAuthService_ChangePassword_WrongCurrentPassword (0.14s)\nPASS\ncoverage: 54.8% of statements\nok  \tgithub.com/pyairtable-compose/auth-service/internal/services\t1.715s\tcoverage: 54.8% of statements\n",
+        "errors": ""
+      }
+    },
+    {
+      "branch": "feature/SCRUM-15-fix-authentication",
+      "service_type": "go",
+      "test_type": "build",
+      "status": "fail",
+      "duration": 0.08048486709594727,
+      "coverage": null,
+      "security_findings": null,
+      "details": {
+        "output": "",
+        "errors": "stat /Users/kg/IdeaProjects/pyairtable-compose/go-services/auth-service/cmd/main.go: directory not found\n"
+      }
+    },
+    {
+      "branch": "feature/SCRUM-15-fix-authentication",
+      "service_type": "go",
+      "test_type": "dependencies",
+      "status": "pass",
+      "duration": 1.7735660076141357,
+      "coverage": null,
+      "security_findings": null,
+      "details": {
+        "output": "all modules verified\n",
+        "errors": ""
+      }
+    },
+    {
+      "branch": "feature/SCRUM-15-fix-authentication",
+      "service_type": "go",
+      "test_type": "security",
+      "status": "fail",
+      "duration": 0.9948489665985107,
+      "coverage": null,
+      "security_findings": [],
+      "details": {
+        "output": "",
+        "errors": "/bin/sh: nancy: command not found\n"
+      }
+    },
+    {
+      "branch": "feature/SCRUM-16-repair-airtable",
+      "service_type": "python",
+      "test_type": "unit",
+      "status": "fail",
+      "duration": 0.0033719539642333984,
+      "coverage": null,
+      "security_findings": null,
+      "details": {
+        "output": "",
+        "errors": "/bin/sh: python: command not found\n"
+      }
+    },
+    {
+      "branch": "feature/SCRUM-16-repair-airtable",
+      "service_type": "python",
+      "test_type": "dependencies",
+      "status": "fail",
+      "duration": 0.003057718276977539,
+      "coverage": null,
+      "security_findings": null,
+      "details": {
+        "output": "",
+        "errors": "/bin/sh: pip: command not found\n"
+      }
+    },
+    {
+      "branch": "feature/SCRUM-16-repair-airtable",
+      "service_type": "python",
+      "test_type": "lint",
+      "status": "fail",
+      "duration": 0.002904176712036133,
+      "coverage": null,
+      "security_findings": null,
+      "details": {
+        "output": "",
+        "errors": "/bin/sh: python: command not found\n"
+      }
+    },
+    {
+      "branch": "feature/SCRUM-16-repair-airtable",
+      "service_type": "python",
+      "test_type": "security",
+      "status": "fail",
+      "duration": 0.002974271774291992,
+      "coverage": null,
+      "security_findings": [],
+      "details": {
+        "output": "",
+        "errors": "/bin/sh: pip-audit: command not found\n"
+      }
+    },
+    {
+      "branch": "feature/SCRUM-17-deploy-frontend",
+      "service_type": "typescript",
+      "test_type": "install",
+      "status": "pass",
+      "duration": 21.19810390472412,
+      "coverage": null,
+      "security_findings": null,
+      "details": {
+        "output": "\nadded 1087 packages, and audited 1088 packages in 21s\n\n205 packages are looking for funding\n  run `npm fund` for details\n\n3 low severity vulnerabilities\n\nTo address all issues, run:\n  npm audit fix --force\n\nRun `npm audit` for details.\n",
+        "errors": "npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.\nnpm warn deprecated lodash.get@4.4.2: This package is deprecated. Use the optional chaining (?.) operator instead.\nnpm warn deprecated @humanwhocodes/config-array@0.13.0: Use @eslint/config-array instead\nnpm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported\nnpm warn deprecated abab@2.0.6: Use your platform's native atob() and btoa() methods instead\nnpm warn deprecated @humanwhocodes/object-schema@2.0.3: Use @eslint/object-schema instead\nnpm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported\nnpm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported\nnpm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported\nnpm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported\nnpm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported\nnpm warn deprecated lodash.isequal@4.5.0: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.\nnpm warn deprecated domexception@4.0.0: Use your platform's native DOMException instead\nnpm warn deprecated eslint@8.57.1: This version is no longer supported. Please see https://eslint.org/version-support for other options.\n"
+      }
+    },
+    {
+      "branch": "feature/SCRUM-17-deploy-frontend",
+      "service_type": "typescript",
+      "test_type": "unit",
+      "status": "fail",
+      "duration": 1.7399842739105225,
+      "coverage": null,
+      "security_findings": null,
+      "details": {
+        "output": "\n> pyairtable-tenant-dashboard@1.0.0 test\n> jest --coverage --watchAll=false\n\n",
+        "errors": "\u25cf Validation Warning:\n\n  Unknown option \"moduleNameMapping\" with value {\"^@/(.*)$\": \"<rootDir>/src/$1\", \"^@/components/(.*)$\": \"<rootDir>/src/components/$1\", \"^@/hooks/(.*)$\": \"<rootDir>/src/hooks/$1\", \"^@/lib/(.*)$\": \"<rootDir>/src/lib/$1\", \"^@/types/(.*)$\": \"<rootDir>/src/types/$1\", \"^@/utils/(.*)$\": \"<rootDir>/src/utils/$1\"} was found.\n  This is probably a typing mistake. Fixing it will remove this message.\n\n  Configuration Documentation:\n  https://jestjs.io/docs/configuration\n\n\u25cf Validation Error:\n\n  Watch plugin jest-watch-typeahead/filename cannot be found. Make sure the watchPlugins configuration option points to an existing node module.\n\n  Configuration Documentation:\n  https://jestjs.io/docs/configuration\n\n"
+      }
+    },
+    {
+      "branch": "feature/SCRUM-17-deploy-frontend",
+      "service_type": "typescript",
+      "test_type": "build",
+      "status": "pass",
+      "duration": 14.434000015258789,
+      "coverage": null,
+      "security_findings": null,
+      "details": {
+        "output": "\n> pyairtable-tenant-dashboard@1.0.0 build\n> next build\n\n  \u25b2 Next.js 14.2.31\n  - Environments: .env.local\n\n   Creating an optimized production build ...\n \u2713 Compiled successfully\n   Skipping validation of types\n   Skipping linting\n   Collecting page data ...\n   Generating static pages (0/18) ...\n   Generating static pages (4/18) \n   Generating static pages (8/18) \n   Generating static pages (13/18) \n \u2713 Generating static pages (18/18)\n   Finalizing page optimization ...\n   Collecting build traces ...\n\nRoute (app)                              Size     First Load JS\n\u250c \u25cb /                                    108 kB          301 kB\n\u251c \u25cb /_not-found                          880 B          88.3 kB\n\u251c \u0192 /api/airtable/analyze-structure      0 B                0 B\n\u251c \u0192 /api/airtable/bases                  0 B                0 B\n\u251c \u0192 /api/airtable/validate               0 B                0 B\n\u251c \u0192 /api/auth/[...nextauth]              0 B                0 B\n\u251c \u0192 /api/auth/register                   0 B                0 B\n\u251c \u25cb /api/health                          0 B                0 B\n\u251c \u0192 /api/onboarding/complete             0 B                0 B\n\u251c \u0192 /api/test-auth                       0 B                0 B\n\u251c \u25cb /auth/login                          4.11 kB         143 kB\n\u251c \u25cb /auth/onboarding                     7.86 kB         138 kB\n\u251c \u25cb /auth/register                       8.29 kB         147 kB\n\u251c \u25cb /chat                                17.6 kB         180 kB\n\u251c \u25cb /dashboard                           4.71 kB         113 kB\n\u251c \u25cb /demo                                2.52 kB         191 kB\n\u2514 \u25cb /offline                             3.34 kB         103 kB\n+ First Load JS shared by all            87.4 kB\n  \u251c chunks/117-9078f1fd2bbe7375.js       31.7 kB\n  \u251c chunks/fd9d1056-255ef6ab60583eca.js  53.7 kB\n  \u2514 other shared chunks (total)          2 kB\n\n\n\u0192 Middleware                             36.2 kB\n\n\u25cb  (Static)   prerendered as static content\n\u0192  (Dynamic)  server-rendered on demand\n\n",
+        "errors": " \u26a0 Compiled with warnings\n\n./node_modules/@opentelemetry/instrumentation/build/esm/platform/node/instrumentation.js\nCritical dependency: the request of a dependency is an expression\n\nImport trace for requested module:\n./node_modules/@opentelemetry/instrumentation/build/esm/platform/node/instrumentation.js\n./node_modules/@opentelemetry/instrumentation/build/esm/platform/node/index.js\n./node_modules/@opentelemetry/instrumentation/build/esm/platform/index.js\n./node_modules/@opentelemetry/instrumentation/build/esm/index.js\n./node_modules/@sentry/opentelemetry/build/cjs/index.js\n./node_modules/@sentry/nextjs/build/cjs/server/index.js\n./node_modules/@sentry/nextjs/build/cjs/index.server.js\n./src/app/global-error.tsx\n\n./node_modules/require-in-the-middle/index.js\nCritical dependency: require function is used in a way in which dependencies cannot be statically extracted\n\nImport trace for requested module:\n./node_modules/require-in-the-middle/index.js\n./node_modules/@opentelemetry/instrumentation/build/esm/platform/node/instrumentation.js\n./node_modules/@opentelemetry/instrumentation/build/esm/platform/node/index.js\n./node_modules/@opentelemetry/instrumentation/build/esm/platform/index.js\n./node_modules/@opentelemetry/instrumentation/build/esm/index.js\n./node_modules/@sentry/opentelemetry/build/cjs/index.js\n./node_modules/@sentry/nextjs/build/cjs/server/index.js\n./node_modules/@sentry/nextjs/build/cjs/index.server.js\n./src/app/global-error.tsx\n\n \u26a0 Unsupported metadata viewport is configured in metadata export in /auth/login. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n \u26a0 Unsupported metadata viewport is configured in metadata export in /auth/login. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n \u26a0 Unsupported metadata viewport is configured in metadata export in /auth/onboarding. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n \u26a0 Unsupported metadata viewport is configured in metadata export in /auth/onboarding. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n \u26a0 Unsupported metadata viewport is configured in metadata export in /_not-found. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n \u26a0 Unsupported metadata viewport is configured in metadata export in /_not-found. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n \u26a0 Unsupported metadata viewport is configured in metadata export in /auth/register. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n \u26a0 Unsupported metadata viewport is configured in metadata export in /auth/register. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n \u26a0 Unsupported metadata viewport is configured in metadata export in /chat. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n \u26a0 Unsupported metadata viewport is configured in metadata export in /chat. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n \u26a0 Unsupported metadata viewport is configured in metadata export in /. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n \u26a0 Unsupported metadata viewport is configured in metadata export in /offline. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n \u26a0 Unsupported metadata viewport is configured in metadata export in /offline. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n \u26a0 Unsupported metadata viewport is configured in metadata export in /. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n \u26a0 Unsupported metadata viewport is configured in metadata export in /demo. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n \u26a0 Unsupported metadata viewport is configured in metadata export in /demo. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n \u26a0 Unsupported metadata viewport is configured in metadata export in /dashboard. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n \u26a0 Unsupported metadata viewport is configured in metadata export in /dashboard. Please move it to viewport export instead.\nRead more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport\n"
+      }
+    },
+    {
+      "branch": "feature/SCRUM-17-deploy-frontend",
+      "service_type": "typescript",
+      "test_type": "lint",
+      "status": "fail",
+      "duration": 2.7235848903656006,
+      "coverage": null,
+      "security_findings": null,
+      "details": {
+        "output": "\n> pyairtable-tenant-dashboard@1.0.0 lint\n> next lint\n\n",
+        "errors": "\n./src/app/api/airtable/analyze-structure/route.ts\n10:21  Error: 'personalAccessToken' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n\n./src/app/api/airtable/bases/route.ts\n48:44  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/onboarding/complete/route.ts\n22:18  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n33:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n119:27  Error: 'request' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/app/api/test-auth/route.ts\n3:27  Error: 'req' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/app/auth/onboarding/page.tsx\n224:48  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/chat/page.tsx\n77:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n77:63  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n78:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n78:29  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n78:69  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n79:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n79:59  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n86:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n86:58  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n87:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n87:68  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n88:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n88:57  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n95:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n95:62  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n96:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n96:56  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n97:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n97:48  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n109:63  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n\n./src/app/posthog-provider.tsx\n13:14  Error: 'ph' is defined but never used.  @typescript-eslint/no-unused-vars\n66:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n67:21  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n115:75  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n124:60  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/providers.tsx\n28:42  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/components/chat/chat-interface.tsx\n32:29  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n318:62  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/components/dashboard/UsageChart.tsx\n26:18  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n69:54  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n74:32  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/components/dashboard/UsageProgress.tsx\n14:3  Error: 'getUsageColor' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/components/dashboard/__tests__/DashboardOverview.test.tsx\n48:10  Error: Component definition is missing display name  react/display-name\n\n./src/components/design-system/command-palette.tsx\n10:3  Error: 'Smile' is defined but never used.  @typescript-eslint/no-unused-vars\n17:3  Error: 'Database' is defined but never used.  @typescript-eslint/no-unused-vars\n63:9  Warning: The 'commands' array makes the dependencies of useMemo Hook (at line 230) change on every render. To fix this, wrap the initialization of 'commands' in its own useMemo() Hook.  react-hooks/exhaustive-deps\n63:9  Warning: The 'commands' array makes the dependencies of useEffect Hook (at line 289) change on every render. To fix this, wrap the initialization of 'commands' in its own useMemo() Hook.  react-hooks/exhaustive-deps\n\n./src/components/design-system/data-table.tsx\n327:32  Error: 'TData' is defined but never used.  @typescript-eslint/no-unused-vars\n328:10  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n423:34  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n424:31  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/components/design-system/metric-card.tsx\n6:29  Error: 'CardHeader' is defined but never used.  @typescript-eslint/no-unused-vars\n6:41  Error: 'CardTitle' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/components/error-boundary.tsx\n253:55  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/components/layout/Header.tsx\n28:10  Error: 'CommandPalette' is defined but never used.  @typescript-eslint/no-unused-vars\n37:11  Error: 'open' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n\n./src/components/layout/Sidebar.tsx\n245:37  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n261:6  Warning: React Hook React.useEffect has missing dependencies: 'expandedItems', 'hasActiveChild', and 'isActiveItem'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps\n\n./src/components/onboarding/AirtableConnectionWizard.tsx\n13:10  Error: 'Separator' is defined but never used.  @typescript-eslint/no-unused-vars\n27:3  Error: 'RefreshCw' is defined but never used.  @typescript-eslint/no-unused-vars\n29:3  Error: 'Filter' is defined but never used.  @typescript-eslint/no-unused-vars\n30:3  Error: 'Settings' is defined but never used.  @typescript-eslint/no-unused-vars\n31:3  Error: 'Users' is defined but never used.  @typescript-eslint/no-unused-vars\n34:3  Error: 'Clock' is defined but never used.  @typescript-eslint/no-unused-vars\n38:3  Error: 'Copy' is defined but never used.  @typescript-eslint/no-unused-vars\n39:3  Error: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars\n75:13  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n132:78  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n149:6  Warning: React Hook useEffect has a missing dependency: 'validateTokenFormat'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps\n310:13  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n402:34  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n402:57  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n403:31  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n403:48  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n510:42  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n510:64  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n552:68  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n625:22  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n665:72  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n678:80  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n686:80  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n697:15  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n\n./src/components/onboarding/BaseConfigurationStep.tsx\n3:27  Error: 'useEffect' is defined but never used.  @typescript-eslint/no-unused-vars\n19:3  Error: 'Eye' is defined but never used.  @typescript-eslint/no-unused-vars\n23:3  Error: 'Info' is defined but never used.  @typescript-eslint/no-unused-vars\n33:3  Error: 'Users' is defined but never used.  @typescript-eslint/no-unused-vars\n34:3  Error: 'Globe' is defined but never used.  @typescript-eslint/no-unused-vars\n42:3  Error: 'RefreshCw' is defined but never used.  @typescript-eslint/no-unused-vars\n43:3  Error: 'Download' is defined but never used.  @typescript-eslint/no-unused-vars\n44:3  Error: 'Upload' is defined but never used.  @typescript-eslint/no-unused-vars\n74:13  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n134:3  Error: 'availableBases' is defined but never used.  @typescript-eslint/no-unused-vars\n136:3  Error: 'onUpdate' is defined but never used.  @typescript-eslint/no-unused-vars\n143:10  Error: 'isAnalyzing' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n159:10  Error: 'filterDataType' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n159:26  Error: 'setFilterDataType' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n254:21  Warning: Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images.  jsx-a11y/alt-text\n285:14  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n355:25  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n355:45  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n688:33  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n688:56  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n690:18  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n\n./src/components/onboarding/ComprehensiveOnboarding.tsx\n6:10  Error: 'useForm' is defined but never used.  @typescript-eslint/no-unused-vars\n7:10  Error: 'zodResolver' is defined but never used.  @typescript-eslint/no-unused-vars\n11:10  Error: 'Input' is defined but never used.  @typescript-eslint/no-unused-vars\n13:10  Error: 'Alert' is defined but never used.  @typescript-eslint/no-unused-vars\n13:17  Error: 'AlertDescription' is defined but never used.  @typescript-eslint/no-unused-vars\n16:10  Error: 'Separator' is defined but never used.  @typescript-eslint/no-unused-vars\n19:3  Error: 'Key' is defined but never used.  @typescript-eslint/no-unused-vars\n23:3  Error: 'ArrowLeft' is defined but never used.  @typescript-eslint/no-unused-vars\n29:3  Error: 'Volume2' is defined but never used.  @typescript-eslint/no-unused-vars\n30:3  Error: 'VolumeX' is defined but never used.  @typescript-eslint/no-unused-vars\n31:3  Error: 'ChevronRight' is defined but never used.  @typescript-eslint/no-unused-vars\n35:3  Error: 'Award' is defined but never used.  @typescript-eslint/no-unused-vars\n40:3  Error: 'Shield' is defined but never used.  @typescript-eslint/no-unused-vars\n41:3  Error: 'Clock' is defined but never used.  @typescript-eslint/no-unused-vars\n43:3  Error: 'TrendingUp' is defined but never used.  @typescript-eslint/no-unused-vars\n44:3  Error: 'FileText' is defined but never used.  @typescript-eslint/no-unused-vars\n46:3  Error: 'Settings' is defined but never used.  @typescript-eslint/no-unused-vars\n47:3  Error: 'Eye' is defined but never used.  @typescript-eslint/no-unused-vars\n48:3  Error: 'CheckCheck' is defined but never used.  @typescript-eslint/no-unused-vars\n49:3  Error: 'AlertTriangle' is defined but never used.  @typescript-eslint/no-unused-vars\n50:3  Error: 'Info' is defined but never used.  @typescript-eslint/no-unused-vars\n52:3  Error: 'Wand2' is defined but never used.  @typescript-eslint/no-unused-vars\n54:3  Error: 'Github' is defined but never used.  @typescript-eslint/no-unused-vars\n111:13  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n199:7  Error: 'AVAILABLE_FEATURES' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n266:7  Error: 'PRODUCT_TOUR_STEPS' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n463:3  Error: React Hook \"useEffect\" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?  react-hooks/rules-of-hooks\n481:3  Error: React Hook \"useEffect\" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?  react-hooks/rules-of-hooks\n710:19  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n751:4  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n764:48  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n786:60  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n800:69  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n848:18  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n868:35  Error: 'props' is defined but never used.  @typescript-eslint/no-unused-vars\n868:42  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n872:32  Error: 'props' is defined but never used.  @typescript-eslint/no-unused-vars\n872:39  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n876:35  Error: 'props' is defined but never used.  @typescript-eslint/no-unused-vars\n876:42  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n880:32  Error: 'props' is defined but never used.  @typescript-eslint/no-unused-vars\n880:39  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n884:33  Error: 'props' is defined but never used.  @typescript-eslint/no-unused-vars\n884:40  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n888:33  Error: 'props' is defined but never used.  @typescript-eslint/no-unused-vars\n888:40  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/components/onboarding/ErrorHandling.tsx\n18:3  Error: 'ArrowLeft' is defined but never used.  @typescript-eslint/no-unused-vars\n21:3  Error: 'Phone' is defined but never used.  @typescript-eslint/no-unused-vars\n22:3  Error: 'Mail' is defined but never used.  @typescript-eslint/no-unused-vars\n24:3  Error: 'Search' is defined but never used.  @typescript-eslint/no-unused-vars\n32:3  Error: 'Key' is defined but never used.  @typescript-eslint/no-unused-vars\n34:3  Error: 'Bug' is defined but never used.  @typescript-eslint/no-unused-vars\n340:6  Warning: React Hook useEffect has a missing dependency: 'handleAutoRetry'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps\n483:50  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n646:36  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n\n./src/components/onboarding/FirstAIInteractionDemo.tsx\n4:18  Error: 'AnimatePresence' is defined but never used.  @typescript-eslint/no-unused-vars\n10:10  Error: 'Separator' is defined but never used.  @typescript-eslint/no-unused-vars\n15:3  Error: 'ArrowRight' is defined but never used.  @typescript-eslint/no-unused-vars\n17:3  Error: 'Sparkles' is defined but never used.  @typescript-eslint/no-unused-vars\n20:3  Error: 'Users' is defined but never used.  @typescript-eslint/no-unused-vars\n21:3  Error: 'Calendar' is defined but never used.  @typescript-eslint/no-unused-vars\n22:3  Error: 'Target' is defined but never used.  @typescript-eslint/no-unused-vars\n29:3  Error: 'Copy' is defined but never used.  @typescript-eslint/no-unused-vars\n32:3  Error: 'RefreshCw' is defined but never used.  @typescript-eslint/no-unused-vars\n33:3  Error: 'Zap' is defined but never used.  @typescript-eslint/no-unused-vars\n35:3  Error: 'Settings' is defined but never used.  @typescript-eslint/no-unused-vars\n36:3  Error: 'HelpCircle' is defined but never used.  @typescript-eslint/no-unused-vars\n37:3  Error: 'Wand2' is defined but never used.  @typescript-eslint/no-unused-vars\n39:3  Error: 'Filter' is defined but never used.  @typescript-eslint/no-unused-vars\n40:3  Error: 'Search' is defined but never used.  @typescript-eslint/no-unused-vars\n44:3  Error: 'Globe' is defined but never used.  @typescript-eslint/no-unused-vars\n46:3  Error: 'FileText' is defined but never used.  @typescript-eslint/no-unused-vars\n47:3  Error: 'Image' is defined but never used.  @typescript-eslint/no-unused-vars\n48:3  Error: 'Play' is defined but never used.  @typescript-eslint/no-unused-vars\n49:3  Error: 'Pause' is defined but never used.  @typescript-eslint/no-unused-vars\n78:21  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n99:32  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n646:25  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n646:44  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n669:40  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n670:20  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n731:54  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n731:76  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n\n./src/components/onboarding/InteractiveProductTour.tsx\n4:10  Error: 'motion' is defined but never used.  @typescript-eslint/no-unused-vars\n4:18  Error: 'AnimatePresence' is defined but never used.  @typescript-eslint/no-unused-vars\n7:10  Error: 'Alert' is defined but never used.  @typescript-eslint/no-unused-vars\n7:17  Error: 'AlertDescription' is defined but never used.  @typescript-eslint/no-unused-vars\n13:3  Error: 'SkipForward' is defined but never used.  @typescript-eslint/no-unused-vars\n22:3  Error: 'Users' is defined but never used.  @typescript-eslint/no-unused-vars\n23:3  Error: 'BarChart3' is defined but never used.  @typescript-eslint/no-unused-vars\n24:3  Error: 'Settings' is defined but never used.  @typescript-eslint/no-unused-vars\n31:3  Error: 'Database' is defined but never used.  @typescript-eslint/no-unused-vars\n32:3  Error: 'TrendingUp' is defined but never used.  @typescript-eslint/no-unused-vars\n35:3  Error: 'Shield' is defined but never used.  @typescript-eslint/no-unused-vars\n36:3  Error: 'Clock' is defined but never used.  @typescript-eslint/no-unused-vars\n41:3  Error: 'RefreshCw' is defined but never used.  @typescript-eslint/no-unused-vars\n42:3  Error: 'Download' is defined but never used.  @typescript-eslint/no-unused-vars\n43:3  Error: 'Share2' is defined but never used.  @typescript-eslint/no-unused-vars\n44:3  Error: 'Filter' is defined but never used.  @typescript-eslint/no-unused-vars\n65:11  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n281:3  Error: 'error' is defined but never used.  @typescript-eslint/no-unused-vars\n282:3  Error: 'setError' is defined but never used.  @typescript-eslint/no-unused-vars\n289:10  Error: 'notes' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n289:17  Error: 'setNotes' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n292:10  Error: 'quizAnswers' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n329:6  Warning: React Hook useEffect has a missing dependency: 'handleStepComplete'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps\n575:34  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n680:19  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n\n./src/hooks/usePWA.ts\n32:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n221:59  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n254:60  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/hooks/useTenant.ts\n36:35  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n92:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n106:64  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n146:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n172:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n209:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n234:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n272:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n285:66  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/lib/api.ts\n8:37  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n84:58  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n89:42  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n96:41  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n103:43  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n149:78  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n149:93  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n190:35  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n193:18  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n193:40  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n196:33  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n200:23  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n203:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n203:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n206:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n207:19  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n211:22  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n215:23  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n218:27  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n218:50  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n221:35  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n224:25  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n224:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n228:23  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n232:23  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n235:36  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n238:26  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n238:48  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n241:35  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n244:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n244:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n247:53  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n250:36  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n253:25  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n253:48  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n256:44  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n257:19  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n261:22  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n265:23  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n269:20  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n272:36  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n276:22  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n280:39  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/lib/auth.ts\n2:8  Error: 'GoogleProvider' is defined but never used.  @typescript-eslint/no-unused-vars\n3:8  Error: 'GitHubProvider' is defined but never used.  @typescript-eslint/no-unused-vars\n130:20  Error: 'user' is defined but never used.  @typescript-eslint/no-unused-vars\n130:35  Error: 'profile' is defined but never used.  @typescript-eslint/no-unused-vars\n130:44  Error: 'email' is defined but never used.  @typescript-eslint/no-unused-vars\n130:51  Error: 'credentials' is defined but never used.  @typescript-eslint/no-unused-vars\n170:21  Error: 'session' is defined but never used.  @typescript-eslint/no-unused-vars\n170:30  Error: 'token' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/lib/realtime/events.ts\n18:31  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n28:31  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n58:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n69:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n89:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/lib/realtime/realtime-client.ts\n86:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n305:23  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/lib/realtime/sse-client.ts\n228:33  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n296:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/lib/realtime/websocket-client.ts\n129:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n175:17  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n350:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/lib/stores/app-store.ts\n122:10  Error: 'get' is defined but never used.  @typescript-eslint/no-unused-vars\n173:10  Error: 'get' is defined but never used.  @typescript-eslint/no-unused-vars\n330:6  Error: 'notifications' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/lib/stores/types.ts\n63:27  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n70:35  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n126:32  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n210:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/lib/stores/utils/create-slice.ts\n19:35  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n28:45  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n32:61  Error: 'get' is defined but never used.  @typescript-eslint/no-unused-vars\n41:69  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n48:16  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n53:16  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n58:42  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n66:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n68:10  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n93:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n96:67  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n108:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n113:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n118:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n123:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n127:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n132:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n136:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n142:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n151:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n156:44  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n159:88  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n160:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n164:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n168:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n170:22  Error: 'removed' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n171:55  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n180:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n187:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n208:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n222:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n228:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n230:62  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n232:61  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n236:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n238:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n246:57  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n247:61  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n251:48  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/lib/utils.ts\n87:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n87:56  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n98:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n98:56  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n180:57  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n192:51  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n196:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n205:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/middleware.ts\n28:9  Error: 'isAuthPath' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n34:9  Error: 'isPublicPath' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n\n./src/types/index.ts\n55:29  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n97:28  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n163:10  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n316:27  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n485:26  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n554:26  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n586:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n615:26  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n652:13  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n653:13  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n742:28  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n758:34  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n763:20  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n774:29  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n817:10  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n828:20  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n834:10  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n842:28  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n852:10  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n858:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n865:9  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\ninfo  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules\n"
+      }
+    },
+    {
+      "branch": "feature/SCRUM-17-deploy-frontend",
+      "service_type": "typescript",
+      "test_type": "security",
+      "status": "fail",
+      "duration": 0.8508450984954834,
+      "coverage": null,
+      "security_findings": [
+        "@auth/core: low",
+        "cookie: low",
+        "next-auth: low"
+      ],
+      "details": {
+        "output": "{\n  \"auditReportVersion\": 2,\n  \"vulnerabilities\": {\n    \"@auth/core\": {\n      \"name\": \"@auth/core\",\n      \"severity\": \"low\",\n      \"isDirect\": false,\n      \"via\": [\n        \"cookie\"\n      ],\n      \"effects\": [\n        \"next-auth\"\n      ],\n      \"range\": \"<=0.35.3\",\n      \"nodes\": [\n        \"node_modules/next-auth/node_modules/@auth/core\"\n      ],\n      \"fixAvailable\": {\n        \"name\": \"next-auth\",\n        \"version\": \"5.0.0-beta.29\",\n        \"isSemVerMajor\": false\n      }\n    },\n    \"cookie\": {\n      \"name\": \"cookie\",\n      \"severity\": \"low\",\n      \"isDirect\": false,\n      \"via\": [\n        {\n          \"source\": 1103907,\n          \"name\": \"cookie\",\n          \"dependency\": \"cookie\",\n          \"title\": \"cookie accepts cookie name, path, and domain with out of bounds characters\",\n          \"url\": \"https://github.com/advisories/GHSA-pxg6-pf52-xh8x\",\n          \"severity\": \"low\",\n          \"cwe\": [\n            \"CWE-74\"\n          ],\n          \"cvss\": {\n            \"score\": 0,\n            \"vectorString\": null\n          },\n          \"range\": \"<0.7.0\"\n        }\n      ],\n      \"effects\": [\n        \"@auth/core\"\n      ],\n      \"range\": \"<0.7.0\",\n      \"nodes\": [\n        \"node_modules/cookie\"\n      ],\n      \"fixAvailable\": {\n        \"name\": \"next-auth\",\n        \"version\": \"5.0.0-beta.29\",\n        \"isSemVerMajor\": false\n      }\n    },\n    \"next-auth\": {\n      \"name\": \"next-auth\",\n      \"severity\": \"low\",\n      \"isDirect\": true,\n      \"via\": [\n        \"@auth/core\"\n      ],\n      \"effects\": [],\n      \"range\": \"<=0.0.0-pr.11562.ed0fce23 || 4.24.8 - 5.0.0-beta.22\",\n      \"nodes\": [\n        \"node_modules/next-auth\"\n      ],\n      \"fixAvailable\": {\n        \"name\": \"next-auth\",\n        \"version\": \"5.0.0-beta.29\",\n        \"isSemVerMajor\": false\n      }\n    }\n  },\n  \"metadata\": {\n    \"vulnerabilities\": {\n      \"info\": 0,\n      \"low\": 3,\n      \"moderate\": 0,\n      \"high\": 0,\n      \"critical\": 0,\n      \"total\": 3\n    },\n    \"dependencies\": {\n      \"prod\": 418,\n      \"dev\": 601,\n      \"optional\": 43,\n      \"peer\": 61,\n      \"peerOptional\": 0,\n      \"total\": 1087\n    }\n  }\n}\n",
+        "errors": ""
+      }
+    },
+    {
+      "branch": "feature/SCRUM-18-fix-automation",
+      "service_type": "python",
+      "test_type": "unit",
+      "status": "fail",
+      "duration": 0.004088163375854492,
+      "coverage": null,
+      "security_findings": null,
+      "details": {
+        "output": "",
+        "errors": "/bin/sh: python: command not found\n"
+      }
+    },
+    {
+      "branch": "feature/SCRUM-18-fix-automation",
+      "service_type": "python",
+      "test_type": "dependencies",
+      "status": "fail",
+      "duration": 0.003538846969604492,
+      "coverage": null,
+      "security_findings": null,
+      "details": {
+        "output": "",
+        "errors": "/bin/sh: pip: command not found\n"
+      }
+    },
+    {
+      "branch": "feature/SCRUM-18-fix-automation",
+      "service_type": "python",
+      "test_type": "lint",
+      "status": "fail",
+      "duration": 0.0033316612243652344,
+      "coverage": null,
+      "security_findings": null,
+      "details": {
+        "output": "",
+        "errors": "/bin/sh: python: command not found\n"
+      }
+    },
+    {
+      "branch": "feature/SCRUM-18-fix-automation",
+      "service_type": "python",
+      "test_type": "security",
+      "status": "fail",
+      "duration": 0.003286123275756836,
+      "coverage": null,
+      "security_findings": [],
+      "details": {
+        "output": "",
+        "errors": "/bin/sh: pip-audit: command not found\n"
+      }
+    },
+    {
+      "branch": "feature/SCRUM-19-stabilize-saga",
+      "service_type": "python",
+      "test_type": "unit",
+      "status": "fail",
+      "duration": 0.0044629573822021484,
+      "coverage": null,
+      "security_findings": null,
+      "details": {
+        "output": "",
+        "errors": "/bin/sh: python: command not found\n"
+      }
+    },
+    {
+      "branch": "feature/SCRUM-19-stabilize-saga",
+      "service_type": "python",
+      "test_type": "dependencies",
+      "status": "fail",
+      "duration": 0.004639387130737305,
+      "coverage": null,
+      "security_findings": null,
+      "details": {
+        "output": "",
+        "errors": "/bin/sh: pip: command not found\n"
+      }
+    },
+    {
+      "branch": "feature/SCRUM-19-stabilize-saga",
+      "service_type": "python",
+      "test_type": "lint",
+      "status": "fail",
+      "duration": 0.004007816314697266,
+      "coverage": null,
+      "security_findings": null,
+      "details": {
+        "output": "",
+        "errors": "/bin/sh: python: command not found\n"
+      }
+    },
+    {
+      "branch": "feature/SCRUM-19-stabilize-saga",
+      "service_type": "python",
+      "test_type": "security",
+      "status": "fail",
+      "duration": 0.0034999847412109375,
+      "coverage": null,
+      "security_findings": [],
+      "details": {
+        "output": "",
+        "errors": "/bin/sh: pip-audit: command not found\n"
+      }
+    }
+  ],
+  "recommendations": [
+    "Sprint 1 requires significant fixes before release",
+    "Address security vulnerabilities in: feature/SCRUM-17-deploy-frontend",
+    "Improve test coverage for: feature/SCRUM-15-fix-authentication"
+  ]
+}

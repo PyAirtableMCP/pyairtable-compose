@@ -1,0 +1,124 @@
+{
+  "timestamp": "2025-08-08T14:50:01.988198",
+  "summary": {
+    "total_tests": 9,
+    "passed": 4,
+    "failed": 4,
+    "skipped": 1,
+    "success_rate": 50.0
+  },
+  "test_results": [
+    {
+      "name": "service_health",
+      "status": "PASSED",
+      "message": "Automation services are healthy",
+      "duration": 0.15,
+      "details": {
+        "service": "PyAirtable Automation Services",
+        "version": "1.0.0",
+        "timestamp": "2025-08-08T14:50:01.409671",
+        "status": "healthy",
+        "components": {
+          "database": {
+            "status": "healthy",
+            "message": "Database connection successful"
+          },
+          "redis": {
+            "status": "healthy",
+            "message": "Redis connection successful"
+          },
+          "file_storage": {
+            "status": "healthy",
+            "message": "Upload directory accessible: /tmp/uploads"
+          },
+          "scheduler": {
+            "status": "healthy",
+            "message": "Workflow scheduler running"
+          }
+        }
+      }
+    },
+    {
+      "name": "saga_health",
+      "status": "PASSED",
+      "message": "SAGA orchestrator is healthy",
+      "duration": 0.11,
+      "details": {
+        "status": "healthy",
+        "version": "0.1.0",
+        "timestamp": "2025-08-08T14:50:01.554543",
+        "components": {
+          "saga_orchestrator": "healthy",
+          "redis": "healthy",
+          "database": "healthy",
+          "event_bus": "healthy"
+        }
+      }
+    },
+    {
+      "name": "template_crud",
+      "status": "PASSED",
+      "message": "Template CRUD operations successful",
+      "duration": 0.3,
+      "details": {
+        "template_id": 1,
+        "operations": [
+          "create",
+          "read",
+          "update",
+          "list"
+        ]
+      }
+    },
+    {
+      "name": "workflow_from_template",
+      "status": "FAILED",
+      "message": "Workflow from template failed: Workflow from template creation failed: 500",
+      "duration": 0.02,
+      "details": {}
+    },
+    {
+      "name": "workflow_execution",
+      "status": "FAILED",
+      "message": "Workflow execution failed: No workflows available for testing",
+      "duration": 0.0,
+      "details": {}
+    },
+    {
+      "name": "saga_integration",
+      "status": "SKIPPED",
+      "message": "No executions available to test SAGA integration",
+      "duration": 0.0,
+      "details": {}
+    },
+    {
+      "name": "workflow_step_tracking",
+      "status": "FAILED",
+      "message": "Step tracking test failed: Multi-step workflow creation failed: 500",
+      "duration": 0.01,
+      "details": {}
+    },
+    {
+      "name": "error_handling_rollback",
+      "status": "FAILED",
+      "message": "Error handling test failed: Error test workflow creation failed: 500",
+      "duration": 0.01,
+      "details": {}
+    },
+    {
+      "name": "cleanup",
+      "status": "PASSED",
+      "message": "Cleaned up 0 test resources",
+      "duration": 0.12,
+      "details": {
+        "cleaned_items": 0
+      }
+    }
+  ],
+  "test_data_summary": {
+    "templates_created": 1,
+    "workflows_created": 0,
+    "executions_run": 0,
+    "saga_instances_found": 0
+  }
+}

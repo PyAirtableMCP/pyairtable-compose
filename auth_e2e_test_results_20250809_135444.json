@@ -1,0 +1,251 @@
+{
+  "test_start_time": "2025-08-09T13:54:33.032123",
+  "tests_passed": 11,
+  "tests_failed": 17,
+  "test_results": [
+    {
+      "test_name": "Database Connection",
+      "passed": true,
+      "timestamp": "2025-08-09T13:54:33.671751",
+      "details": "Successfully connected to PostgreSQL",
+      "error": ""
+    },
+    {
+      "test_name": "Table platform_users exists",
+      "passed": true,
+      "timestamp": "2025-08-09T13:54:33.706418",
+      "details": "Table platform_users found in database",
+      "error": ""
+    },
+    {
+      "test_name": "Table platform_analytics_events exists",
+      "passed": true,
+      "timestamp": "2025-08-09T13:54:33.708734",
+      "details": "Table platform_analytics_events found in database",
+      "error": ""
+    },
+    {
+      "test_name": "Table platform_analytics_metrics exists",
+      "passed": true,
+      "timestamp": "2025-08-09T13:54:33.709626",
+      "details": "Table platform_analytics_metrics found in database",
+      "error": ""
+    },
+    {
+      "test_name": "User table has id column",
+      "passed": true,
+      "timestamp": "2025-08-09T13:54:33.764082",
+      "details": "Column id present",
+      "error": ""
+    },
+    {
+      "test_name": "User table has email column",
+      "passed": true,
+      "timestamp": "2025-08-09T13:54:33.764435",
+      "details": "Column email present",
+      "error": ""
+    },
+    {
+      "test_name": "User table has password_hash column",
+      "passed": true,
+      "timestamp": "2025-08-09T13:54:33.764637",
+      "details": "Column password_hash present",
+      "error": ""
+    },
+    {
+      "test_name": "User table has created_at column",
+      "passed": true,
+      "timestamp": "2025-08-09T13:54:33.764694",
+      "details": "Column created_at present",
+      "error": ""
+    },
+    {
+      "test_name": "User table has updated_at column",
+      "passed": true,
+      "timestamp": "2025-08-09T13:54:33.764815",
+      "details": "Column updated_at present",
+      "error": ""
+    },
+    {
+      "test_name": "Redis Connection",
+      "passed": false,
+      "timestamp": "2025-08-09T13:54:33.767473",
+      "details": "",
+      "error": "Error 61 connecting to localhost:6380. Connection refused."
+    },
+    {
+      "test_name": "API Gateway CORS",
+      "passed": false,
+      "timestamp": "2025-08-09T13:54:33.771437",
+      "details": "CORS not properly configured",
+      "error": ""
+    },
+    {
+      "test_name": "Platform Services CORS",
+      "passed": false,
+      "timestamp": "2025-08-09T13:54:33.775541",
+      "details": "",
+      "error": "Platform Services unreachable: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+    },
+    {
+      "test_name": "API Gateway Registration",
+      "passed": false,
+      "timestamp": "2025-08-09T13:54:33.779784",
+      "details": "",
+      "error": "Status: 403, Response: "
+    },
+    {
+      "test_name": "Platform Services Registration",
+      "passed": false,
+      "timestamp": "2025-08-09T13:54:33.786293",
+      "details": "",
+      "error": "Network error: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+    },
+    {
+      "test_name": "API Gateway Login",
+      "passed": false,
+      "timestamp": "2025-08-09T13:54:33.790075",
+      "details": "",
+      "error": "Status: 403, Response: "
+    },
+    {
+      "test_name": "Platform Services Login",
+      "passed": false,
+      "timestamp": "2025-08-09T13:54:33.794139",
+      "details": "",
+      "error": "Network error: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+    },
+    {
+      "test_name": "API Gateway Error Handling",
+      "passed": false,
+      "timestamp": "2025-08-09T13:54:33.797372",
+      "details": "",
+      "error": "Unexpected status 403 for invalid credentials"
+    },
+    {
+      "test_name": "API Gateway Error Handling",
+      "passed": false,
+      "timestamp": "2025-08-09T13:54:33.800008",
+      "details": "",
+      "error": "Unexpected status 403 for invalid credentials"
+    },
+    {
+      "test_name": "API Gateway Error Handling",
+      "passed": false,
+      "timestamp": "2025-08-09T13:54:33.801657",
+      "details": "",
+      "error": "Unexpected status 403 for invalid credentials"
+    },
+    {
+      "test_name": "Platform Services Error Handling",
+      "passed": false,
+      "timestamp": "2025-08-09T13:54:33.803893",
+      "details": "",
+      "error": "Network error: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+    },
+    {
+      "test_name": "Platform Services Error Handling",
+      "passed": false,
+      "timestamp": "2025-08-09T13:54:33.806105",
+      "details": "",
+      "error": "Network error: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+    },
+    {
+      "test_name": "Platform Services Error Handling",
+      "passed": false,
+      "timestamp": "2025-08-09T13:54:33.807708",
+      "details": "",
+      "error": "Network error: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+    },
+    {
+      "test_name": "API Gateway Invalid Token Rejection",
+      "passed": false,
+      "timestamp": "2025-08-09T13:54:33.810058",
+      "details": "",
+      "error": "Invalid token not rejected, status: 403"
+    },
+    {
+      "test_name": "Platform Services Invalid Token Rejection",
+      "passed": false,
+      "timestamp": "2025-08-09T13:54:33.813428",
+      "details": "",
+      "error": "Network error: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+    },
+    {
+      "test_name": "Frontend Accessibility",
+      "passed": true,
+      "timestamp": "2025-08-09T13:54:35.462523",
+      "details": "Page loaded with title: Vite + React + TS",
+      "error": ""
+    },
+    {
+      "test_name": "Frontend Registration Flow",
+      "passed": false,
+      "timestamp": "2025-08-09T13:54:38.646612",
+      "details": "",
+      "error": "No redirect after registration, still at: http://localhost:5173/auth/register"
+    },
+    {
+      "test_name": "Frontend Login Flow",
+      "passed": false,
+      "timestamp": "2025-08-09T13:54:43.772659",
+      "details": "",
+      "error": "No redirect after login, still at: http://localhost:5173/auth/login"
+    },
+    {
+      "test_name": "Chat UI Accessibility",
+      "passed": true,
+      "timestamp": "2025-08-09T13:54:44.413293",
+      "details": "Chat UI loaded with title: Vite + React + TS",
+      "error": ""
+    }
+  ],
+  "service_health": {
+    "API Gateway": {
+      "status": "unhealthy",
+      "status_code": 403,
+      "error": ""
+    },
+    "Platform Services": {
+      "status": "unreachable",
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+    },
+    "Frontend": {
+      "status": "healthy",
+      "response_time": 0.137027,
+      "data": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">import { injectIntoGlobalHook } from \"/@react-refresh\";\ninjectIntoGlobalHook(window);\nwindow.$RefreshReg$ = () => {};\nwindow.$RefreshSig$ = () => (type) => type;</script>\n\n    <script type=\"module\" src=\"/@vite/client\"></script>\n\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/vite.svg\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>Vite + React + TS</title>\n  </head>\n  <body>\n    <div id=\"root\"></div>\n    <script type=\"module\" src=\"/src/main.tsx?t=1754734197960\"></script>\n  </body>\n</html>\n"
+    },
+    "Chat UI": {
+      "status": "healthy",
+      "response_time": 0.22035,
+      "data": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">import { injectIntoGlobalHook } from \"/@react-refresh\";\ninjectIntoGlobalHook(window);\nwindow.$RefreshReg$ = () => {};\nwindow.$RefreshSig$ = () => (type) => type;</script>\n\n    <script type=\"module\" src=\"/@vite/client\"></script>\n\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/vite.svg\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>Vite + React + TS</title>\n  </head>\n  <body>\n    <div id=\"root\"></div>\n    <script type=\"module\" src=\"/src/main.tsx\"></script>\n  </body>\n</html>\n"
+    }
+  },
+  "database_checks": {
+    "connection": "success",
+    "tables_found": [
+      "platform_users",
+      "platform_analytics_events",
+      "platform_analytics_metrics"
+    ],
+    "user_table_columns": {
+      "id": "uuid",
+      "email": "character varying",
+      "password_hash": "character varying",
+      "is_active": "boolean",
+      "created_at": "timestamp with time zone",
+      "updated_at": "timestamp with time zone",
+      "first_name": "character varying",
+      "last_name": "character varying",
+      "meta_data": "jsonb"
+    }
+  },
+  "redis_checks": {
+    "connection": "failed",
+    "error": "Error 61 connecting to localhost:6380. Connection refused."
+  },
+  "security_validations": {},
+  "test_end_time": "2025-08-09T13:54:44.453716",
+  "total_tests": 28,
+  "success_rate": 39.285714285714285
+}

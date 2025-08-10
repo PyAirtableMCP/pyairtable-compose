@@ -1,0 +1,142 @@
+version: '3.8'
+
+services:
+  # LLM Orchestrator - Gemini 2.5 Flash integration
+  llm-orchestrator:
+    build:
+      context: ./python-services/llm-orchestrator
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MCP_SERVER_HTTP_URL=http://mcp-server:8001
+      - USE_HTTP_MCP=true
+      - AIRTABLE_BASE=${AIRTABLE_BASE}
+      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - USE_REDIS_SESSIONS=true
+      - THINKING_BUDGET=${THINKING_BUDGET:-10}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      - mcp-server
+      - redis
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8003/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Automation Services - File processing and workflows
+  automation-services:
+    build:
+      context: ./pyairtable-automation-services
+      dockerfile: Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      - MCP_SERVER_URL=http://mcp-server:8001
+      - PLATFORM_SERVICES_URL=http://platform-services:8007
+      - API_KEY=${API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-25MB}
+      - ALLOWED_EXTENSIONS=${ALLOWED_EXTENSIONS:-pdf,doc,docx,txt,csv,xlsx}
+      - UPLOAD_DIR=${UPLOAD_DIR:-/tmp/uploads}
+      - DEFAULT_WORKFLOW_TIMEOUT=${DEFAULT_WORKFLOW_TIMEOUT:-600}
+      - MAX_WORKFLOW_RETRIES=${MAX_WORKFLOW_RETRIES:-3}
+      - SCHEDULER_CHECK_INTERVAL=${SCHEDULER_CHECK_INTERVAL:-30}
+    depends_on:
+      - mcp-server
+      - redis
+      - postgres
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    volumes:
+      - file-uploads:/tmp/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8006/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # SAGA Orchestrator - Distributed transaction coordination
+  saga-orchestrator:
+    build:
+      context: ./saga-orchestrator
+      dockerfile: Dockerfile
+    ports:
+      - "8008:8008"
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - API_KEY=${API_KEY}
+      - REQUIRE_API_KEY=${REQUIRE_API_KEY:-true}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - USE_REDIS_EVENT_BUS=true
+      - SAGA_TIMEOUT_SECONDS=${SAGA_TIMEOUT_SECONDS:-3600}
+      - SAGA_RETRY_ATTEMPTS=${SAGA_RETRY_ATTEMPTS:-3}
+      - SAGA_STEP_TIMEOUT_SECONDS=${SAGA_STEP_TIMEOUT_SECONDS:-300}
+      - AUTH_SERVICE_URL=http://platform-services:8007
+      - NOTIFICATION_SERVICE_URL=http://automation-services:8006
+      - AIRTABLE_CONNECTOR_URL=http://airtable-gateway:8002
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8008/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # API Gateway - Main entry point (Go service)
+  api-gateway:
+    build:
+      context: ./go-services/api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
+      - MCP_SERVER_URL=http://mcp-server:8001
+      - LLM_ORCHESTRATOR_URL=http://llm-orchestrator:8003
+      - PLATFORM_SERVICES_URL=http://platform-services:8007
+      - AUTOMATION_SERVICES_URL=http://automation-services:8006
+      - SAGA_ORCHESTRATOR_URL=http://saga-orchestrator:8008
+      - API_KEY=${API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PORT=8000
+    depends_on:
+      - llm-orchestrator
+      - automation-services
+      - saga-orchestrator
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  pyairtable-network:
+    external: true
+    name: pyairtable-compose_pyairtable-network
+
+volumes:
+  file-uploads:
+    driver: local

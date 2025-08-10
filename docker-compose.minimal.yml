@@ -51,9 +51,8 @@ services:
 
   # Airtable Gateway - Direct Airtable API integration (Working)
   airtable-gateway:
-    image: ghcr.io/reg-kris/airtable-gateway-py:latest
     build:
-      context: ../airtable-gateway-py
+      context: ./python-services/airtable-gateway
       dockerfile: Dockerfile
     ports:
       - "8002:8002"

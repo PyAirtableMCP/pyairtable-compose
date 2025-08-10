@@ -1,0 +1,650 @@
+{
+  "test_execution_summary": {
+    "timestamp": "2025-08-08T10:35:57.825293",
+    "total_duration_seconds": 0.9,
+    "total_tests": 42,
+    "passed": 15,
+    "failed": 10,
+    "skipped": 17,
+    "overall_success_rate": 35.7
+  },
+  "category_results": {
+    "Service Health": {
+      "category": "Service Health",
+      "total_tests": 10,
+      "passed": 8,
+      "failed": 2,
+      "skipped": 0,
+      "success_rate": 80.0,
+      "avg_response_time_ms": 17.7,
+      "performance_metrics": {
+        "response_time_ms": [
+          12,
+          53,
+          17,
+          16,
+          13,
+          23,
+          12,
+          27
+        ]
+      }
+    },
+    "Authentication Flow": {
+      "category": "Authentication Flow",
+      "total_tests": 5,
+      "passed": 1,
+      "failed": 1,
+      "skipped": 3,
+      "success_rate": 20.0,
+      "avg_response_time_ms": 97.66666666666667,
+      "performance_metrics": {
+        "response_time_ms": [
+          261
+        ]
+      }
+    },
+    "Airtable Operations": {
+      "category": "Airtable Operations",
+      "total_tests": 12,
+      "passed": 0,
+      "failed": 6,
+      "skipped": 6,
+      "success_rate": 0.0,
+      "avg_response_time_ms": 3.8333333333333335,
+      "performance_metrics": {}
+    },
+    "Workflow Management": {
+      "category": "Workflow Management",
+      "total_tests": 3,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 3,
+      "success_rate": 0.0,
+      "avg_response_time_ms": 9.0,
+      "performance_metrics": {}
+    },
+    "File Operations": {
+      "category": "File Operations",
+      "total_tests": 3,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 2,
+      "success_rate": 33.33333333333333,
+      "avg_response_time_ms": 4.0,
+      "performance_metrics": {
+        "response_time_ms": [
+          1
+        ]
+      }
+    },
+    "SAGA Transactions": {
+      "category": "SAGA Transactions",
+      "total_tests": 3,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 3,
+      "success_rate": 0.0,
+      "avg_response_time_ms": 9.666666666666666,
+      "performance_metrics": {}
+    },
+    "Frontend Integration": {
+      "category": "Frontend Integration",
+      "total_tests": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "success_rate": 100.0,
+      "avg_response_time_ms": 1.0,
+      "performance_metrics": {
+        "response_time_ms": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    "Performance Metrics": {
+      "category": "Performance Metrics",
+      "total_tests": 3,
+      "passed": 2,
+      "failed": 1,
+      "skipped": 0,
+      "success_rate": 66.66666666666666,
+      "avg_response_time_ms": 111.66666666666667,
+      "performance_metrics": {
+        "avg_response_time_ms": [
+          2.5
+        ],
+        "max_response_time_ms": [
+          3
+        ],
+        "min_response_time_ms": [
+          2
+        ],
+        "endpoints_tested": [
+          2
+        ],
+        "concurrent_requests": [
+          10
+        ],
+        "successful_requests": [
+          5
+        ],
+        "success_rate_percent": [
+          50.0
+        ],
+        "total_requests": [
+          3
+        ],
+        "error_count": [
+          0
+        ],
+        "error_rate_percent": [
+          0.0
+        ]
+      }
+    }
+  },
+  "detailed_results": [
+    {
+      "test_name": "frontend_health",
+      "category": "Service Health",
+      "status": "PASS",
+      "duration_ms": 12,
+      "details": "Service frontend is healthy",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 12
+      }
+    },
+    {
+      "test_name": "api_gateway_health",
+      "category": "Service Health",
+      "status": "PASS",
+      "duration_ms": 53,
+      "details": "Service api_gateway is healthy",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 53
+      }
+    },
+    {
+      "test_name": "auth_service_health",
+      "category": "Service Health",
+      "status": "PASS",
+      "duration_ms": 17,
+      "details": "Service auth_service is healthy",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 17
+      }
+    },
+    {
+      "test_name": "airtable_service_health",
+      "category": "Service Health",
+      "status": "PASS",
+      "duration_ms": 16,
+      "details": "Service airtable_service is healthy",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 16
+      }
+    },
+    {
+      "test_name": "workflow_service_health",
+      "category": "Service Health",
+      "status": "PASS",
+      "duration_ms": 13,
+      "details": "Service workflow_service is healthy",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 13
+      }
+    },
+    {
+      "test_name": "file_service_health",
+      "category": "Service Health",
+      "status": "PASS",
+      "duration_ms": 23,
+      "details": "Service file_service is healthy",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 23
+      }
+    },
+    {
+      "test_name": "saga_service_health",
+      "category": "Service Health",
+      "status": "PASS",
+      "duration_ms": 12,
+      "details": "Service saga_service is healthy",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 12
+      }
+    },
+    {
+      "test_name": "notification_service_connectivity",
+      "category": "Service Health",
+      "status": "FAIL",
+      "duration_ms": 2,
+      "details": "Service notification_service is not accessible",
+      "error_message": "Cannot connect to host localhost:8004 ssl:default [Multiple exceptions: [Errno 61] Connect call failed ('::1', 8004, 0, 0), [Errno 61] Connect call failed ('127.0.0.1', 8004)]",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "platform_service_health",
+      "category": "Service Health",
+      "status": "PASS",
+      "duration_ms": 27,
+      "details": "Service platform_service is healthy",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 27
+      }
+    },
+    {
+      "test_name": "user_service_connectivity",
+      "category": "Service Health",
+      "status": "FAIL",
+      "duration_ms": 2,
+      "details": "Service user_service is not accessible",
+      "error_message": "Cannot connect to host localhost:8005 ssl:default [Multiple exceptions: [Errno 61] Connect call failed ('::1', 8005, 0, 0), [Errno 61] Connect call failed ('127.0.0.1', 8005)]",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "user_registration",
+      "category": "Authentication Flow",
+      "status": "PASS",
+      "duration_ms": 261,
+      "details": "User registration successful",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 261
+      }
+    },
+    {
+      "test_name": "user_login",
+      "category": "Authentication Flow",
+      "status": "FAIL",
+      "duration_ms": 16,
+      "details": "Login failed with status 422",
+      "error_message": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"email\"],\"msg\":\"Field required\",\"input\":{\"username\":\"testuser\",\"password\":\"password123\"},\"url\":\"https://errors.pydantic.dev/2.5/v/missing\"}]}",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "user_login",
+      "category": "Authentication Flow",
+      "status": "SKIP",
+      "duration_ms": 16,
+      "details": "No accessible login endpoint found",
+      "error_message": "All login endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "jwt_validation",
+      "category": "Authentication Flow",
+      "status": "SKIP",
+      "duration_ms": 0,
+      "details": "No session token available for validation",
+      "error_message": "Login test did not provide token",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "session_management",
+      "category": "Authentication Flow",
+      "status": "SKIP",
+      "duration_ms": 0,
+      "details": "No session token available for session management tests",
+      "error_message": "Login test did not provide token",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_list_tables",
+      "category": "Airtable Operations",
+      "status": "FAIL",
+      "duration_ms": 13,
+      "details": "Failed to list tables: status 401",
+      "error_message": "{\"detail\":\"Invalid API key\"}",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_list_tables",
+      "category": "Airtable Operations",
+      "status": "SKIP",
+      "duration_ms": 13,
+      "details": "No accessible Airtable tables endpoint found",
+      "error_message": "All Airtable endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_create_record",
+      "category": "Airtable Operations",
+      "status": "FAIL",
+      "duration_ms": 2,
+      "details": "Failed to create record: status 401",
+      "error_message": "{\"detail\":\"Invalid API key\"}",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_create_record",
+      "category": "Airtable Operations",
+      "status": "SKIP",
+      "duration_ms": 2,
+      "details": "No accessible Airtable create endpoint found",
+      "error_message": "All Airtable endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_read_records",
+      "category": "Airtable Operations",
+      "status": "FAIL",
+      "duration_ms": 5,
+      "details": "Failed to read records: status 401",
+      "error_message": "{\"detail\":\"Invalid API key\"}",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_read_records",
+      "category": "Airtable Operations",
+      "status": "SKIP",
+      "duration_ms": 5,
+      "details": "No accessible Airtable read endpoint found",
+      "error_message": "All Airtable endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_update_record",
+      "category": "Airtable Operations",
+      "status": "FAIL",
+      "duration_ms": 1,
+      "details": "Failed to update record: status 401",
+      "error_message": "{\"detail\":\"Invalid API key\"}",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_update_record",
+      "category": "Airtable Operations",
+      "status": "SKIP",
+      "duration_ms": 1,
+      "details": "No accessible Airtable update endpoint found",
+      "error_message": "All Airtable endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_delete_record",
+      "category": "Airtable Operations",
+      "status": "FAIL",
+      "duration_ms": 1,
+      "details": "Failed to delete record: status 401",
+      "error_message": "{\"detail\":\"Invalid API key\"}",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_delete_record",
+      "category": "Airtable Operations",
+      "status": "SKIP",
+      "duration_ms": 1,
+      "details": "No accessible Airtable delete endpoint found",
+      "error_message": "All Airtable endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_schema_retrieval",
+      "category": "Airtable Operations",
+      "status": "FAIL",
+      "duration_ms": 1,
+      "details": "Failed to retrieve schema: status 401",
+      "error_message": "{\"detail\":\"Invalid API key\"}",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "airtable_schema_retrieval",
+      "category": "Airtable Operations",
+      "status": "SKIP",
+      "duration_ms": 1,
+      "details": "No accessible Airtable schema endpoint found",
+      "error_message": "All Airtable endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "workflow_create",
+      "category": "Workflow Management",
+      "status": "SKIP",
+      "duration_ms": 14,
+      "details": "No accessible workflow create endpoint found",
+      "error_message": "All workflow endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "workflow_execute",
+      "category": "Workflow Management",
+      "status": "SKIP",
+      "duration_ms": 8,
+      "details": "No accessible workflow execute endpoint found",
+      "error_message": "All workflow endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "workflow_history",
+      "category": "Workflow Management",
+      "status": "SKIP",
+      "duration_ms": 5,
+      "details": "No accessible workflow history endpoint found",
+      "error_message": "All workflow endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "file_upload",
+      "category": "File Operations",
+      "status": "SKIP",
+      "duration_ms": 7,
+      "details": "No accessible file upload endpoint found",
+      "error_message": "All file upload endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "file_list",
+      "category": "File Operations",
+      "status": "SKIP",
+      "duration_ms": 4,
+      "details": "No accessible file list endpoint found",
+      "error_message": "All file endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "file_download",
+      "category": "File Operations",
+      "status": "PASS",
+      "duration_ms": 1,
+      "details": "Download endpoint accessible (file not found is expected)",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 1
+      }
+    },
+    {
+      "test_name": "saga_start_transaction",
+      "category": "SAGA Transactions",
+      "status": "SKIP",
+      "duration_ms": 14,
+      "details": "No accessible SAGA start endpoint found",
+      "error_message": "All SAGA endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "saga_execute_steps",
+      "category": "SAGA Transactions",
+      "status": "SKIP",
+      "duration_ms": 7,
+      "details": "No accessible SAGA execute endpoint found",
+      "error_message": "All SAGA endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "saga_compensation",
+      "category": "SAGA Transactions",
+      "status": "SKIP",
+      "duration_ms": 8,
+      "details": "No accessible SAGA compensation endpoint found",
+      "error_message": "All SAGA endpoints unavailable",
+      "performance_metrics": null
+    },
+    {
+      "test_name": "frontend_api_integration",
+      "category": "Frontend Integration",
+      "status": "PASS",
+      "duration_ms": 1,
+      "details": "Frontend is accessible and can handle API calls",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 1
+      }
+    },
+    {
+      "test_name": "frontend_auth_flow",
+      "category": "Frontend Integration",
+      "status": "PASS",
+      "duration_ms": 1,
+      "details": "Frontend authentication pages are accessible",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 1
+      }
+    },
+    {
+      "test_name": "frontend_data_flow",
+      "category": "Frontend Integration",
+      "status": "PASS",
+      "duration_ms": 1,
+      "details": "Frontend loads successfully without errors",
+      "error_message": null,
+      "performance_metrics": {
+        "response_time_ms": 1
+      }
+    },
+    {
+      "test_name": "system_response_times",
+      "category": "Performance Metrics",
+      "status": "PASS",
+      "duration_ms": 5,
+      "details": "Good response times - avg: 2.5ms, max: 3ms",
+      "error_message": null,
+      "performance_metrics": {
+        "avg_response_time_ms": 2.5,
+        "max_response_time_ms": 3,
+        "min_response_time_ms": 2,
+        "endpoints_tested": 2
+      }
+    },
+    {
+      "test_name": "concurrent_requests",
+      "category": "Performance Metrics",
+      "status": "FAIL",
+      "duration_ms": 325,
+      "details": "Poor concurrent performance - 50.0% success rate",
+      "error_message": null,
+      "performance_metrics": {
+        "concurrent_requests": 10,
+        "successful_requests": 5,
+        "success_rate_percent": 50.0
+      }
+    },
+    {
+      "test_name": "system_error_rates",
+      "category": "Performance Metrics",
+      "status": "PASS",
+      "duration_ms": 5,
+      "details": "Low error rate: 0.0%",
+      "error_message": null,
+      "performance_metrics": {
+        "total_requests": 3,
+        "error_count": 0,
+        "error_rate_percent": 0.0
+      }
+    }
+  ],
+  "production_readiness_assessment": {
+    "readiness_level": "NOT_READY",
+    "readiness_message": "System has critical issues that must be resolved before production",
+    "critical_issues": [
+      "Authentication Flow: 20.0% success rate (too low)",
+      "Overall success rate 35.7% is below production threshold"
+    ],
+    "warnings": [
+      "Service Health: 80.0% success rate (could be improved)"
+    ],
+    "overall_success_rate": 35.7
+  },
+  "recommendations": [
+    {
+      "category": "Service Health",
+      "priority": "HIGH",
+      "issue": "2 failed tests in Service Health",
+      "recommendation": "Investigate and fix the 2 failing test(s) in Service Health",
+      "impact": "May cause production issues"
+    },
+    {
+      "category": "Authentication Flow",
+      "priority": "HIGH",
+      "issue": "1 failed tests in Authentication Flow",
+      "recommendation": "Investigate and fix the 1 failing test(s) in Authentication Flow",
+      "impact": "May cause production issues"
+    },
+    {
+      "category": "Authentication Flow",
+      "priority": "MEDIUM",
+      "issue": "3 tests skipped in Authentication Flow",
+      "recommendation": "Ensure services for Authentication Flow are properly deployed and accessible",
+      "impact": "Incomplete test coverage"
+    },
+    {
+      "category": "Airtable Operations",
+      "priority": "MEDIUM",
+      "issue": "6 failed tests in Airtable Operations",
+      "recommendation": "Investigate and fix the 6 failing test(s) in Airtable Operations",
+      "impact": "Should be addressed before production"
+    },
+    {
+      "category": "Airtable Operations",
+      "priority": "MEDIUM",
+      "issue": "6 tests skipped in Airtable Operations",
+      "recommendation": "Ensure services for Airtable Operations are properly deployed and accessible",
+      "impact": "Incomplete test coverage"
+    },
+    {
+      "category": "Workflow Management",
+      "priority": "MEDIUM",
+      "issue": "3 tests skipped in Workflow Management",
+      "recommendation": "Ensure services for Workflow Management are properly deployed and accessible",
+      "impact": "Incomplete test coverage"
+    },
+    {
+      "category": "File Operations",
+      "priority": "MEDIUM",
+      "issue": "2 tests skipped in File Operations",
+      "recommendation": "Ensure services for File Operations are properly deployed and accessible",
+      "impact": "Incomplete test coverage"
+    },
+    {
+      "category": "SAGA Transactions",
+      "priority": "MEDIUM",
+      "issue": "3 tests skipped in SAGA Transactions",
+      "recommendation": "Ensure services for SAGA Transactions are properly deployed and accessible",
+      "impact": "Incomplete test coverage"
+    },
+    {
+      "category": "Performance Metrics",
+      "priority": "MEDIUM",
+      "issue": "1 failed tests in Performance Metrics",
+      "recommendation": "Investigate and fix the 1 failing test(s) in Performance Metrics",
+      "impact": "Should be addressed before production"
+    }
+  ],
+  "performance_summary": {
+    "average_response_time_ms": 31.82,
+    "total_requests_tested": 42,
+    "performance_rating": "Good"
+  }
+}

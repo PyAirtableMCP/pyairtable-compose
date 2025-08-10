@@ -1,0 +1,176 @@
+# Frontend Deployment and Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: pyairtable-production
+  labels:
+    app: frontend
+    component: frontend
+    tier: frontend
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+        component: frontend
+        tier: frontend
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/api/metrics"
+    spec:
+      serviceAccountName: pyairtable-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+      - name: frontend
+        image: ghcr.io/reg-kris/pyairtable-frontend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        env:
+        # API Gateway endpoint
+        - name: NEXT_PUBLIC_API_URL
+          value: "https://api.pyairtable.com"
+        - name: NEXT_PUBLIC_API_GATEWAY_URL
+          value: "http://api-gateway:8000"
+        # Internal service URLs (for SSR/API routes)
+        - name: LLM_ORCHESTRATOR_URL
+          value: "http://llm-orchestrator:8003"
+        - name: MCP_SERVER_URL
+          value: "http://mcp-server:8001"
+        - name: AIRTABLE_GATEWAY_URL
+          value: "http://airtable-gateway:8002"
+        - name: PLATFORM_SERVICES_URL
+          value: "http://platform-services:8007"
+        - name: AUTOMATION_SERVICES_URL
+          value: "http://automation-services:8006"
+        - name: SAGA_ORCHESTRATOR_URL
+          value: "http://saga-orchestrator:8008"
+        # Authentication and security
+        - name: NEXTAUTH_URL
+          value: "https://pyairtable.com"
+        - name: NODE_ENV
+          value: "production"
+        # Feature flags
+        - name: NEXT_PUBLIC_ENABLE_DEBUG
+          value: "false"
+        - name: NEXT_PUBLIC_SHOW_COST_TRACKING
+          value: "true"
+        envFrom:
+        - secretRef:
+            name: pyairtable-api-keys
+        - secretRef:
+            name: pyairtable-app-config
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 40
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - frontend
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: pyairtable-production
+  labels:
+    app: frontend
+    component: frontend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app: frontend
+---
+# HorizontalPodAutoscaler for Frontend
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: frontend-hpa
+  namespace: pyairtable-production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: frontend
+  minReplicas: 3
+  maxReplicas: 15
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60

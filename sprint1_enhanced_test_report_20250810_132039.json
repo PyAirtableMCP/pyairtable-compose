@@ -1,0 +1,721 @@
+{
+  "test_metadata": {
+    "sprint": "Sprint 1",
+    "execution_date": "2025-08-10T13:20:23.228928",
+    "total_duration_seconds": 16.213276,
+    "test_runner_version": "Enhanced v2.0"
+  },
+  "environment_summary": {
+    "python_available": true,
+    "pip_available": true,
+    "go_available": true,
+    "npm_available": true,
+    "docker_available": true,
+    "git_available": true,
+    "python_command": "python3",
+    "go_command": "go",
+    "npm_command": "npm"
+  },
+  "overall_summary": {
+    "total_branches_tested": 5,
+    "ready_branches": 4,
+    "total_tests_executed": 25,
+    "total_tests_passed": 15,
+    "total_tests_failed": 3,
+    "total_tests_skipped": 5,
+    "overall_success_rate": 0.6,
+    "sprint_readiness": "READY"
+  },
+  "branch_summaries": {
+    "feature/SCRUM-15-fix-authentication": {
+      "service_name": "auth-service",
+      "service_type": "go",
+      "readiness_score": 90.0,
+      "total_tests": 5,
+      "passed_tests": 4,
+      "failed_tests": 0,
+      "skipped_tests": 1,
+      "warning_tests": 0,
+      "success_rate": 0.8,
+      "critical_issues": [],
+      "all_issues": [],
+      "recommendations": [
+        "Configure security scanning tools"
+      ],
+      "merge_recommendation": "APPROVE",
+      "test_results": [
+        {
+          "branch": "feature/SCRUM-15-fix-authentication",
+          "service": "auth-service",
+          "test_type": "structure",
+          "status": "pass",
+          "duration": 0,
+          "details": {
+            "go.mod": "exists",
+            "main_go": "exists",
+            "dockerfile": "exists",
+            "source_files_count": 11
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": []
+        },
+        {
+          "branch": "feature/SCRUM-15-fix-authentication",
+          "service": "auth-service",
+          "test_type": "module",
+          "status": "pass",
+          "duration": 2.715574026107788,
+          "details": {
+            "stdout": "all modules verified\n",
+            "stderr": ""
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": []
+        },
+        {
+          "branch": "feature/SCRUM-15-fix-authentication",
+          "service": "auth-service",
+          "test_type": "build",
+          "status": "pass",
+          "duration": 2.2617430686950684,
+          "details": {
+            "stdout": "",
+            "stderr": ""
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": []
+        },
+        {
+          "branch": "feature/SCRUM-15-fix-authentication",
+          "service": "auth-service",
+          "test_type": "unit_tests",
+          "status": "pass",
+          "duration": 0.7927989959716797,
+          "details": {
+            "stdout": "\tgithub.com/pyairtable-compose/auth-service/cmd/auth-service\t\tcoverage: 0.0% of statements\n\tgithub.com/pyairtable-compose/auth-service/internal/config\t\tcoverage: 0.0% of statements\n\tgithub.com/pyairtable-compose/auth-service/internal/handlers\t\tcoverage: 0.0% of statements\n\tgithub.com/pyairtable-compose/auth-service/internal/middleware\t\tcoverage: 0.0% of statements\n=== RUN   TestHashPassword\n--- PASS: TestHashPassword (0.07s)\n=== RUN   TestCheckPassword\n--- PASS: TestCheckPassword (0.30s)\n=== RUN   TestLoginRequest_GetIdentifier\n=== RUN   TestLoginRequest_GetIdentifier/Email_provided\n=== RUN   TestLoginRequest_GetIdentifier/Username_provided\n=== RUN   TestLoginRequest_GetIdentifier/Both_email_and_username_provided_-_email_takes_precedence\n=== RUN   TestLoginRequest_GetIdentifier/Neither_email_nor_username_provided\n--- PASS: TestLoginRequest_GetIdentifier (0.00s)\n    --- PASS: TestLoginRequest_GetIdentifier/Email_provided (0.00s)\n    --- PASS: TestLoginRequest_GetIdentifier/Username_provided (0.00s)\n    --- PASS: TestLoginRequest_GetIdentifier/Both_email_and_username_provided_-_email_takes_precedence (0.00s)\n    --- PASS: TestLoginRequest_GetIdentifier/Neither_email_nor_username_provided (0.00s)\n=== RUN   TestPasswordValidation\n=== RUN   TestPasswordValidation/Valid_password\n=== RUN   TestPasswordValidation/Short_password\n=== RUN   TestPasswordValidation/Empty_password\n=== RUN   TestPasswordValidation/Long_password_(within_bcrypt_limit)\n=== RUN   TestPasswordValidation/Too_long_password_(exceeds_bcrypt_limit)\n--- PASS: TestPasswordValidation (0.58s)\n    --- PASS: TestPasswordValidation/Valid_password (0.15s)\n    --- PASS: TestPasswordValidation/Short_password (0.15s)\n    --- PASS: TestPasswordValidation/Empty_password (0.14s)\n    --- PASS: TestPasswordValidation/Long_password_(within_bcrypt_limit) (0.15s)\n    --- PASS: TestPasswordValidation/Too_long_password_(exceeds_bcrypt_limit) (0.00s)\nPASS\ncoverage: 100.0% of statements\nok  \tgithub.com/pyairtable-compose/auth-service/internal/models\t(cached)\tcoverage: 100.0% of statements\n?   \tgithub.com/pyairtable-compose/auth-service/internal/repository\t[no test files]\n\tgithub.com/pyairtable-compose/auth-service/internal/repository/postgres\t\tcoverage: 0.0% of statements\n\tgithub.com/pyairtable-compose/auth-service/internal/repository/redis\t\tcoverage: 0.0% of statements\n=== RUN   TestAuthService_Register\n--- PASS: TestAuthService_Register (0.15s)\n=== RUN   TestAuthService_Register_DuplicateEmail\n--- PASS: TestAuthService_Register_DuplicateEmail (0.07s)\n=== RUN   TestAuthService_Login\n--- PASS: TestAuthService_Login (0.15s)\n=== RUN   TestAuthService_Login_InvalidCredentials\n    logger.go:146: 2025-08-10T13:17:02.829+0300\tERROR\tFailed to find user\t{\"error\": \"user not found\", \"identifier\": \"nonexistent@example.com\"}\n--- PASS: TestAuthService_Login_InvalidCredentials (0.15s)\n=== RUN   TestAuthService_ValidateToken\n--- PASS: TestAuthService_ValidateToken (0.15s)\n=== RUN   TestAuthService_ValidateToken_Invalid\n--- PASS: TestAuthService_ValidateToken_Invalid (0.00s)\n=== RUN   TestAuthService_ChangePassword\n--- PASS: TestAuthService_ChangePassword (0.35s)\n=== RUN   TestAuthService_ChangePassword_WrongCurrentPassword\n--- PASS: TestAuthService_ChangePassword_WrongCurrentPassword (0.14s)\nPASS\ncoverage: 54.8% of statements\nok  \tgithub.com/pyairtable-compose/auth-service/internal/services\t(cached)\tcoverage: 54.8% of statements\n",
+            "stderr": ""
+          },
+          "coverage": 0.0,
+          "issues": [],
+          "recommendations": []
+        },
+        {
+          "branch": "feature/SCRUM-15-fix-authentication",
+          "service": "auth-service",
+          "test_type": "security",
+          "status": "skip",
+          "duration": 0,
+          "details": {
+            "reason": "Security scanning not configured for this service type"
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": [
+            "Configure security scanning tools"
+          ]
+        }
+      ]
+    },
+    "feature/SCRUM-16-repair-airtable": {
+      "service_name": "airtable-gateway",
+      "service_type": "python",
+      "readiness_score": 70.0,
+      "total_tests": 5,
+      "passed_tests": 3,
+      "failed_tests": 1,
+      "skipped_tests": 1,
+      "warning_tests": 0,
+      "success_rate": 0.6,
+      "critical_issues": [
+        "Tests failed: ImportError while loading conftest '/Users/kg/IdeaProjects/pyairtable-compose/python-services/conftest.py'.\n../conftest.py:9: in <module>\n    import pytest_asyncio\nE   ModuleNotFoundError: No module named 'pytest_asyncio'\n"
+      ],
+      "all_issues": [
+        "Tests failed: ImportError while loading conftest '/Users/kg/IdeaProjects/pyairtable-compose/python-services/conftest.py'.\n../conftest.py:9: in <module>\n    import pytest_asyncio\nE   ModuleNotFoundError: No module named 'pytest_asyncio'\n"
+      ],
+      "recommendations": [
+        "Consider installing dependencies in virtual environment",
+        "Fix failing tests",
+        "Configure security scanning tools"
+      ],
+      "merge_recommendation": "CONDITIONAL",
+      "test_results": [
+        {
+          "branch": "feature/SCRUM-16-repair-airtable",
+          "service": "airtable-gateway",
+          "test_type": "structure",
+          "status": "pass",
+          "duration": 0,
+          "details": {
+            "dependency_file": "exists",
+            "main_module": "/Users/kg/IdeaProjects/pyairtable-compose/python-services/airtable-gateway/src/main.py",
+            "dockerfile": "exists",
+            "source_files_count": 843
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": []
+        },
+        {
+          "branch": "feature/SCRUM-16-repair-airtable",
+          "service": "airtable-gateway",
+          "test_type": "dependencies_check",
+          "status": "pass",
+          "duration": 0,
+          "details": {
+            "dependencies_file": "/Users/kg/IdeaProjects/pyairtable-compose/python-services/airtable-gateway/requirements.txt"
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": [
+            "Consider installing dependencies in virtual environment"
+          ]
+        },
+        {
+          "branch": "feature/SCRUM-16-repair-airtable",
+          "service": "airtable-gateway",
+          "test_type": "syntax_check",
+          "status": "pass",
+          "duration": 0,
+          "details": {
+            "files_checked": 843
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": []
+        },
+        {
+          "branch": "feature/SCRUM-16-repair-airtable",
+          "service": "airtable-gateway",
+          "test_type": "unit_tests",
+          "status": "fail",
+          "duration": 0.1503920555114746,
+          "details": {
+            "stdout": "",
+            "stderr": "ImportError while loading conftest '/Users/kg/IdeaProjects/pyairtable-compose/python-services/conftest.py'.\n../conftest.py:9: in <module>\n    import pytest_asyncio\nE   ModuleNotFoundError: No module named 'pytest_asyncio'\n"
+          },
+          "coverage": null,
+          "issues": [
+            "Tests failed: ImportError while loading conftest '/Users/kg/IdeaProjects/pyairtable-compose/python-services/conftest.py'.\n../conftest.py:9: in <module>\n    import pytest_asyncio\nE   ModuleNotFoundError: No module named 'pytest_asyncio'\n"
+          ],
+          "recommendations": [
+            "Fix failing tests"
+          ]
+        },
+        {
+          "branch": "feature/SCRUM-16-repair-airtable",
+          "service": "airtable-gateway",
+          "test_type": "security",
+          "status": "skip",
+          "duration": 0,
+          "details": {
+            "reason": "Security scanning not configured for this service type"
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": [
+            "Configure security scanning tools"
+          ]
+        }
+      ]
+    },
+    "feature/SCRUM-17-deploy-frontend": {
+      "service_name": "tenant-dashboard",
+      "service_type": "typescript",
+      "readiness_score": 68.0,
+      "total_tests": 5,
+      "passed_tests": 2,
+      "failed_tests": 1,
+      "skipped_tests": 0,
+      "warning_tests": 2,
+      "success_rate": 0.4,
+      "critical_issues": [
+        "TypeScript errors: ",
+        "10:21  Error: 'personalAccessToken' is assigned a value but never used.  @typescript-eslint/no-unused-vars",
+        "119:27  Error: 'request' is defined but never used.  @typescript-eslint/no-unused-vars",
+        "3:27  Error: 'req' is defined but never used.  @typescript-eslint/no-unused-vars",
+        "77:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities",
+        "77:63  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities",
+        "78:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities"
+      ],
+      "all_issues": [
+        "TypeScript errors: ",
+        "10:21  Error: 'personalAccessToken' is assigned a value but never used.  @typescript-eslint/no-unused-vars",
+        "48:44  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any",
+        "22:18  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any",
+        "33:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any",
+        "119:27  Error: 'request' is defined but never used.  @typescript-eslint/no-unused-vars",
+        "3:27  Error: 'req' is defined but never used.  @typescript-eslint/no-unused-vars",
+        "224:48  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any",
+        "77:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities",
+        "77:63  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities",
+        "78:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities",
+        "3 vulnerabilities found"
+      ],
+      "recommendations": [
+        "Fix TypeScript compilation errors",
+        "Address linting issues",
+        "Run npm audit fix to address vulnerabilities"
+      ],
+      "merge_recommendation": "BLOCK",
+      "test_results": [
+        {
+          "branch": "feature/SCRUM-17-deploy-frontend",
+          "service": "tenant-dashboard",
+          "test_type": "structure",
+          "status": "pass",
+          "duration": 0,
+          "details": {
+            "package.json": "exists",
+            "dockerfile": "exists",
+            "source_files_count": 10407
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": []
+        },
+        {
+          "branch": "feature/SCRUM-17-deploy-frontend",
+          "service": "tenant-dashboard",
+          "test_type": "dependencies",
+          "status": "pass",
+          "duration": 0,
+          "details": {
+            "node_modules_exists": true
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": []
+        },
+        {
+          "branch": "feature/SCRUM-17-deploy-frontend",
+          "service": "tenant-dashboard",
+          "test_type": "typescript_check",
+          "status": "fail",
+          "duration": 4.6705121994018555,
+          "details": {
+            "stdout": "e2e/airtable-integration-journey.spec.ts(259,32): error TS7006: Parameter 'page' implicitly has an 'any' type.\ne2e/airtable-integration-journey.spec.ts(261,48): error TS7006: Parameter 'route' implicitly has an 'any' type.\ne2e/airtable-integration-journey.spec.ts(292,52): error TS7006: Parameter 'route' implicitly has an 'any' type.\ne2e/airtable-integration-journey.spec.ts(307,58): error TS7006: Parameter 'route' implicitly has an 'any' type.\ne2e/airtable-integration-journey.spec.ts(319,53): error TS7006: Parameter 'route' implicitly has an 'any' type.\ne2e/complete-user-journey.spec.ts(163,35): error TS2304: Cannot find name 'welcomeMessage'.\ne2e/complete-user-journey.spec.ts(244,35): error TS2304: Cannot find name 'welcomeMessage'.\nplaywright.config.ts(152,24): error TS2769: No overload matches this call.\n  The last overload gave the following error.\n    Object literal may only specify known properties, and 'animations' does not exist in type '{ maxDiffPixels?: number | undefined; maxDiffPixelRatio?: number | undefined; threshold?: number | undefined; }'.\nplaywright.simple.config.ts(137,24): error TS2769: No overload matches this call.\n  The last overload gave the following error.\n    Object literal may only specify known properties, and 'animations' does not exist in type '{ maxDiffPixels?: number | undefined; maxDiffPixelRatio?: number | undefined; threshold?: number | undefined; }'.\nplaywright.visual.config.ts(99,7): error TS2769: No overload matches this call.\n  The last overload gave the following error.\n    Object literal may only specify known properties, and 'mode' does not exist in type '{ animations?: \"allow\" | \"disabled\" | undefined; caret?: \"hide\" | \"initial\" | undefined; maxDiffPixels?: number | undefined; maxDiffPixelRatio?: number | undefined; scale?: \"css\" | \"device\" | undefined; stylePath?: string | ... 1 more ... | undefined; threshold?: number | undefined; pathTemplate?: string | undefined...'.\n      Object literal may only specify known properties, and 'animations' does not exist in type '{ maxDiffPixels?: number | undefined; maxDiffPixelRatio?: number | undefined; threshold?: number | undefined; }'.\nplaywright.visual.config.ts(102,7): error TS2769: No overload matches this call.\n  The last overload gave the following error.\n    Object literal may only specify known properties, and 'mode' does not exist in type '{ animations?: \"allow\" | \"disabled\" | undefined; caret?: \"hide\" | \"initial\" | undefined; maxDiffPixels?: number | undefined; maxDiffPixelRatio?: number | undefined; scale?: \"css\" | \"device\" | undefined; stylePath?: string | ... 1 more ... | undefined; threshold?: number | undefined; pathTemplate?: string | undefined...'.\n      Object literal may only specify known properties, and 'animations' does not exist in type '{ maxDiffPixels?: number | undefined; maxDiffPixelRatio?: number | undefined; threshold?: number | undefined; }'.\nsentry.client.config.ts(51,16): error TS2339: Property 'Replay' does not exist on type 'typeof import(\"/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/node_modules/@sentry/nextjs/build/types/index.types\")'.\nsentry.client.config.ts(59,16): error TS2339: Property 'BrowserTracing' does not exist on type 'typeof import(\"/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/node_modules/@sentry/nextjs/build/types/index.types\")'.\nsentry.server.config.ts(47,16): error TS2551: Property 'ProfilingIntegration' does not exist on type 'typeof import(\"/Users/kg/IdeaProjects/pyairtable-compose/frontend-services/tenant-dashboard/node_modules/@sentry/nextjs/build/types/index.types\")'. Did you mean 'mongoIntegration'?\nsrc/app/page.tsx(414,9): error TS2322: Type '{ tenant: Tenant; showAdvancedMetrics: boolean; showBillingSection: boolean; }' is not assignable to type 'IntrinsicAttributes & DashboardOverviewProps'.\n  Property 'showAdvancedMetrics' does not exist on type 'IntrinsicAttributes & DashboardOverviewProps'.\nsrc/app/providers.tsx(37,13): error TS2353: Object literal may only specify known properties, and 'onError' does not exist in type 'OmitKeyof<QueryObserverOptions<unknown, Error, unknown, unknown, readonly unknown[], never>, \"suspense\" | \"queryKey\", \"strictly\">'.\nsrc/app/providers.tsx(37,23): error TS7006: Parameter 'error' implicitly has an 'any' type.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(8,1): error TS2304: Cannot find name 'jest'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(9,26): error TS2503: Cannot find namespace 'jest'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(55,1): error TS2582: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(56,3): error TS2304: Cannot find name 'beforeEach'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(57,5): error TS2304: Cannot find name 'jest'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(60,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(65,13): error TS2741: Property 'tenant' is missing in type '{}' but required in type 'DashboardOverviewProps'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(67,5): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(70,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(73,13): error TS2741: Property 'tenant' is missing in type '{}' but required in type 'DashboardOverviewProps'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(76,7): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(80,5): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(81,5): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(82,5): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(85,5): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(86,5): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(87,5): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(88,5): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(91,5): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(92,5): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(93,5): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(96,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(100,13): error TS2741: Property 'tenant' is missing in type '{}' but required in type 'DashboardOverviewProps'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(103,7): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(106,5): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(109,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(121,13): error TS2741: Property 'tenant' is missing in type '{}' but required in type 'DashboardOverviewProps'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(124,7): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(125,7): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(129,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(137,13): error TS2741: Property 'tenant' is missing in type '{}' but required in type 'DashboardOverviewProps'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(140,7): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(144,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(147,13): error TS2741: Property 'tenant' is missing in type '{}' but required in type 'DashboardOverviewProps'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(150,7): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(158,7): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(162,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(178,13): error TS2741: Property 'tenant' is missing in type '{}' but required in type 'DashboardOverviewProps'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(181,7): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(185,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(188,13): error TS2741: Property 'tenant' is missing in type '{}' but required in type 'DashboardOverviewProps'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(192,7): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(193,7): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(194,7): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/__tests__/DashboardOverview.test.tsx(197,7): error TS2304: Cannot find name 'expect'.\nsrc/components/dashboard/DashboardOverview.tsx(224,31): error TS2339: Property 'workspaces' does not exist on type 'TenantUsage'.\nsrc/components/dashboard/DashboardOverview.tsx(232,31): error TS2339: Property 'storage' does not exist on type 'TenantUsage'.\nsrc/components/dashboard/DashboardOverview.tsx(241,31): error TS2339: Property 'apiCalls' does not exist on type 'TenantUsage'.\nsrc/components/dashboard/DashboardOverview.tsx(279,39): error TS2339: Property 'users' does not exist on type 'TenantUsage'.\nsrc/components/dashboard/DashboardOverview.tsx(285,39): error TS2339: Property 'workspaces' does not exist on type 'TenantUsage'.\nsrc/components/dashboard/DashboardOverview.tsx(291,39): error TS2339: Property 'storage' does not exist on type 'TenantUsage'.\nsrc/components/dashboard/DashboardOverview.tsx(298,39): error TS2339: Property 'apiCalls' does not exist on type 'TenantUsage'.\nsrc/components/dashboard/UsageChart.tsx(95,12): error TS2322: Type '{ children: (false | Element)[]; width: string; height: number; data: ChartDataPoint[]; }' is not assignable to type 'CategoricalChartProps'.\n  Types of property 'width' are incompatible.\n    Type 'string' is not assignable to type 'number'.\nsrc/components/dashboard/UsageChart.tsx(115,12): error TS2322: Type '{ children: (false | Element)[]; width: string; height: number; data: ChartDataPoint[]; }' is not assignable to type 'CategoricalChartProps'.\n  Types of property 'width' are incompatible.\n    Type 'string' is not assignable to type 'number'.\nsrc/components/dashboard/UsageChart.tsx(142,12): error TS2322: Type '{ children: (false | Element)[]; width: string; height: number; data: ChartDataPoint[]; }' is not assignable to type 'CategoricalChartProps'.\n  Types of property 'width' are incompatible.\n    Type 'string' is not assignable to type 'number'.\nsrc/components/onboarding/AirtableConnectionWizard.tsx(273,9): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.\n  No index signature with a parameter of type 'string' was found on type '{}'.\nsrc/components/onboarding/BaseConfigurationStep.tsx(190,9): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.\n  No index signature with a parameter of type 'string' was found on type '{}'.\nsrc/components/onboarding/BaseConfigurationStep.tsx(259,12): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ singleLineText: Element; multipleRecordLinks: Element; number: Element; date: Element; attachment: Element; checkbox: Element; multipleSelects: Element; singleSelect: Element; }'.\n  No index signature with a parameter of type 'string' was found on type '{ singleLineText: Element; multipleRecordLinks: Element; number: Element; date: Element; attachment: Element; checkbox: Element; multipleSelects: Element; singleSelect: Element; }'.\nsrc/components/onboarding/ComprehensiveOnboarding.tsx(527,24): error TS7006: Parameter 'data' implicitly has an 'any' type.\nsrc/components/onboarding/ComprehensiveOnboarding.tsx(540,24): error TS7006: Parameter 'bases' implicitly has an 'any' type.\nsrc/components/onboarding/ComprehensiveOnboarding.tsx(549,24): error TS7006: Parameter 'data' implicitly has an 'any' type.\nsrc/components/onboarding/ComprehensiveOnboarding.tsx(561,24): error TS7006: Parameter 'features' implicitly has an 'any' type.\nsrc/components/onboarding/ComprehensiveOnboarding.tsx(588,32): error TS7006: Parameter 'feedback' implicitly has an 'any' type.\nsrc/components/onboarding/InteractiveProductTour.tsx(333,45): error TS2802: Type 'Set<string>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.\nsrc/lib/auth.ts(23,5): error TS2353: Object literal may only specify known properties, and 'signUp' does not exist in type 'Partial<PagesOptions>'.\nsrc/lib/auth.ts(101,9): error TS2322: Type 'string | null | undefined' is not assignable to type 'string | undefined'.\n  Type 'null' is not assignable to type 'string | undefined'.\nsrc/lib/auth.ts(102,9): error TS2322: Type 'string | null | undefined' is not assignable to type 'string | undefined'.\n  Type 'null' is not assignable to type 'string | undefined'.\nsrc/lib/auth.ts(170,21): error TS2339: Property 'session' does not exist on type '{ session: void | AdapterSession | null | undefined; } | { token: JWT | null; }'.\nsrc/lib/auth.ts(170,30): error TS2339: Property 'token' does not exist on type '{ session: void | AdapterSession | null | undefined; } | { token: JWT | null; }'.\nsrc/lib/realtime/realtime-client.ts(151,7): error TS2322: Type '\"sse\" | \"websocket\" | undefined' is not assignable to type 'TransportType'.\n  Type 'undefined' is not assignable to type 'TransportType'.\nsrc/lib/realtime/realtime-client.ts(222,31): error TS2339: Property 'status' does not exist on type '{ id: string; content: string; role: \"user\" | \"system\" | \"assistant\"; status: \"error\" | \"pending\" | \"completed\" | \"streaming\"; metadata?: Record<string, any> | undefined; } | ... 7 more ... | { ...; }'.\n  Property 'status' does not exist on type '{ messageId: string; chunk: string; isComplete: boolean; metadata?: Record<string, any> | undefined; }'.\nsrc/lib/stores/app-store.ts(40,28): error TS2345: Argument of type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to parameter of type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...> | ((state: UI...'.\n  Type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => (UIState & { ...; }) | Partial<...>'.\n    Type 'void' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...>'.\nsrc/lib/stores/app-store.ts(44,44): error TS2345: Argument of type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to parameter of type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...> | ((state: UI...'.\n  Type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => (UIState & { ...; }) | Partial<...>'.\n    Type 'void' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...>'.\nsrc/lib/stores/app-store.ts(48,57): error TS2345: Argument of type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to parameter of type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...> | ((state: UI...'.\n  Type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => (UIState & { ...; }) | Partial<...>'.\n    Type 'void' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...>'.\nsrc/lib/stores/app-store.ts(52,35): error TS2345: Argument of type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to parameter of type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...> | ((state: UI...'.\n  Type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => (UIState & { ...; }) | Partial<...>'.\n    Type 'void' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...>'.\nsrc/lib/stores/app-store.ts(56,45): error TS2345: Argument of type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to parameter of type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...> | ((state: UI...'.\n  Type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => (UIState & { ...; }) | Partial<...>'.\n    Type 'void' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...>'.\nsrc/lib/stores/app-store.ts(60,68): error TS2345: Argument of type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to parameter of type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...> | ((state: UI...'.\n  Type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => (UIState & { ...; }) | Partial<...>'.\n    Type 'void' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...>'.\nsrc/lib/stores/app-store.ts(77,45): error TS2345: Argument of type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to parameter of type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...> | ((state: UI...'.\n  Type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => (UIState & { ...; }) | Partial<...>'.\n    Type 'void' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...>'.\nsrc/lib/stores/app-store.ts(84,43): error TS2345: Argument of type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to parameter of type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...> | ((state: UI...'.\n  Type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => (UIState & { ...; }) | Partial<...>'.\n    Type 'void' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...>'.\nsrc/lib/stores/app-store.ts(88,33): error TS2345: Argument of type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to parameter of type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...> | ((state: UI...'.\n  Type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => (UIState & { ...; }) | Partial<...>'.\n    Type 'void' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...>'.\nsrc/lib/stores/app-store.ts(92,35): error TS2345: Argument of type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to parameter of type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...> | ((state: UI...'.\n  Type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => (UIState & { ...; }) | Partial<...>'.\n    Type 'void' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...>'.\nsrc/lib/stores/app-store.ts(96,36): error TS2345: Argument of type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to parameter of type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...> | ((state: UI...'.\n  Type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => (UIState & { ...; }) | Partial<...>'.\n    Type 'void' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...>'.\nsrc/lib/stores/app-store.ts(100,54): error TS2345: Argument of type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to parameter of type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...> | ((state: UI...'.\n  Type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => void' is not assignable to type '(state: UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) => (UIState & { ...; }) | Partial<...>'.\n    Type 'void' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...>'.\nsrc/lib/stores/app-store.ts(130,39): error TS2345: Argument of type '(state: { user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; }) => void' is not assignable to parameter of type '{ user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; } | Partial<...> | ((state: { ...; }) => {...'.\n  Type '(state: { user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; }) => void' is not assignable to type '(state: { user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; }) => { ...; } | Partial<...>'.\n    Type 'void' is not assignable to type '{ user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; } | Partial<...>'.\nsrc/lib/stores/app-store.ts(136,47): error TS2345: Argument of type '(state: { user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; }) => void' is not assignable to parameter of type '{ user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; } | Partial<...> | ((state: { ...; }) => {...'.\n  Type '(state: { user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; }) => void' is not assignable to type '(state: { user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; }) => { ...; } | Partial<...>'.\n    Type 'void' is not assignable to type '{ user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; } | Partial<...>'.\nsrc/lib/stores/app-store.ts(142,41): error TS2345: Argument of type '(state: { user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; }) => void' is not assignable to parameter of type '{ user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; } | Partial<...> | ((state: { ...; }) => {...'.\n  Type '(state: { user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; }) => void' is not assignable to type '(state: { user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; }) => { ...; } | Partial<...>'.\n    Type 'void' is not assignable to type '{ user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; } | Partial<...>'.\nsrc/lib/stores/app-store.ts(146,43): error TS2345: Argument of type '(state: { user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; }) => void' is not assignable to parameter of type '{ user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; } | Partial<...> | ((state: { ...; }) => {...'.\n  Type '(state: { user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; }) => void' is not assignable to type '(state: { user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; }) => { ...; } | Partial<...>'.\n    Type 'void' is not assignable to type '{ user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; } | Partial<...>'.\nsrc/lib/stores/app-store.ts(151,21): error TS2345: Argument of type '(state: { user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; }) => void' is not assignable to parameter of type '{ user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; } | Partial<...> | ((state: { ...; }) => {...'.\n  Type '(state: { user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; }) => void' is not assignable to type '(state: { user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; }) => { ...; } | Partial<...>'.\n    Type 'void' is not assignable to type '{ user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; } | Partial<...>'.\nsrc/lib/stores/app-store.ts(181,52): error TS2345: Argument of type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => void' is not assignable to parameter of type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; } | Partial<...> | ((state: { ...; }) => { ...; } | Partial<...>)'.\n  Type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => void' is not assignable to type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => { ...; } | Partial<...>'.\n    Type 'void' is not assignable to type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; } | Partial<...>'.\nsrc/lib/stores/app-store.ts(185,42): error TS2345: Argument of type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => void' is not assignable to parameter of type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; } | Partial<...> | ((state: { ...; }) => { ...; } | Partial<...>)'.\n  Type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => void' is not assignable to type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => { ...; } | Partial<...>'.\n    Type 'void' is not assignable to type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; } | Partial<...>'.\nsrc/lib/stores/app-store.ts(189,63): error TS2345: Argument of type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => void' is not assignable to parameter of type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; } | Partial<...> | ((state: { ...; }) => { ...; } | Partial<...>)'.\n  Type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => void' is not assignable to type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => { ...; } | Partial<...>'.\n    Type 'void' is not assignable to type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; } | Partial<...>'.\nsrc/lib/stores/app-store.ts(202,38): error TS2345: Argument of type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => void' is not assignable to parameter of type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; } | Partial<...> | ((state: { ...; }) => { ...; } | Partial<...>)'.\n  Type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => void' is not assignable to type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => { ...; } | Partial<...>'.\n    Type 'void' is not assignable to type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; } | Partial<...>'.\nsrc/lib/stores/app-store.ts(206,37): error TS2345: Argument of type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => void' is not assignable to parameter of type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; } | Partial<...> | ((state: { ...; }) => { ...; } | Partial<...>)'.\n  Type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => void' is not assignable to type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => { ...; } | Partial<...>'.\n    Type 'void' is not assignable to type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; } | Partial<...>'.\nsrc/lib/stores/app-store.ts(213,41): error TS2345: Argument of type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => void' is not assignable to parameter of type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; } | Partial<...> | ((state: { ...; }) => { ...; } | Partial<...>)'.\n  Type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => void' is not assignable to type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => { ...; } | Partial<...>'.\n    Type 'void' is not assignable to type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; } | Partial<...>'.\nsrc/lib/stores/app-store.ts(217,43): error TS2345: Argument of type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => void' is not assignable to parameter of type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; } | Partial<...> | ((state: { ...; }) => { ...; } | Partial<...>)'.\n  Type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => void' is not assignable to type '(state: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }) => { ...; } | Partial<...>'.\n    Type 'void' is not assignable to type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; } | Partial<...>'.\nsrc/lib/stores/app-store.ts(232,28): error TS2322: Type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 27 more ...; closeModal: (key: string) => void; }' is not assignable to type 'UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; } & { ...; } & { ...; }'.\n  Type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 27 more ...; closeModal: (key: string) => void; }' is not assignable to type '{ toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }'.\n    Types of property 'setLoading' are incompatible.\n      Type '(loading: boolean) => void' is not assignable to type '(key: string, loading: boolean) => void'.\n        Types of parameters 'loading' and 'key' are incompatible.\n          Type 'string' is not assignable to type 'boolean'.\nsrc/lib/stores/app-store.ts(233,28): error TS2345: Argument of type '(nextStateOrUpdater: (UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; } & { ...; } & { ...; }) | Partial<...> | ((state: Dra...' is not assignable to parameter of type '(partial: (UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...> | ((state: UIState & { ...; }) => (UIState & { ...'.\n  Types of parameters 'nextStateOrUpdater' and 'partial' are incompatible.\n    Type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }) | Partial<...> | ((state: UI...' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; } & { ...; } & { ...; }) | Part...'.\n      Type 'UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; } & { ...; } & { ...; }) | Part...'.\n        Type 'UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; }' is not assignable to type 'Partial<UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; } & { ...; } & { ...; }>'.\n          Types of property 'setLoading' are incompatible.\n            Type '(key: string, loading: boolean) => void' is not assignable to type '((key: string, loading: boolean) => void) & ((loading: boolean) => void) & ((loading: boolean) => void)'.\n              Type '(key: string, loading: boolean) => void' is not assignable to type '(loading: boolean) => void'.\n                Target signature provides too few arguments. Expected 2 or more, but got 1.\nsrc/lib/stores/app-store.ts(234,30): error TS2345: Argument of type '(nextStateOrUpdater: (UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; } & { ...; } & { ...; }) | Partial<...> | ((state: Dra...' is not assignable to parameter of type '(partial: { user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; } | Partial<...> | ((state: { .....'.\n  Types of parameters 'nextStateOrUpdater' and 'partial' are incompatible.\n    Type '{ user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; } | Partial<...> | ((state: { ...; }) => {...' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; } & { ...; } & { ...; }) | Part...'.\n      Type '{ user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; }' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; } & { ...; } & { ...; }) | Part...'.\n        Type '{ user: User | null; isAuthenticated: boolean; isLoading: boolean; error: string | null; setUser: (user: User | null) => void; updateUser: (updates: Partial<User>) => void; setLoading: (loading: boolean) => void; setError: (error: string | null) => void; logout: () => void; }' is not assignable to type 'Partial<UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; } & { ...; } & { ...; }>'.\n          Types of property 'setLoading' are incompatible.\n            Type '(loading: boolean) => void' is not assignable to type '((key: string, loading: boolean) => void) & ((loading: boolean) => void) & ((loading: boolean) => void)'.\n              Type '(loading: boolean) => void' is not assignable to type '(key: string, loading: boolean) => void'.\n                Types of parameters 'loading' and 'key' are incompatible.\n                  Type 'string' is not assignable to type 'boolean'.\nsrc/lib/stores/app-store.ts(235,32): error TS2345: Argument of type '(nextStateOrUpdater: (UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; ... 7 more ...; setLoading: (key: string, loading: boolean) => void; } & { ...; } & { ...; }) | Partial<...> | ((state: Dra...' is not assignable to parameter of type '(partial: { currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; } | Partial<...> | ((state: { ...; }) => { ...; } | Partial<...>...'.\n  Types of parameters 'nextStateOrUpdater' and 'partial' are incompatible.\n    Type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; } | Partial<...> | ((state: { ...; }) => { ...; } | Partial<...>)' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; } & { ...; } & { ...; }) | Part...'.\n      Type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }' is not assignable to type '(UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; } & { ...; } & { ...; }) | Part...'.\n        Type '{ currentTenant: Tenant | null; tenants: Tenant[]; isLoading: boolean; error: string | null; setCurrentTenant: (tenant: Tenant | null) => void; setTenants: (tenants: Tenant[]) => void; ... 4 more ...; setError: (error: string | null) => void; }' is not assignable to type 'Partial<UIState & { toggleSidebar: () => void; setSidebarMobile: (open: boolean) => void; setTheme: (theme: \"light\" | \"dark\" | \"system\") => void; toggleCommandPalette: () => void; setCommandPalette: (open: boolean) => void; ... 6 more ...; setLoading: (key: string, loading: boolean) => void; } & { ...; } & { ...; }>'.\n          Types of property 'setLoading' are incompatible.\n            Type '(loading: boolean) => void' is not assignable to type '((key: string, loading: boolean) => void) & ((loading: boolean) => void) & ((loading: boolean) => void)'.\n              Type '(loading: boolean) => void' is not assignable to type '(key: string, loading: boolean) => void'.\n                Types of parameters 'loading' and 'key' are incompatible.\n                  Type 'string' is not assignable to type 'boolean'.\nsrc/lib/stores/index.ts(9,30): error TS2307: Cannot find module './user-store' or its corresponding type declarations.\nsrc/lib/stores/index.ts(10,32): error TS2307: Cannot find module './tenant-store' or its corresponding type declarations.\nsrc/lib/stores/index.ts(11,28): error TS2307: Cannot find module './ui-store' or its corresponding type declarations.\nsrc/lib/stores/index.ts(12,33): error TS2307: Cannot find module './offline-store' or its corresponding type declarations.\nsrc/lib/stores/index.ts(13,35): error TS2307: Cannot find module './analytics-store' or its corresponding type declarations.\nsrc/lib/stores/index.ts(17,30): error TS2307: Cannot find module './utils/devtools' or its corresponding type declarations.\nsrc/lib/stores/index.ts(18,33): error TS2307: Cannot find module './utils/persistence' or its corresponding type declarations.\nsrc/lib/stores/index.ts(19,27): error TS2307: Cannot find module './utils/immer' or its corresponding type declarations.\nsrc/lib/stores/index.ts(20,34): error TS2307: Cannot find module './utils/async-slice' or its corresponding type declarations.\nsrc/lib/utils.ts(173,30): error TS2802: Type 'URLSearchParamsIterator<[string, string]>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.\nsrc/middleware.ts(9,5): error TS2322: Type 'string | undefined' is not assignable to type 'string | string[]'.\n  Type 'undefined' is not assignable to type 'string | string[]'.\n",
+            "stderr": ""
+          },
+          "coverage": null,
+          "issues": [
+            "TypeScript errors: "
+          ],
+          "recommendations": [
+            "Fix TypeScript compilation errors"
+          ]
+        },
+        {
+          "branch": "feature/SCRUM-17-deploy-frontend",
+          "service": "tenant-dashboard",
+          "test_type": "linting",
+          "status": "warning",
+          "duration": 2.0795247554779053,
+          "details": {
+            "stdout": "\n> pyairtable-tenant-dashboard@1.0.0 lint\n> next lint\n\n",
+            "stderr": "\n./src/app/api/airtable/analyze-structure/route.ts\n10:21  Error: 'personalAccessToken' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n\n./src/app/api/airtable/bases/route.ts\n48:44  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/api/onboarding/complete/route.ts\n22:18  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n33:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n119:27  Error: 'request' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/app/api/test-auth/route.ts\n3:27  Error: 'req' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/app/auth/onboarding/page.tsx\n224:48  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/chat/page.tsx\n77:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n77:63  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n78:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n78:29  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n78:69  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n79:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n79:59  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n86:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n86:58  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n87:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n87:68  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n88:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n88:57  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n95:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n95:62  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n96:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n96:56  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n97:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n97:48  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n109:63  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n\n./src/app/posthog-provider.tsx\n13:14  Error: 'ph' is defined but never used.  @typescript-eslint/no-unused-vars\n66:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n67:21  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n115:75  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n124:60  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/app/providers.tsx\n28:42  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/components/chat/chat-interface.tsx\n32:29  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n318:62  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/components/dashboard/UsageChart.tsx\n26:18  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n69:54  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n74:32  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/components/dashboard/UsageProgress.tsx\n14:3  Error: 'getUsageColor' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/components/dashboard/__tests__/DashboardOverview.test.tsx\n48:10  Error: Component definition is missing display name  react/display-name\n\n./src/components/design-system/command-palette.tsx\n10:3  Error: 'Smile' is defined but never used.  @typescript-eslint/no-unused-vars\n17:3  Error: 'Database' is defined but never used.  @typescript-eslint/no-unused-vars\n63:9  Warning: The 'commands' array makes the dependencies of useMemo Hook (at line 230) change on every render. To fix this, wrap the initialization of 'commands' in its own useMemo() Hook.  react-hooks/exhaustive-deps\n63:9  Warning: The 'commands' array makes the dependencies of useEffect Hook (at line 289) change on every render. To fix this, wrap the initialization of 'commands' in its own useMemo() Hook.  react-hooks/exhaustive-deps\n\n./src/components/design-system/data-table.tsx\n327:32  Error: 'TData' is defined but never used.  @typescript-eslint/no-unused-vars\n328:10  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n423:34  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n424:31  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/components/design-system/metric-card.tsx\n6:29  Error: 'CardHeader' is defined but never used.  @typescript-eslint/no-unused-vars\n6:41  Error: 'CardTitle' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/components/error-boundary.tsx\n253:55  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/components/layout/Header.tsx\n28:10  Error: 'CommandPalette' is defined but never used.  @typescript-eslint/no-unused-vars\n37:11  Error: 'open' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n\n./src/components/layout/Sidebar.tsx\n245:37  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n261:6  Warning: React Hook React.useEffect has missing dependencies: 'expandedItems', 'hasActiveChild', and 'isActiveItem'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps\n\n./src/components/onboarding/AirtableConnectionWizard.tsx\n13:10  Error: 'Separator' is defined but never used.  @typescript-eslint/no-unused-vars\n27:3  Error: 'RefreshCw' is defined but never used.  @typescript-eslint/no-unused-vars\n29:3  Error: 'Filter' is defined but never used.  @typescript-eslint/no-unused-vars\n30:3  Error: 'Settings' is defined but never used.  @typescript-eslint/no-unused-vars\n31:3  Error: 'Users' is defined but never used.  @typescript-eslint/no-unused-vars\n34:3  Error: 'Clock' is defined but never used.  @typescript-eslint/no-unused-vars\n38:3  Error: 'Copy' is defined but never used.  @typescript-eslint/no-unused-vars\n39:3  Error: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars\n75:13  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n132:78  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n149:6  Warning: React Hook useEffect has a missing dependency: 'validateTokenFormat'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps\n310:13  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n402:34  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n402:57  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n403:31  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n403:48  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n510:42  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n510:64  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n552:68  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n625:22  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n665:72  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n678:80  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n686:80  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n697:15  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n\n./src/components/onboarding/BaseConfigurationStep.tsx\n3:27  Error: 'useEffect' is defined but never used.  @typescript-eslint/no-unused-vars\n19:3  Error: 'Eye' is defined but never used.  @typescript-eslint/no-unused-vars\n23:3  Error: 'Info' is defined but never used.  @typescript-eslint/no-unused-vars\n33:3  Error: 'Users' is defined but never used.  @typescript-eslint/no-unused-vars\n34:3  Error: 'Globe' is defined but never used.  @typescript-eslint/no-unused-vars\n42:3  Error: 'RefreshCw' is defined but never used.  @typescript-eslint/no-unused-vars\n43:3  Error: 'Download' is defined but never used.  @typescript-eslint/no-unused-vars\n44:3  Error: 'Upload' is defined but never used.  @typescript-eslint/no-unused-vars\n74:13  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n134:3  Error: 'availableBases' is defined but never used.  @typescript-eslint/no-unused-vars\n136:3  Error: 'onUpdate' is defined but never used.  @typescript-eslint/no-unused-vars\n143:10  Error: 'isAnalyzing' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n159:10  Error: 'filterDataType' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n159:26  Error: 'setFilterDataType' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n254:21  Warning: Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images.  jsx-a11y/alt-text\n285:14  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n355:25  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n355:45  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n688:33  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n688:56  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n690:18  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n\n./src/components/onboarding/ComprehensiveOnboarding.tsx\n6:10  Error: 'useForm' is defined but never used.  @typescript-eslint/no-unused-vars\n7:10  Error: 'zodResolver' is defined but never used.  @typescript-eslint/no-unused-vars\n11:10  Error: 'Input' is defined but never used.  @typescript-eslint/no-unused-vars\n13:10  Error: 'Alert' is defined but never used.  @typescript-eslint/no-unused-vars\n13:17  Error: 'AlertDescription' is defined but never used.  @typescript-eslint/no-unused-vars\n16:10  Error: 'Separator' is defined but never used.  @typescript-eslint/no-unused-vars\n19:3  Error: 'Key' is defined but never used.  @typescript-eslint/no-unused-vars\n23:3  Error: 'ArrowLeft' is defined but never used.  @typescript-eslint/no-unused-vars\n29:3  Error: 'Volume2' is defined but never used.  @typescript-eslint/no-unused-vars\n30:3  Error: 'VolumeX' is defined but never used.  @typescript-eslint/no-unused-vars\n31:3  Error: 'ChevronRight' is defined but never used.  @typescript-eslint/no-unused-vars\n35:3  Error: 'Award' is defined but never used.  @typescript-eslint/no-unused-vars\n40:3  Error: 'Shield' is defined but never used.  @typescript-eslint/no-unused-vars\n41:3  Error: 'Clock' is defined but never used.  @typescript-eslint/no-unused-vars\n43:3  Error: 'TrendingUp' is defined but never used.  @typescript-eslint/no-unused-vars\n44:3  Error: 'FileText' is defined but never used.  @typescript-eslint/no-unused-vars\n46:3  Error: 'Settings' is defined but never used.  @typescript-eslint/no-unused-vars\n47:3  Error: 'Eye' is defined but never used.  @typescript-eslint/no-unused-vars\n48:3  Error: 'CheckCheck' is defined but never used.  @typescript-eslint/no-unused-vars\n49:3  Error: 'AlertTriangle' is defined but never used.  @typescript-eslint/no-unused-vars\n50:3  Error: 'Info' is defined but never used.  @typescript-eslint/no-unused-vars\n52:3  Error: 'Wand2' is defined but never used.  @typescript-eslint/no-unused-vars\n54:3  Error: 'Github' is defined but never used.  @typescript-eslint/no-unused-vars\n111:13  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n199:7  Error: 'AVAILABLE_FEATURES' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n266:7  Error: 'PRODUCT_TOUR_STEPS' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n463:3  Error: React Hook \"useEffect\" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?  react-hooks/rules-of-hooks\n481:3  Error: React Hook \"useEffect\" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?  react-hooks/rules-of-hooks\n710:19  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n751:4  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n764:48  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n786:60  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n800:69  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n848:18  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n868:35  Error: 'props' is defined but never used.  @typescript-eslint/no-unused-vars\n868:42  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n872:32  Error: 'props' is defined but never used.  @typescript-eslint/no-unused-vars\n872:39  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n876:35  Error: 'props' is defined but never used.  @typescript-eslint/no-unused-vars\n876:42  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n880:32  Error: 'props' is defined but never used.  @typescript-eslint/no-unused-vars\n880:39  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n884:33  Error: 'props' is defined but never used.  @typescript-eslint/no-unused-vars\n884:40  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n888:33  Error: 'props' is defined but never used.  @typescript-eslint/no-unused-vars\n888:40  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/components/onboarding/ErrorHandling.tsx\n18:3  Error: 'ArrowLeft' is defined but never used.  @typescript-eslint/no-unused-vars\n21:3  Error: 'Phone' is defined but never used.  @typescript-eslint/no-unused-vars\n22:3  Error: 'Mail' is defined but never used.  @typescript-eslint/no-unused-vars\n24:3  Error: 'Search' is defined but never used.  @typescript-eslint/no-unused-vars\n32:3  Error: 'Key' is defined but never used.  @typescript-eslint/no-unused-vars\n34:3  Error: 'Bug' is defined but never used.  @typescript-eslint/no-unused-vars\n340:6  Warning: React Hook useEffect has a missing dependency: 'handleAutoRetry'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps\n483:50  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n646:36  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n\n./src/components/onboarding/FirstAIInteractionDemo.tsx\n4:18  Error: 'AnimatePresence' is defined but never used.  @typescript-eslint/no-unused-vars\n10:10  Error: 'Separator' is defined but never used.  @typescript-eslint/no-unused-vars\n15:3  Error: 'ArrowRight' is defined but never used.  @typescript-eslint/no-unused-vars\n17:3  Error: 'Sparkles' is defined but never used.  @typescript-eslint/no-unused-vars\n20:3  Error: 'Users' is defined but never used.  @typescript-eslint/no-unused-vars\n21:3  Error: 'Calendar' is defined but never used.  @typescript-eslint/no-unused-vars\n22:3  Error: 'Target' is defined but never used.  @typescript-eslint/no-unused-vars\n29:3  Error: 'Copy' is defined but never used.  @typescript-eslint/no-unused-vars\n32:3  Error: 'RefreshCw' is defined but never used.  @typescript-eslint/no-unused-vars\n33:3  Error: 'Zap' is defined but never used.  @typescript-eslint/no-unused-vars\n35:3  Error: 'Settings' is defined but never used.  @typescript-eslint/no-unused-vars\n36:3  Error: 'HelpCircle' is defined but never used.  @typescript-eslint/no-unused-vars\n37:3  Error: 'Wand2' is defined but never used.  @typescript-eslint/no-unused-vars\n39:3  Error: 'Filter' is defined but never used.  @typescript-eslint/no-unused-vars\n40:3  Error: 'Search' is defined but never used.  @typescript-eslint/no-unused-vars\n44:3  Error: 'Globe' is defined but never used.  @typescript-eslint/no-unused-vars\n46:3  Error: 'FileText' is defined but never used.  @typescript-eslint/no-unused-vars\n47:3  Error: 'Image' is defined but never used.  @typescript-eslint/no-unused-vars\n48:3  Error: 'Play' is defined but never used.  @typescript-eslint/no-unused-vars\n49:3  Error: 'Pause' is defined but never used.  @typescript-eslint/no-unused-vars\n78:21  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n99:32  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n646:25  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n646:44  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n669:40  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n670:20  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n731:54  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n731:76  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities\n\n./src/components/onboarding/InteractiveProductTour.tsx\n4:10  Error: 'motion' is defined but never used.  @typescript-eslint/no-unused-vars\n4:18  Error: 'AnimatePresence' is defined but never used.  @typescript-eslint/no-unused-vars\n7:10  Error: 'Alert' is defined but never used.  @typescript-eslint/no-unused-vars\n7:17  Error: 'AlertDescription' is defined but never used.  @typescript-eslint/no-unused-vars\n13:3  Error: 'SkipForward' is defined but never used.  @typescript-eslint/no-unused-vars\n22:3  Error: 'Users' is defined but never used.  @typescript-eslint/no-unused-vars\n23:3  Error: 'BarChart3' is defined but never used.  @typescript-eslint/no-unused-vars\n24:3  Error: 'Settings' is defined but never used.  @typescript-eslint/no-unused-vars\n31:3  Error: 'Database' is defined but never used.  @typescript-eslint/no-unused-vars\n32:3  Error: 'TrendingUp' is defined but never used.  @typescript-eslint/no-unused-vars\n35:3  Error: 'Shield' is defined but never used.  @typescript-eslint/no-unused-vars\n36:3  Error: 'Clock' is defined but never used.  @typescript-eslint/no-unused-vars\n41:3  Error: 'RefreshCw' is defined but never used.  @typescript-eslint/no-unused-vars\n42:3  Error: 'Download' is defined but never used.  @typescript-eslint/no-unused-vars\n43:3  Error: 'Share2' is defined but never used.  @typescript-eslint/no-unused-vars\n44:3  Error: 'Filter' is defined but never used.  @typescript-eslint/no-unused-vars\n65:11  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n281:3  Error: 'error' is defined but never used.  @typescript-eslint/no-unused-vars\n282:3  Error: 'setError' is defined but never used.  @typescript-eslint/no-unused-vars\n289:10  Error: 'notes' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n289:17  Error: 'setNotes' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n292:10  Error: 'quizAnswers' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n329:6  Warning: React Hook useEffect has a missing dependency: 'handleStepComplete'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps\n575:34  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n680:19  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities\n\n./src/hooks/usePWA.ts\n32:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n221:59  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n254:60  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/hooks/useTenant.ts\n36:35  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n92:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n106:64  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n146:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n172:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n209:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n234:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n272:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n285:66  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/lib/api.ts\n8:37  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n84:58  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n89:42  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n96:41  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n103:43  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n149:78  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n149:93  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n190:35  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n193:18  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n193:40  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n196:33  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n200:23  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n203:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n203:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n206:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n207:19  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n211:22  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n215:23  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n218:27  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n218:50  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n221:35  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n224:25  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n224:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n228:23  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n232:23  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n235:36  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n238:26  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n238:48  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n241:35  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n244:24  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n244:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n247:53  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n250:36  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n253:25  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n253:48  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n256:44  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n257:19  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n261:22  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n265:23  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n269:20  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n272:36  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n276:22  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n280:39  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/lib/auth.ts\n2:8  Error: 'GoogleProvider' is defined but never used.  @typescript-eslint/no-unused-vars\n3:8  Error: 'GitHubProvider' is defined but never used.  @typescript-eslint/no-unused-vars\n130:20  Error: 'user' is defined but never used.  @typescript-eslint/no-unused-vars\n130:35  Error: 'profile' is defined but never used.  @typescript-eslint/no-unused-vars\n130:44  Error: 'email' is defined but never used.  @typescript-eslint/no-unused-vars\n130:51  Error: 'credentials' is defined but never used.  @typescript-eslint/no-unused-vars\n170:21  Error: 'session' is defined but never used.  @typescript-eslint/no-unused-vars\n170:30  Error: 'token' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/lib/realtime/events.ts\n18:31  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n28:31  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n58:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n69:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n89:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/lib/realtime/realtime-client.ts\n86:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n305:23  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/lib/realtime/sse-client.ts\n228:33  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n296:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/lib/realtime/websocket-client.ts\n129:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n175:17  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n350:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/lib/stores/app-store.ts\n122:10  Error: 'get' is defined but never used.  @typescript-eslint/no-unused-vars\n173:10  Error: 'get' is defined but never used.  @typescript-eslint/no-unused-vars\n330:6  Error: 'notifications' is defined but never used.  @typescript-eslint/no-unused-vars\n\n./src/lib/stores/types.ts\n63:27  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n70:35  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n126:32  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n210:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/lib/stores/utils/create-slice.ts\n19:35  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n28:45  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n32:61  Error: 'get' is defined but never used.  @typescript-eslint/no-unused-vars\n41:69  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n48:16  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n53:16  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n58:42  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n66:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n68:10  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n93:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n96:67  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n108:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n113:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n118:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n123:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n127:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n132:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n136:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n142:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n151:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n156:44  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n159:88  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n160:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n164:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n168:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n170:22  Error: 'removed' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n171:55  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n180:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n187:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n208:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n222:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n228:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n230:62  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n232:61  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n236:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n238:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n246:57  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n247:61  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n251:48  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/lib/utils.ts\n87:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n87:56  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n98:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n98:56  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n180:57  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n192:51  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n196:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n205:47  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\n./src/middleware.ts\n28:9  Error: 'isAuthPath' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n34:9  Error: 'isPublicPath' is assigned a value but never used.  @typescript-eslint/no-unused-vars\n\n./src/types/index.ts\n55:29  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n97:28  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n163:10  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n316:27  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n485:26  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n554:26  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n586:30  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n615:26  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n652:13  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n653:13  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n742:28  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n758:34  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n763:20  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n774:29  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n817:10  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n828:20  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n834:10  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n842:28  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n852:10  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n858:12  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n865:9  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any\n\ninfo  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules\n"
+          },
+          "coverage": null,
+          "issues": [
+            "10:21  Error: 'personalAccessToken' is assigned a value but never used.  @typescript-eslint/no-unused-vars",
+            "48:44  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any",
+            "22:18  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any",
+            "33:14  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any",
+            "119:27  Error: 'request' is defined but never used.  @typescript-eslint/no-unused-vars",
+            "3:27  Error: 'req' is defined but never used.  @typescript-eslint/no-unused-vars",
+            "224:48  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any",
+            "77:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities",
+            "77:63  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities",
+            "78:24  Error: `\"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities"
+          ],
+          "recommendations": [
+            "Address linting issues"
+          ]
+        },
+        {
+          "branch": "feature/SCRUM-17-deploy-frontend",
+          "service": "tenant-dashboard",
+          "test_type": "security",
+          "status": "warning",
+          "duration": 0.7963740825653076,
+          "details": {
+            "vulnerabilities": 3,
+            "audit_data": {
+              "auditReportVersion": 2,
+              "vulnerabilities": {
+                "@auth/core": {
+                  "name": "@auth/core",
+                  "severity": "low",
+                  "isDirect": false,
+                  "via": [
+                    "cookie"
+                  ],
+                  "effects": [
+                    "next-auth"
+                  ],
+                  "range": "<=0.35.3",
+                  "nodes": [
+                    "node_modules/next-auth/node_modules/@auth/core"
+                  ],
+                  "fixAvailable": {
+                    "name": "next-auth",
+                    "version": "5.0.0-beta.29",
+                    "isSemVerMajor": false
+                  }
+                },
+                "cookie": {
+                  "name": "cookie",
+                  "severity": "low",
+                  "isDirect": false,
+                  "via": [
+                    {
+                      "source": 1103907,
+                      "name": "cookie",
+                      "dependency": "cookie",
+                      "title": "cookie accepts cookie name, path, and domain with out of bounds characters",
+                      "url": "https://github.com/advisories/GHSA-pxg6-pf52-xh8x",
+                      "severity": "low",
+                      "cwe": [
+                        "CWE-74"
+                      ],
+                      "cvss": {
+                        "score": 0,
+                        "vectorString": null
+                      },
+                      "range": "<0.7.0"
+                    }
+                  ],
+                  "effects": [
+                    "@auth/core"
+                  ],
+                  "range": "<0.7.0",
+                  "nodes": [
+                    "node_modules/cookie"
+                  ],
+                  "fixAvailable": {
+                    "name": "next-auth",
+                    "version": "5.0.0-beta.29",
+                    "isSemVerMajor": false
+                  }
+                },
+                "next-auth": {
+                  "name": "next-auth",
+                  "severity": "low",
+                  "isDirect": true,
+                  "via": [
+                    "@auth/core"
+                  ],
+                  "effects": [],
+                  "range": "<=0.0.0-pr.11562.ed0fce23 || 4.24.8 - 5.0.0-beta.22",
+                  "nodes": [
+                    "node_modules/next-auth"
+                  ],
+                  "fixAvailable": {
+                    "name": "next-auth",
+                    "version": "5.0.0-beta.29",
+                    "isSemVerMajor": false
+                  }
+                }
+              },
+              "metadata": {
+                "vulnerabilities": {
+                  "info": 0,
+                  "low": 3,
+                  "moderate": 0,
+                  "high": 0,
+                  "critical": 0,
+                  "total": 3
+                },
+                "dependencies": {
+                  "prod": 418,
+                  "dev": 601,
+                  "optional": 43,
+                  "peer": 61,
+                  "peerOptional": 0,
+                  "total": 1087
+                }
+              }
+            }
+          },
+          "coverage": null,
+          "issues": [
+            "3 vulnerabilities found"
+          ],
+          "recommendations": [
+            "Run npm audit fix to address vulnerabilities"
+          ]
+        }
+      ]
+    },
+    "feature/SCRUM-18-fix-automation": {
+      "service_name": "automation-services",
+      "service_type": "python",
+      "readiness_score": 80.0,
+      "total_tests": 5,
+      "passed_tests": 3,
+      "failed_tests": 0,
+      "skipped_tests": 2,
+      "warning_tests": 0,
+      "success_rate": 0.6,
+      "critical_issues": [],
+      "all_issues": [],
+      "recommendations": [
+        "Consider installing dependencies in virtual environment",
+        "Install pytest to run unit tests",
+        "Configure security scanning tools"
+      ],
+      "merge_recommendation": "CONDITIONAL",
+      "test_results": [
+        {
+          "branch": "feature/SCRUM-18-fix-automation",
+          "service": "automation-services",
+          "test_type": "structure",
+          "status": "pass",
+          "duration": 0,
+          "details": {
+            "dependency_file": "exists",
+            "main_module": "/Users/kg/IdeaProjects/pyairtable-compose/pyairtable-automation-services/src/main.py",
+            "dockerfile": "exists",
+            "source_files_count": 1270
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": []
+        },
+        {
+          "branch": "feature/SCRUM-18-fix-automation",
+          "service": "automation-services",
+          "test_type": "dependencies_check",
+          "status": "pass",
+          "duration": 0,
+          "details": {
+            "dependencies_file": "/Users/kg/IdeaProjects/pyairtable-compose/pyairtable-automation-services/requirements.txt"
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": [
+            "Consider installing dependencies in virtual environment"
+          ]
+        },
+        {
+          "branch": "feature/SCRUM-18-fix-automation",
+          "service": "automation-services",
+          "test_type": "syntax_check",
+          "status": "pass",
+          "duration": 0,
+          "details": {
+            "files_checked": 1270
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": []
+        },
+        {
+          "branch": "feature/SCRUM-18-fix-automation",
+          "service": "automation-services",
+          "test_type": "unit_tests",
+          "status": "skip",
+          "duration": 0,
+          "details": {
+            "error": "pytest not available"
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": [
+            "Install pytest to run unit tests"
+          ]
+        },
+        {
+          "branch": "feature/SCRUM-18-fix-automation",
+          "service": "automation-services",
+          "test_type": "security",
+          "status": "skip",
+          "duration": 0,
+          "details": {
+            "reason": "Security scanning not configured for this service type"
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": [
+            "Configure security scanning tools"
+          ]
+        }
+      ]
+    },
+    "feature/SCRUM-19-stabilize-saga": {
+      "service_name": "saga-orchestrator",
+      "service_type": "python",
+      "readiness_score": 70.0,
+      "total_tests": 5,
+      "passed_tests": 3,
+      "failed_tests": 1,
+      "skipped_tests": 1,
+      "warning_tests": 0,
+      "success_rate": 0.6,
+      "critical_issues": [
+        "Tests failed: "
+      ],
+      "all_issues": [
+        "Tests failed: "
+      ],
+      "recommendations": [
+        "Consider installing dependencies in virtual environment",
+        "Fix failing tests",
+        "Configure security scanning tools"
+      ],
+      "merge_recommendation": "CONDITIONAL",
+      "test_results": [
+        {
+          "branch": "feature/SCRUM-19-stabilize-saga",
+          "service": "saga-orchestrator",
+          "test_type": "structure",
+          "status": "pass",
+          "duration": 0,
+          "details": {
+            "dependency_file": "exists",
+            "dockerfile": "exists",
+            "source_files_count": 30
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": []
+        },
+        {
+          "branch": "feature/SCRUM-19-stabilize-saga",
+          "service": "saga-orchestrator",
+          "test_type": "dependencies_check",
+          "status": "pass",
+          "duration": 0,
+          "details": {
+            "dependencies_file": "/Users/kg/IdeaProjects/pyairtable-compose/saga-orchestrator/pyproject.toml"
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": [
+            "Consider installing dependencies in virtual environment"
+          ]
+        },
+        {
+          "branch": "feature/SCRUM-19-stabilize-saga",
+          "service": "saga-orchestrator",
+          "test_type": "syntax_check",
+          "status": "pass",
+          "duration": 0,
+          "details": {
+            "files_checked": 30
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": []
+        },
+        {
+          "branch": "feature/SCRUM-19-stabilize-saga",
+          "service": "saga-orchestrator",
+          "test_type": "unit_tests",
+          "status": "fail",
+          "duration": 0.2039012908935547,
+          "details": {
+            "stdout": "============================= test session starts ==============================\nplatform darwin -- Python 3.13.5, pytest-8.4.1, pluggy-1.6.0 -- /opt/homebrew/opt/python@3.13/bin/python3.13\ncachedir: .pytest_cache\nrootdir: /Users/kg/IdeaProjects/pyairtable-compose/saga-orchestrator\nconfigfile: pyproject.toml\nplugins: anyio-4.10.0\ncollecting ... collected 2 items\n\ntest_transaction_endpoints.py::test_transaction_endpoints FAILED         [ 50%]\ntest_transaction_endpoints.py::test_performance FAILED                   [100%]\n\n=================================== FAILURES ===================================\n__________________________ test_transaction_endpoints __________________________\nasync def functions are not natively supported.\nYou need to install a suitable plugin for your async framework, for example:\n  - anyio\n  - pytest-asyncio\n  - pytest-tornasync\n  - pytest-trio\n  - pytest-twisted\n_______________________________ test_performance _______________________________\nasync def functions are not natively supported.\nYou need to install a suitable plugin for your async framework, for example:\n  - anyio\n  - pytest-asyncio\n  - pytest-tornasync\n  - pytest-trio\n  - pytest-twisted\n=============================== warnings summary ===============================\n../../../../../opt/homebrew/lib/python3.13/site-packages/_pytest/config/__init__.py:1533\n  /opt/homebrew/lib/python3.13/site-packages/_pytest/config/__init__.py:1533: PytestConfigWarning: No files were found in testpaths; consider removing or adjusting your testpaths configuration. Searching recursively from the current directory instead.\n    self.args, self.args_source = self._decide_args(\n\n../../../../../opt/homebrew/lib/python3.13/site-packages/_pytest/config/__init__.py:1474\n  /opt/homebrew/lib/python3.13/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: asyncio_mode\n  \n    self._warn_or_fail_if_strict(f\"Unknown config option: {key}\\n\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ============================\nFAILED test_transaction_endpoints.py::test_transaction_endpoints - Failed: async def functions are not natively supported.\nYou need to install a suitable plugin for your async framework, for example:\n  - anyio\n  - pytest-asyncio\n  - pytest-tornasync\n  - pytest-trio\n  - pytest-twisted\nFAILED test_transaction_endpoints.py::test_performance - Failed: async def functions are not natively supported.\nYou need to install a suitable plugin for your async framework, for example:\n  - anyio\n  - pytest-asyncio\n  - pytest-tornasync\n  - pytest-trio\n  - pytest-twisted\n======================== 2 failed, 2 warnings in 0.05s =========================\n",
+            "stderr": ""
+          },
+          "coverage": null,
+          "issues": [
+            "Tests failed: "
+          ],
+          "recommendations": [
+            "Fix failing tests"
+          ]
+        },
+        {
+          "branch": "feature/SCRUM-19-stabilize-saga",
+          "service": "saga-orchestrator",
+          "test_type": "security",
+          "status": "skip",
+          "duration": 0,
+          "details": {
+            "reason": "Security scanning not configured for this service type"
+          },
+          "coverage": null,
+          "issues": [],
+          "recommendations": [
+            "Configure security scanning tools"
+          ]
+        }
+      ]
+    }
+  },
+  "executive_summary": {
+    "sprint_status": "READY",
+    "readiness_percentage": 80.0,
+    "total_services": 5,
+    "ready_services": 4,
+    "critical_blockers": 9,
+    "top_issues": [
+      "feature/SCRUM-16-repair-airtable: Tests failed: ImportError while loading conftest '/Users/kg/IdeaProjects/pyairtable-compose/python-services/conftest.py'.\n../conftest.py:9: in <module>\n    import pytest_asyncio\nE   ModuleNotFoundError: No module named 'pytest_asyncio'\n",
+      "feature/SCRUM-17-deploy-frontend: TypeScript errors: ",
+      "feature/SCRUM-17-deploy-frontend: 10:21  Error: 'personalAccessToken' is assigned a value but never used.  @typescript-eslint/no-unused-vars",
+      "feature/SCRUM-17-deploy-frontend: 119:27  Error: 'request' is defined but never used.  @typescript-eslint/no-unused-vars",
+      "feature/SCRUM-17-deploy-frontend: 3:27  Error: 'req' is defined but never used.  @typescript-eslint/no-unused-vars"
+    ],
+    "environment_issues": []
+  },
+  "action_plan": [
+    {
+      "priority": "HIGH",
+      "branch": "feature/SCRUM-17-deploy-frontend",
+      "service": "tenant-dashboard",
+      "action": "Fix critical issues",
+      "issues": [
+        "TypeScript errors: ",
+        "10:21  Error: 'personalAccessToken' is assigned a value but never used.  @typescript-eslint/no-unused-vars",
+        "119:27  Error: 'request' is defined but never used.  @typescript-eslint/no-unused-vars"
+      ],
+      "estimated_effort": "High"
+    },
+    {
+      "priority": "MEDIUM",
+      "branch": "feature/SCRUM-16-repair-airtable",
+      "service": "airtable-gateway",
+      "action": "Address minor issues",
+      "issues": [
+        "Consider installing dependencies in virtual environment",
+        "Fix failing tests",
+        "Configure security scanning tools"
+      ],
+      "estimated_effort": "Low-Medium"
+    },
+    {
+      "priority": "MEDIUM",
+      "branch": "feature/SCRUM-18-fix-automation",
+      "service": "automation-services",
+      "action": "Address minor issues",
+      "issues": [
+        "Consider installing dependencies in virtual environment",
+        "Install pytest to run unit tests",
+        "Configure security scanning tools"
+      ],
+      "estimated_effort": "Low-Medium"
+    },
+    {
+      "priority": "MEDIUM",
+      "branch": "feature/SCRUM-19-stabilize-saga",
+      "service": "saga-orchestrator",
+      "action": "Address minor issues",
+      "issues": [
+        "Consider installing dependencies in virtual environment",
+        "Fix failing tests",
+        "Configure security scanning tools"
+      ],
+      "estimated_effort": "Low-Medium"
+    }
+  ],
+  "next_steps": [
+    "Priority: Fix critical issues in tenant-dashboard",
+    "Address minor issues in airtable-gateway, automation-services, saga-orchestrator",
+    "Set up automated testing pipeline",
+    "Configure security scanning tools",
+    "Implement service health checks"
+  ]
+}

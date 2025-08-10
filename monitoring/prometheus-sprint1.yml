@@ -1,0 +1,120 @@
+# Prometheus Configuration for PyAirtable MCP
+# Service Discovery and Monitoring Configuration
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'pyairtable-dev'
+    environment: 'development'
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - "alert_rules.yml"
+
+# Alert Manager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # PyAirtable Services
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8080']
+    metrics_path: /metrics
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  - job_name: 'llm-orchestrator'
+    static_configs:
+      - targets: ['llm-orchestrator:8083']
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  - job_name: 'mcp-server'
+    static_configs:
+      - targets: ['mcp-server:8081']
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  - job_name: 'airtable-gateway'
+    static_configs:
+      - targets: ['airtable-gateway:8082']
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  - job_name: 'platform-services'
+    static_configs:
+      - targets: ['platform-services:8087']
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  - job_name: 'automation-services'
+    static_configs:
+      - targets: ['automation-services:8086']
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  - job_name: 'saga-orchestrator'
+    static_configs:
+      - targets: ['saga-orchestrator:8088', 'saga-orchestrator:9090']
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  - job_name: 'frontend'
+    static_configs:
+      - targets: ['frontend:3080']
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  # Infrastructure Services
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 15s
+
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 15s
+
+  # Health Check Endpoints
+  - job_name: 'health-checks'
+    metrics_path: /health
+    static_configs:
+      - targets: 
+        - 'api-gateway:8000'
+        - 'llm-orchestrator:8003'
+        - 'mcp-server:8001'
+        - 'airtable-gateway:8002'
+        - 'platform-services:8007'
+        - 'automation-services:8006'
+        - 'saga-orchestrator:8008'
+        - 'frontend:3000'
+    scrape_interval: 30s
+
+  # Service Discovery for Docker Compose
+  - job_name: 'docker-services'
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 30s
+        filters:
+          - name: label
+            values: ["com.docker.compose.project=pyairtable-compose"]
+    relabel_configs:
+      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
+        target_label: service
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+      - source_labels: [__address__]
+        target_label: __address__
+        replacement: '${1}:8080'

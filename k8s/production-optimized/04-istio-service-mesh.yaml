@@ -1,0 +1,457 @@
+# Istio Service Mesh Configuration for Production PyAirtable
+---
+# Gateway for external traffic
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: pyairtable-gateway
+  namespace: pyairtable
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - pyairtable.local
+    - "*.pyairtable.local"
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: pyairtable-tls-secret
+    hosts:
+    - pyairtable.local
+    - "*.pyairtable.local"
+
+---
+# Virtual Service for API Gateway
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: api-gateway-vs
+  namespace: pyairtable
+spec:
+  hosts:
+  - pyairtable.local
+  - api-gateway.pyairtable.svc.cluster.local
+  gateways:
+  - pyairtable-gateway
+  - mesh
+  http:
+  - match:
+    - uri:
+        prefix: /api/
+    route:
+    - destination:
+        host: api-gateway.pyairtable.svc.cluster.local
+        port:
+          number: 8080
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+      retryOn: 5xx,reset,connect-failure,refused-stream
+      retryRemoteLocalities: true
+    fault:
+      delay:
+        percentage:
+          value: 0.1
+        fixedDelay: 100ms
+    headers:
+      request:
+        set:
+          x-forwarded-proto: https
+      response:
+        add:
+          x-service-version: v1
+
+---
+# Destination Rule for API Gateway with Circuit Breaker
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: api-gateway-dr
+  namespace: pyairtable
+spec:
+  host: api-gateway.pyairtable.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 30s
+        tcpNoDelay: true
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 10
+        maxRetries: 3
+        idleTimeout: 90s
+        h2UpgradePolicy: UPGRADE
+    circuitBreaker:
+      consecutiveGatewayErrors: 5
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 30
+    loadBalancer:
+      simple: LEAST_CONN
+  portLevelSettings:
+  - port:
+      number: 8080
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 50
+        maxRequestsPerConnection: 10
+
+---
+# Destination Rule for Airtable Gateway
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: airtable-gateway-dr
+  namespace: pyairtable
+spec:
+  host: airtable-gateway.pyairtable.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 50
+        connectTimeout: 30s
+      http:
+        http1MaxPendingRequests: 25
+        http2MaxRequests: 50
+        maxRequestsPerConnection: 5
+        maxRetries: 3
+        idleTimeout: 60s
+    circuitBreaker:
+      consecutiveGatewayErrors: 5
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+    loadBalancer:
+      simple: ROUND_ROBIN
+
+---
+# Destination Rule for LLM Orchestrator with special handling
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: llm-orchestrator-dr
+  namespace: pyairtable
+spec:
+  host: llm-orchestrator.pyairtable.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 25
+        connectTimeout: 60s
+      http:
+        http1MaxPendingRequests: 10
+        http2MaxRequests: 25
+        maxRequestsPerConnection: 2
+        maxRetries: 2
+        idleTimeout: 300s  # Longer timeout for LLM requests
+    circuitBreaker:
+      consecutiveGatewayErrors: 3
+      consecutive5xxErrors: 2
+      interval: 60s
+      baseEjectionTime: 60s
+      maxEjectionPercent: 30
+    loadBalancer:
+      simple: LEAST_CONN
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      consecutive5xxErrors: 2
+      interval: 60s
+      baseEjectionTime: 60s
+      maxEjectionPercent: 30
+      minHealthPercent: 50
+
+---
+# Destination Rule for MCP Server
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: mcp-server-dr
+  namespace: pyairtable
+spec:
+  host: mcp-server.pyairtable.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 50
+        connectTimeout: 30s
+      http:
+        http1MaxPendingRequests: 25
+        http2MaxRequests: 50
+        maxRequestsPerConnection: 5
+        maxRetries: 3
+        idleTimeout: 60s
+    circuitBreaker:
+      consecutiveGatewayErrors: 5
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+    loadBalancer:
+      simple: RANDOM
+
+---
+# Service Entry for External Airtable API
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: airtable-api
+  namespace: pyairtable
+spec:
+  hosts:
+  - api.airtable.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+# Service Entry for External Gemini API
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: gemini-api
+  namespace: pyairtable
+spec:
+  hosts:
+  - generativelanguage.googleapis.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+# Virtual Service for External Airtable API with retry policy
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: airtable-external-vs
+  namespace: pyairtable
+spec:
+  hosts:
+  - api.airtable.com
+  http:
+  - route:
+    - destination:
+        host: api.airtable.com
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+      retryOn: 5xx,reset,connect-failure,refused-stream
+
+---
+# Virtual Service for External Gemini API with special handling
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: gemini-external-vs
+  namespace: pyairtable
+spec:
+  hosts:
+  - generativelanguage.googleapis.com
+  http:
+  - route:
+    - destination:
+        host: generativelanguage.googleapis.com
+    timeout: 60s  # Longer timeout for LLM API
+    retries:
+      attempts: 2
+      perTryTimeout: 30s
+      retryOn: 5xx,reset,connect-failure,refused-stream
+
+---
+# Peer Authentication - Enable mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: pyairtable
+spec:
+  mtls:
+    mode: STRICT
+
+---
+# Authorization Policy - Restrict access between services
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: api-gateway-authz
+  namespace: pyairtable
+spec:
+  selector:
+    matchLabels:
+      app: api-gateway
+  rules:
+  - from:
+    - source:
+        namespaces: ["istio-system"]  # Allow ingress gateway
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+
+---
+# Authorization Policy for internal service communication
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: internal-services-authz
+  namespace: pyairtable
+spec:
+  selector:
+    matchLabels:
+      app: airtable-gateway
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/pyairtable/sa/pyairtable-sa"]
+    to:
+    - operation:
+        methods: ["GET", "POST"]
+
+---
+# Telemetry Configuration for enhanced observability
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: pyairtable-metrics
+  namespace: pyairtable
+spec:
+  metrics:
+  - providers:
+    - name: prometheus
+  - overrides:
+    - match:
+        metric: ALL_METRICS
+      tagOverrides:
+        request_protocol:
+          operation: UPSERT
+          value: "http"
+    - match:
+        metric: REQUEST_COUNT
+      disabled: false
+    - match:
+        metric: REQUEST_DURATION
+      disabled: false
+    - match:
+        metric: REQUEST_SIZE
+      disabled: false
+    - match:
+        metric: RESPONSE_SIZE
+      disabled: false
+
+---
+# Telemetry for distributed tracing
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: pyairtable-tracing
+  namespace: pyairtable
+spec:
+  tracing:
+  - providers:
+    - name: jaeger
+
+---
+# EnvoyFilter for custom headers and rate limiting
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: api-gateway-ratelimit
+  namespace: pyairtable
+spec:
+  workloadSelector:
+    labels:
+      app: api-gateway
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: envoy.filters.network.http_connection_manager
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.local_ratelimit
+        typed_config:
+          "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+          type_url: type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+          value:
+            stat_prefix: local_rate_limiter
+            token_bucket:
+              max_tokens: 1000
+              tokens_per_fill: 1000
+              fill_interval: 60s
+            filter_enabled:
+              runtime_key: local_rate_limit_enabled
+              default_value:
+                numerator: 100
+                denominator: HUNDRED
+            filter_enforced:
+              runtime_key: local_rate_limit_enforced
+              default_value:
+                numerator: 100
+                denominator: HUNDRED
+
+---
+# Sidecar configuration to optimize resource usage
+apiVersion: networking.istio.io/v1beta1
+kind: Sidecar
+metadata:
+  name: pyairtable-sidecar
+  namespace: pyairtable
+spec:
+  workloadSelector:
+    labels:
+      app: api-gateway
+  ingress:
+  - port:
+      number: 8080
+      protocol: HTTP
+      name: http
+    defaultEndpoint: 127.0.0.1:8080
+  egress:
+  - hosts:
+    - "./airtable-gateway.pyairtable.svc.cluster.local"
+    - "./llm-orchestrator.pyairtable.svc.cluster.local"
+    - "./mcp-server.pyairtable.svc.cluster.local"
+    - "./redis-service.pyairtable.svc.cluster.local"
+    - "./postgres-service.pyairtable.svc.cluster.local"
+    - "api.airtable.com"
+    - "generativelanguage.googleapis.com"
+
+---
+# Workload Entry for external monitoring (if needed)
+apiVersion: networking.istio.io/v1beta1
+kind: WorkloadEntry
+metadata:
+  name: external-monitor
+  namespace: pyairtable
+spec:
+  address: "monitor.pyairtable.com"
+  ports:
+    https: 443
+  labels:
+    app: external-monitor
+    version: v1

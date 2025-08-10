@@ -1,0 +1,6 @@
+pyairtable-compose-airtable-gateway-1: Restarting (1) Less than a second ago
+pyairtable-compose-postgres-1: Up 14 minutes
+pyairtable-compose-redis-1: Up 14 minutes
+content-engine-postgres: Up 4 hours (healthy)
+content-engine-redis: Up 4 hours (healthy)
+go-services-api-gateway-1: Up 20 seconds (health: starting)

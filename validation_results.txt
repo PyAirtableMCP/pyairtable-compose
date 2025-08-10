@@ -1,0 +1,40 @@
+=============================================================================
+PyAirtable Environment Validation
+=============================================================================
+[0;34m[INFO][0m Loading environment from .env file
+
+[0;34m[INFO][0m Validating required external API credentials...
+[0;32m[SUCCESS][0m ✓ AIRTABLE_TOKEN is set
+[0;32m[SUCCESS][0m ✓ AIRTABLE_BASE is set
+[0;32m[SUCCESS][0m ✓ GEMINI_API_KEY is set
+
+[0;34m[INFO][0m Validating secure secrets...
+[0;32m[SUCCESS][0m ✓ API_KEY is set
+[0;32m[SUCCESS][0m ✓ JWT_SECRET is set
+[0;32m[SUCCESS][0m ✓ NEXTAUTH_SECRET is set
+[0;32m[SUCCESS][0m ✓ POSTGRES_PASSWORD is set
+[0;32m[SUCCESS][0m ✓ REDIS_PASSWORD is set
+[0;32m[SUCCESS][0m ✓ API_KEY length meets security standards
+[0;32m[SUCCESS][0m ✓ JWT_SECRET length meets security standards
+[0;32m[SUCCESS][0m ✓ POSTGRES_PASSWORD length meets security standards
+
+[0;34m[INFO][0m Validating environment configuration...
+[0;32m[SUCCESS][0m ✓ ENVIRONMENT is set
+[0;32m[SUCCESS][0m ✓ LOG_LEVEL is set
+[0;32m[SUCCESS][0m ✓ POSTGRES_DB is set
+[0;32m[SUCCESS][0m ✓ POSTGRES_USER is set
+
+[0;34m[INFO][0m Validating service URLs...
+[0;32m[SUCCESS][0m ✓ AIRTABLE_GATEWAY_URL is set
+[0;32m[SUCCESS][0m ✓ MCP_SERVER_URL is set
+[0;32m[SUCCESS][0m ✓ LLM_ORCHESTRATOR_URL is set
+[0;32m[SUCCESS][0m ✓ API_GATEWAY_URL is set
+[0;32m[SUCCESS][0m ✓ AIRTABLE_GATEWAY_URL URL format is valid
+[0;32m[SUCCESS][0m ✓ MCP_SERVER_URL URL format is valid
+[0;32m[SUCCESS][0m ✓ LLM_ORCHESTRATOR_URL URL format is valid
+[0;32m[SUCCESS][0m ✓ API_GATEWAY_URL URL format is valid
+
+[0;34m[INFO][0m Validating database connections...
+[0;32m[SUCCESS][0m ✓ DATABASE_URL is set
+[0;32m[SUCCESS][0m ✓ REDIS_URL is set
+[0;33m[WARNING][0m DATABASE_URL should include connect_timeout parameter

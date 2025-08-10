@@ -1,0 +1,70 @@
+{
+  "health_endpoints": {
+    "mcp-server": {
+      "response_time_ms": 51.72,
+      "status_code": 200,
+      "success": true
+    },
+    "airtable-gateway": {
+      "response_time_ms": 41.0,
+      "status_code": 200,
+      "success": true
+    },
+    "llm-orchestrator": {
+      "response_time_ms": 23.22,
+      "status_code": 200,
+      "success": true
+    },
+    "automation-services": {
+      "response_time_ms": 40.59,
+      "status_code": 200,
+      "success": true
+    },
+    "platform-services": {
+      "response_time_ms": 52.06,
+      "status_code": 200,
+      "success": true
+    },
+    "saga-orchestrator": {
+      "response_time_ms": 31.42,
+      "status_code": 200,
+      "success": true
+    }
+  },
+  "concurrent_load": {
+    "total_requests": 24,
+    "successful_requests": 24,
+    "failed_requests": 0,
+    "success_rate": 100.0,
+    "average_response_time_ms": 67.55822896957397,
+    "max_response_time_ms": 204.12516593933105,
+    "min_response_time_ms": 10.445117950439453
+  },
+  "api_endpoints": {
+    "platform/auth/profile": {
+      "response_time_ms": 42.63,
+      "status_code": 500,
+      "success": false
+    },
+    "platform/analytics/metrics": {
+      "response_time_ms": 15.61,
+      "status_code": 500,
+      "success": false
+    },
+    "platform/gdpr/consent": {
+      "response_time_ms": 7.6,
+      "status_code": 500,
+      "success": false
+    }
+  },
+  "throughput": {
+    "duration_seconds": 15,
+    "total_requests": 135,
+    "successful_requests": 135,
+    "requests_per_second": 9.0,
+    "success_rate": 100.0,
+    "average_response_time_ms": 6.817044152153863
+  },
+  "test_duration": "0:00:15.624769",
+  "timestamp": "2025-08-07T10:42:05.938259"
+}

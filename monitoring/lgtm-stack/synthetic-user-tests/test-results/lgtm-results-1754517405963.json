@@ -1,0 +1,42 @@
+{
+  "summary": {
+    "status": "failed",
+    "startTime": 1754517405682,
+    "endTime": 1754517405878,
+    "duration": 196,
+    "totalTests": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "flaky": 0
+  },
+  "testResults": [],
+  "metrics": {},
+  "traces": 0,
+  "config": {
+    "lokiUrl": "http://localhost:3100",
+    "mimirUrl": "http://localhost:9009",
+    "tempoUrl": "http://localhost:3200",
+    "serviceName": "pyairtable-synthetic-tests",
+    "environment": "test",
+    "outputDir": "test-results",
+    "configDir": "/Users/kg/IdeaProjects/pyairtable-compose/monitoring/lgtm-stack/synthetic-user-tests",
+    "_mode": "list",
+    "_isTestServer": false,
+    "_commandHash": "",
+    "outputFile": "lgtm-report.json",
+    "detailedLogs": true,
+    "realTimeMetrics": true,
+    "lgtm": {
+      "lokiUrl": "http://localhost:3100",
+      "mimirUrl": "http://localhost:9009",
+      "tempoUrl": "http://localhost:3200",
+      "grafanaUrl": "http://localhost:3000",
+      "lokiEnabled": true,
+      "mimirEnabled": true,
+      "tempoEnabled": true,
+      "grafanaEnabled": true
+    }
+  },
+  "exportTime": "2025-08-06T21:56:45.963Z"
+}

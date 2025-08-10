@@ -1,42 +1,23 @@
-# Build stage
-FROM python:3.11-slim as builder
+FROM python:3.12-slim
 
 WORKDIR /app
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
-    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir --user -r requirements.txt
-
-# Runtime stage
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Create non-root user
-RUN useradd -m -u 1000 appuser
-
-# Copy dependencies from builder
-COPY --from=builder /root/.local /home/appuser/.local
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY src/ ./src/
 
 # Set Python path
-ENV PATH=/home/appuser/.local/bin:$PATH
-ENV PYTHONPATH=/app/src
-
-# Change ownership
-RUN chown -R appuser:appuser /app
-
-USER appuser
+ENV PYTHONPATH=/app
 
 EXPOSE 8002
 

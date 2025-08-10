@@ -1,0 +1,132 @@
+{
+  "timestamp": "2025-08-08T15:05:34.857944",
+  "summary": {
+    "total_tests": 9,
+    "passed": 6,
+    "failed": 3,
+    "skipped": 0,
+    "success_rate": 66.67
+  },
+  "test_results": [
+    {
+      "name": "service_health",
+      "status": "PASSED",
+      "message": "Automation services are healthy",
+      "duration": 0.09,
+      "details": {
+        "service": "PyAirtable Automation Services",
+        "version": "1.0.0",
+        "timestamp": "2025-08-08T15:05:24.317782",
+        "status": "healthy",
+        "components": {
+          "database": {
+            "status": "healthy",
+            "message": "Database connection successful"
+          },
+          "redis": {
+            "status": "healthy",
+            "message": "Redis connection successful"
+          },
+          "file_storage": {
+            "status": "healthy",
+            "message": "Upload directory accessible: /tmp/uploads"
+          },
+          "scheduler": {
+            "status": "healthy",
+            "message": "Workflow scheduler running"
+          }
+        }
+      }
+    },
+    {
+      "name": "saga_health",
+      "status": "PASSED",
+      "message": "SAGA orchestrator is healthy",
+      "duration": 0.03,
+      "details": {
+        "status": "healthy",
+        "version": "0.1.0",
+        "timestamp": "2025-08-08T15:05:24.384317",
+        "components": {
+          "saga_orchestrator": "healthy",
+          "redis": "healthy",
+          "database": "healthy",
+          "event_bus": "healthy"
+        }
+      }
+    },
+    {
+      "name": "template_crud",
+      "status": "PASSED",
+      "message": "Template CRUD operations successful",
+      "duration": 0.06,
+      "details": {
+        "template_id": 8,
+        "operations": [
+          "create",
+          "read",
+          "update",
+          "list"
+        ]
+      }
+    },
+    {
+      "name": "workflow_from_template",
+      "status": "PASSED",
+      "message": "Workflow created from template successfully",
+      "duration": 0.02,
+      "details": {
+        "workflow_id": 21,
+        "template_id": 8
+      }
+    },
+    {
+      "name": "workflow_execution",
+      "status": "FAILED",
+      "message": "Workflow execution failed: Execution failed with status: failed",
+      "duration": 4.18,
+      "details": {}
+    },
+    {
+      "name": "saga_integration",
+      "status": "FAILED",
+      "message": "SAGA integration failed: SAGA list failed: 404",
+      "duration": 0.01,
+      "details": {}
+    },
+    {
+      "name": "workflow_step_tracking",
+      "status": "FAILED",
+      "message": "Step tracking test failed: Multi-step execution failed: failed",
+      "duration": 4.11,
+      "details": {}
+    },
+    {
+      "name": "error_handling_rollback",
+      "status": "PASSED",
+      "message": "Error handling working correctly - workflow failed as expected",
+      "duration": 2.08,
+      "details": {
+        "workflow_id": 23,
+        "execution_id": 5,
+        "final_status": "failed",
+        "error_message": "can't subtract offset-naive and offset-aware datetimes"
+      }
+    },
+    {
+      "name": "cleanup",
+      "status": "PASSED",
+      "message": "Cleaned up 2 test resources",
+      "duration": 0.05,
+      "details": {
+        "cleaned_items": 2
+      }
+    }
+  ],
+  "test_data_summary": {
+    "templates_created": 1,
+    "workflows_created": 1,
+    "executions_run": 1,
+    "saga_instances_found": 0
+  }
+}

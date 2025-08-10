@@ -1,0 +1,109 @@
+# Frontend Deployment for Development (Minikube)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: default
+  labels:
+    app: frontend
+    component: frontend
+    tier: frontend
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+        component: frontend
+        tier: frontend
+        version: v1
+    spec:
+      containers:
+      - name: frontend
+        image: ghcr.io/reg-kris/pyairtable-tenant-dashboard:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        env:
+        # API Gateway endpoint (accessible from host)
+        - name: NEXT_PUBLIC_API_URL
+          value: "http://localhost:8000"
+        - name: NEXT_PUBLIC_API_GATEWAY_URL
+          value: "http://api-gateway:8000"
+        # Internal service URLs (for SSR/API routes)
+        - name: LLM_ORCHESTRATOR_URL
+          value: "http://llm-orchestrator:8003"
+        - name: MCP_SERVER_URL
+          value: "http://mcp-server:8001"
+        - name: AIRTABLE_GATEWAY_URL
+          value: "http://airtable-gateway:8002"
+        - name: PLATFORM_SERVICES_URL
+          value: "http://platform-services:8007"
+        - name: AUTOMATION_SERVICES_URL
+          value: "http://automation-services:8006"
+        - name: SAGA_ORCHESTRATOR_URL
+          value: "http://saga-orchestrator:8008"
+        # Authentication and security
+        - name: NEXTAUTH_URL
+          value: "http://localhost:3000"
+        - name: NEXTAUTH_SECRET
+          value: "dev-secret-key-for-testing-only"
+        - name: NODE_ENV
+          value: "development"
+        # Database URL for API routes
+        - name: DATABASE_URL
+          value: "postgresql://postgres:postgres@postgres:5432/pyairtable"
+        # Feature flags
+        - name: NEXT_PUBLIC_ENABLE_DEBUG
+          value: "true"
+        - name: NEXT_PUBLIC_SHOW_COST_TRACKING
+          value: "true"
+        # WebSocket configuration
+        - name: NEXT_PUBLIC_WS_URL
+          value: "ws://localhost:8000/ws"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: default
+  labels:
+    app: frontend
+    component: frontend
+spec:
+  type: NodePort
+  ports:
+  - port: 3000
+    targetPort: 3000
+    nodePort: 30000
+    protocol: TCP
+    name: http
+  selector:
+    app: frontend

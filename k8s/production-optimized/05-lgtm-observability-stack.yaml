@@ -1,0 +1,724 @@
+# LGTM Observability Stack - Loki, Grafana, Tempo, Mimir for Production PyAirtable
+---
+# Namespace for observability
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+  labels:
+    name: observability
+    istio-injection: enabled
+
+---
+# Loki Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-config
+  namespace: observability
+data:
+  loki.yaml: |
+    auth_enabled: false
+    server:
+      http_listen_port: 3100
+      grpc_listen_port: 9096
+    
+    common:
+      path_prefix: /loki
+      storage:
+        filesystem:
+          chunks_directory: /loki/chunks
+          rules_directory: /loki/rules
+      replication_factor: 1
+      ring:
+        kvstore:
+          store: inmemory
+    
+    query_range:
+      results_cache:
+        cache:
+          embedded_cache:
+            enabled: true
+            max_size_mb: 100
+    
+    schema_config:
+      configs:
+        - from: 2020-10-24
+          store: boltdb-shipper
+          object_store: filesystem
+          schema: v11
+          index:
+            prefix: index_
+            period: 24h
+    
+    ruler:
+      alertmanager_url: http://alertmanager:9093
+    
+    # Frontend configuration
+    frontend:
+      compress_responses: true
+      downstream_url: http://query-frontend:3100
+    
+    # Limits configuration
+    limits_config:
+      retention_period: 336h  # 14 days
+      ingestion_rate_mb: 16
+      ingestion_burst_size_mb: 32
+      max_concurrent_tail_requests: 10
+      max_cache_freshness_per_query: 10m
+
+---
+# Loki StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: loki
+  namespace: observability
+  labels:
+    app: loki
+spec:
+  serviceName: loki
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loki
+  template:
+    metadata:
+      labels:
+        app: loki
+    spec:
+      serviceAccountName: loki
+      securityContext:
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+      - name: loki
+        image: grafana/loki:3.0.0
+        args:
+        - -config.file=/etc/loki/loki.yaml
+        ports:
+        - name: http-metrics
+          containerPort: 3100
+          protocol: TCP
+        - name: grpc
+          containerPort: 9096
+          protocol: TCP
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /ready
+            port: http-metrics
+          initialDelaySeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http-metrics
+          initialDelaySeconds: 15
+        volumeMounts:
+        - name: loki-config
+          mountPath: /etc/loki
+        - name: loki-storage
+          mountPath: /loki
+      volumes:
+      - name: loki-config
+        configMap:
+          name: loki-config
+  volumeClaimTemplates:
+  - metadata:
+      name: loki-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 20Gi
+
+---
+# Loki Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki
+  namespace: observability
+  labels:
+    app: loki
+spec:
+  ports:
+  - name: http-metrics
+    port: 3100
+    targetPort: http-metrics
+    protocol: TCP
+  - name: grpc
+    port: 9096
+    targetPort: grpc
+    protocol: TCP
+  selector:
+    app: loki
+
+---
+# Grafana Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: observability
+data:
+  grafana.ini: |
+    [analytics]
+    check_for_updates = true
+    [log]
+    mode = console
+    [paths]
+    data = /var/lib/grafana/data
+    logs = /var/log/grafana
+    plugins = /var/lib/grafana/plugins
+    provisioning = /etc/grafana/provisioning
+    [security]
+    admin_user = admin
+    admin_password = admin123
+    [server]
+    domain = grafana.pyairtable.local
+    http_port = 3000
+    root_url = https://grafana.pyairtable.local
+
+---
+# Grafana Datasources Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: observability
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki:3100
+      isDefault: false
+    - name: Prometheus
+      type: prometheus
+      access: proxy
+      url: http://mimir:9009/prometheus
+      isDefault: true
+    - name: Tempo
+      type: tempo
+      access: proxy
+      url: http://tempo:3200
+      isDefault: false
+    - name: Mimir
+      type: prometheus
+      access: proxy
+      url: http://mimir:9009/prometheus
+      isDefault: false
+
+---
+# Grafana Dashboards Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-config
+  namespace: observability
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+    - name: 'PyAirtable Dashboards'
+      orgId: 1
+      folder: 'PyAirtable'
+      type: file
+      disableDeletion: false
+      updateIntervalSeconds: 10
+      allowUiUpdates: true
+      options:
+        path: /var/lib/grafana/dashboards
+
+---
+# PyAirtable API Gateway Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pyairtable-api-dashboard
+  namespace: observability
+data:
+  api-gateway-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "PyAirtable API Gateway",
+        "tags": ["pyairtable", "api-gateway"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(istio_requests_total{destination_service_name=\"api-gateway\"}[5m]))",
+                "legendFormat": "Request Rate"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Response Times",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{destination_service_name=\"api-gateway\"}[5m])) by (le))",
+                "legendFormat": "95th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.50, sum(rate(istio_request_duration_milliseconds_bucket{destination_service_name=\"api-gateway\"}[5m])) by (le))",
+                "legendFormat": "50th percentile"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          }
+        ],
+        "time": {"from": "now-1h", "to": "now"},
+        "refresh": "5s"
+      }
+    }
+
+---
+# Grafana Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: observability
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      serviceAccountName: grafana
+      securityContext:
+        runAsUser: 472
+        runAsGroup: 472
+        fsGroup: 472
+      containers:
+      - name: grafana
+        image: grafana/grafana:10.4.0
+        ports:
+        - name: http
+          containerPort: 3000
+          protocol: TCP
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: http
+          initialDelaySeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: http
+          initialDelaySeconds: 15
+        volumeMounts:
+        - name: grafana-config
+          mountPath: /etc/grafana
+        - name: grafana-datasources
+          mountPath: /etc/grafana/provisioning/datasources
+        - name: grafana-dashboards-config
+          mountPath: /etc/grafana/provisioning/dashboards
+        - name: grafana-dashboards
+          mountPath: /var/lib/grafana/dashboards
+        - name: grafana-storage
+          mountPath: /var/lib/grafana
+      volumes:
+      - name: grafana-config
+        configMap:
+          name: grafana-config
+      - name: grafana-datasources
+        configMap:
+          name: grafana-datasources
+      - name: grafana-dashboards-config
+        configMap:
+          name: grafana-dashboards-config
+      - name: grafana-dashboards
+        configMap:
+          name: pyairtable-api-dashboard
+      - name: grafana-storage
+        emptyDir: {}
+
+---
+# Grafana Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: observability
+  labels:
+    app: grafana
+spec:
+  ports:
+  - name: http
+    port: 3000
+    targetPort: http
+    protocol: TCP
+  selector:
+    app: grafana
+  type: LoadBalancer
+
+---
+# Tempo Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tempo-config
+  namespace: observability
+data:
+  tempo.yaml: |
+    server:
+      http_listen_port: 3200
+    
+    distributor:
+      receivers:
+        jaeger:
+          protocols:
+            thrift_http:
+              endpoint: 0.0.0.0:14268
+            grpc:
+              endpoint: 0.0.0.0:14250
+        otlp:
+          protocols:
+            http:
+              endpoint: 0.0.0.0:4318
+            grpc:
+              endpoint: 0.0.0.0:4317
+    
+    ingester:
+      trace_idle_period: 10s
+      max_block_duration: 5m
+    
+    compactor:
+      compaction:
+        compaction_window: 1h
+        max_block_bytes: 100_000_000
+        retention_duration: 48h
+    
+    storage:
+      trace:
+        backend: local
+        local:
+          path: /tmp/tempo/traces
+        wal:
+          path: /tmp/tempo/wal
+        pool:
+          max_workers: 100
+          queue_depth: 10000
+
+---
+# Tempo StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tempo
+  namespace: observability
+  labels:
+    app: tempo
+spec:
+  serviceName: tempo
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tempo
+  template:
+    metadata:
+      labels:
+        app: tempo
+    spec:
+      serviceAccountName: tempo
+      containers:
+      - name: tempo
+        image: grafana/tempo:2.4.0
+        args:
+        - -config.file=/etc/tempo/tempo.yaml
+        ports:
+        - name: http
+          containerPort: 3200
+        - name: jaeger-http
+          containerPort: 14268
+        - name: jaeger-grpc
+          containerPort: 14250
+        - name: otlp-http
+          containerPort: 4318
+        - name: otlp-grpc
+          containerPort: 4317
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 15
+        volumeMounts:
+        - name: tempo-config
+          mountPath: /etc/tempo
+        - name: tempo-storage
+          mountPath: /tmp/tempo
+      volumes:
+      - name: tempo-config
+        configMap:
+          name: tempo-config
+  volumeClaimTemplates:
+  - metadata:
+      name: tempo-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 20Gi
+
+---
+# Tempo Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo
+  namespace: observability
+  labels:
+    app: tempo
+spec:
+  ports:
+  - name: http
+    port: 3200
+    targetPort: http
+  - name: jaeger-http
+    port: 14268
+    targetPort: jaeger-http
+  - name: jaeger-grpc
+    port: 14250
+    targetPort: jaeger-grpc
+  - name: otlp-http
+    port: 4318
+    targetPort: otlp-http
+  - name: otlp-grpc
+    port: 4317
+    targetPort: otlp-grpc
+  selector:
+    app: tempo
+
+---
+# Mimir Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mimir-config
+  namespace: observability
+data:
+  mimir.yaml: |
+    target: all
+    
+    server:
+      http_listen_port: 9009
+      grpc_listen_port: 9095
+      log_level: info
+    
+    common:
+      storage:
+        backend: filesystem
+        filesystem:
+          dir: /data/mimir
+    
+    blocks_storage:
+      filesystem:
+        dir: /data/mimir/blocks
+    
+    compactor:
+      data_dir: /data/mimir/compactor
+      sharding_ring:
+        kvstore:
+          store: inmemory
+    
+    distributor:
+      ring:
+        kvstore:
+          store: inmemory
+    
+    ingester:
+      ring:
+        kvstore:
+          store: inmemory
+    
+    ruler:
+      rule_path: /data/mimir/rules
+    
+    store_gateway:
+      sharding_ring:
+        kvstore:
+          store: inmemory
+
+---
+# Mimir StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mimir
+  namespace: observability
+  labels:
+    app: mimir
+spec:
+  serviceName: mimir
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mimir
+  template:
+    metadata:
+      labels:
+        app: mimir
+    spec:
+      serviceAccountName: mimir
+      containers:
+      - name: mimir
+        image: grafana/mimir:2.11.0
+        args:
+        - -config.file=/etc/mimir/mimir.yaml
+        ports:
+        - name: http
+          containerPort: 9009
+        - name: grpc
+          containerPort: 9095
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 45
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 15
+        volumeMounts:
+        - name: mimir-config
+          mountPath: /etc/mimir
+        - name: mimir-storage
+          mountPath: /data/mimir
+      volumes:
+      - name: mimir-config
+        configMap:
+          name: mimir-config
+  volumeClaimTemplates:
+  - metadata:
+      name: mimir-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 50Gi
+
+---
+# Mimir Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mimir
+  namespace: observability
+  labels:
+    app: mimir
+spec:
+  ports:
+  - name: http
+    port: 9009
+    targetPort: http
+  - name: grpc
+    port: 9095
+    targetPort: grpc
+  selector:
+    app: mimir
+
+---
+# Service Accounts
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: loki
+  namespace: observability
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grafana
+  namespace: observability
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tempo
+  namespace: observability
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mimir
+  namespace: observability
+
+---
+# RBAC for Grafana
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: grafana
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "nodes/metrics", "services", "endpoints", "pods"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: grafana
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: grafana
+subjects:
+- kind: ServiceAccount
+  name: grafana
+  namespace: observability
