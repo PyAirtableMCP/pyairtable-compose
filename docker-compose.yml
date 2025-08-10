@@ -381,7 +381,7 @@ services:
       context: ./frontend-services/tenant-dashboard
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "5173:5173"
     environment:
       # API Gateway endpoint
       - NEXT_PUBLIC_API_URL=http://localhost:8000
@@ -396,7 +396,7 @@ services:
       # Authentication and security
       - API_KEY=${API_KEY}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_URL=http://localhost:5173
       # Development configuration
       - NODE_ENV=${NODE_ENV:-development}
       - LOG_LEVEL=${LOG_LEVEL:-info}
