@@ -16,7 +16,8 @@ export async function middleware(req: NextRequest) {
     '/admin',
     '/api/protected',
     '/settings',
-    '/profile'
+    '/profile',
+    '/auth/change-password'
   ]
 
   const isProtectedPath = protectedPaths.some(path => 

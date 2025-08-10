@@ -22,7 +22,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: "/auth/login",
     signUp: "/auth/register",
     error: "/auth/error",
-    verifyRequest: "/auth/verify-request",
+    verifyRequest: "/auth/verify-email",
   },
   providers: [
     // Temporarily disabled OAuth providers for testing

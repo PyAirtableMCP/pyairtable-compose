@@ -9,6 +9,7 @@ import { Toaster } from "react-hot-toast";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { handleAsyncError } from "@/components/error-boundary";
 import { PWAPrompts, ConnectionStatus } from "@/components/pwa/PWAPrompts";
+import { AuthProvider } from "@/contexts/auth-context";
 
 interface ProvidersProps {
   children: React.ReactNode;
@@ -59,9 +60,10 @@ export function Providers({ children }: ProvidersProps) {
       }}
     >
       <SessionProvider>
-        {/* Temporarily disabled: <PostHogProvider> */}
-          <QueryClientProvider client={queryClient}>
-            {children}
+        <AuthProvider>
+          {/* Temporarily disabled: <PostHogProvider> */}
+            <QueryClientProvider client={queryClient}>
+              {children}
             <Toaster
               position="top-right"
               toastOptions={{
@@ -93,8 +95,9 @@ export function Providers({ children }: ProvidersProps) {
             {/* PWA Components */}
             <ConnectionStatus />
             <PWAPrompts showInstallBanner={true} autoShowInstallDialog={false} />
-          </QueryClientProvider>
-        {/* Temporarily disabled: </PostHogProvider> */}
+            </QueryClientProvider>
+          {/* Temporarily disabled: </PostHogProvider> */}
+        </AuthProvider>
       </SessionProvider>
     </ErrorBoundary>
   );
