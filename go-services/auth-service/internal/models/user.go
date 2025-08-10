@@ -23,8 +23,17 @@ type User struct {
 
 // LoginRequest represents a login request
 type LoginRequest struct {
-    Email    string `json:"email" validate:"required,email"`
+    Email    string `json:"email" validate:"omitempty,email"`
+    Username string `json:"username" validate:"omitempty"`
     Password string `json:"password" validate:"required,min=8"`
+}
+
+// GetIdentifier returns email if provided, otherwise username (for login flexibility)
+func (lr *LoginRequest) GetIdentifier() string {
+    if lr.Email != "" {
+        return lr.Email
+    }
+    return lr.Username
 }
 
 // RegisterRequest represents a registration request
@@ -47,6 +56,12 @@ type TokenResponse struct {
 // RefreshRequest represents a token refresh request
 type RefreshRequest struct {
     RefreshToken string `json:"refresh_token" validate:"required"`
+}
+
+// UpdateProfileRequest represents a profile update request
+type UpdateProfileRequest struct {
+    FirstName string `json:"first_name,omitempty" validate:"omitempty,min=1"`
+    LastName  string `json:"last_name,omitempty" validate:"omitempty,min=1"`
 }
 
 // ChangePasswordRequest represents a password change request

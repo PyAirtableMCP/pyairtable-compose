@@ -2,7 +2,7 @@ package repository
 
 import (
     "time"
-    "github.com/Reg-Kris/pyairtable-auth-service/internal/models"
+    "github.com/pyairtable-compose/auth-service/internal/models"
 )
 
 // UserRepository defines the interface for user data access
