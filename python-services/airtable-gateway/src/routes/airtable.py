@@ -1,10 +1,20 @@
 """Airtable API routes"""
+import logging
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from redis import asyncio as aioredis
 
-from ..services.airtable import AirtableService
+from ..services.airtable import (
+    AirtableService, 
+    AirtableError, 
+    AirtableAuthError, 
+    AirtableRateLimitError, 
+    AirtableNotFoundError, 
+    AirtableValidationError
+)
 from ..dependencies import get_redis_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/airtable", tags=["airtable"])
 
@@ -12,6 +22,66 @@ router = APIRouter(prefix="/api/v1/airtable", tags=["airtable"])
 async def get_airtable_service(redis: aioredis.Redis = Depends(get_redis_client)) -> AirtableService:
     """Get Airtable service instance"""
     return AirtableService(redis)
+
+
+def handle_airtable_error(error: Exception) -> HTTPException:
+    """Convert Airtable errors to appropriate HTTP exceptions"""
+    if isinstance(error, AirtableAuthError):
+        return HTTPException(
+            status_code=401,
+            detail={
+                "error": "Authentication Error",
+                "message": error.message,
+                "type": error.error_type or "AUTHENTICATION_ERROR"
+            }
+        )
+    elif isinstance(error, AirtableNotFoundError):
+        return HTTPException(
+            status_code=404,
+            detail={
+                "error": "Not Found",
+                "message": error.message,
+                "type": error.error_type or "NOT_FOUND_ERROR"
+            }
+        )
+    elif isinstance(error, AirtableValidationError):
+        return HTTPException(
+            status_code=422,
+            detail={
+                "error": "Validation Error",
+                "message": error.message,
+                "type": error.error_type or "VALIDATION_ERROR"
+            }
+        )
+    elif isinstance(error, AirtableRateLimitError):
+        return HTTPException(
+            status_code=429,
+            detail={
+                "error": "Rate Limit Exceeded",
+                "message": error.message,
+                "type": error.error_type or "RATE_LIMIT_ERROR"
+            }
+        )
+    elif isinstance(error, AirtableError):
+        status_code = error.status_code or 500
+        return HTTPException(
+            status_code=status_code,
+            detail={
+                "error": "Airtable API Error",
+                "message": error.message,
+                "type": error.error_type or "AIRTABLE_ERROR"
+            }
+        )
+    else:
+        logger.exception("Unexpected error in Airtable operation")
+        return HTTPException(
+            status_code=500,
+            detail={
+                "error": "Internal Server Error",
+                "message": "An unexpected error occurred",
+                "type": "INTERNAL_ERROR"
+            }
+        )
 
 
 @router.get("/bases")
@@ -22,7 +92,7 @@ async def list_bases(
     try:
         return await service.list_bases()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise handle_airtable_error(e)
 
 
 @router.get("/bases/{base_id}/schema")
@@ -34,7 +104,7 @@ async def get_base_schema(
     try:
         return await service.get_base_schema(base_id)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise handle_airtable_error(e)
 
 
 @router.get("/bases/{base_id}/tables/{table_id}/records")
@@ -69,7 +139,7 @@ async def list_records(
             sort=sort
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise handle_airtable_error(e)
 
 
 @router.get("/bases/{base_id}/tables/{table_id}/records/{record_id}")
@@ -83,7 +153,7 @@ async def get_record(
     try:
         return await service.get_record(base_id, table_id, record_id)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise handle_airtable_error(e)
 
 
 @router.post("/bases/{base_id}/tables/{table_id}/records")
@@ -100,7 +170,7 @@ async def create_records(
         formatted_records = [{"fields": record} for record in records]
         return await service.create_records(base_id, table_id, formatted_records, typecast)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise handle_airtable_error(e)
 
 
 @router.patch("/bases/{base_id}/tables/{table_id}/records")
@@ -127,7 +197,7 @@ async def update_records(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise handle_airtable_error(e)
 
 
 @router.put("/bases/{base_id}/tables/{table_id}/records")
@@ -154,7 +224,7 @@ async def replace_records(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise handle_airtable_error(e)
 
 
 @router.delete("/bases/{base_id}/tables/{table_id}/records")
@@ -168,7 +238,7 @@ async def delete_records(
     try:
         return await service.delete_records(base_id, table_id, record_ids)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise handle_airtable_error(e)
 
 
 @router.post("/cache/invalidate")
@@ -181,4 +251,4 @@ async def invalidate_cache(
         await service.invalidate_cache(pattern)
         return {"status": "success", "message": f"Cache invalidated for pattern: {pattern or 'all'}"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise handle_airtable_error(e)
