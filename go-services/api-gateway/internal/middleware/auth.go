@@ -11,14 +11,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// Claims represents the JWT claims structure
+// Claims represents the JWT claims structure - aligned with auth service
 type Claims struct {
-	UserID      string   `json:"user_id"`
-	Email       string   `json:"email"`
-	Roles       []string `json:"roles"`
-	Permissions []string `json:"permissions"`
-	TenantID    string   `json:"tenant_id,omitempty"`
-	SessionID   string   `json:"session_id,omitempty"`
+	UserID   string `json:"user_id"`
+	Email    string `json:"email"`
+	Role     string `json:"role"`
+	TenantID string `json:"tenant_id"`
 	jwt.RegisteredClaims
 }
 
@@ -61,11 +59,11 @@ func (am *AuthMiddleware) JWT() fiber.Handler {
 			})
 		}
 
-		// Parse and validate token
+		// Parse and validate token using proper algorithm validation
 		token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-			// Validate signing method
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			// Explicitly validate algorithm to prevent algorithm confusion attacks
+			if token.Method != jwt.SigningMethodHS256 {
+				return nil, fmt.Errorf("unexpected signing method: only HS256 allowed")
 			}
 			return []byte(am.config.Auth.JWTSecret), nil
 		})
@@ -102,20 +100,15 @@ func (am *AuthMiddleware) JWT() fiber.Handler {
 		c.Locals("user", claims)
 		c.Locals("user_id", claims.UserID)
 		c.Locals("email", claims.Email)
-		c.Locals("roles", claims.Roles)
-		c.Locals("permissions", claims.Permissions)
+		c.Locals("role", claims.Role)
 		c.Locals("tenant_id", claims.TenantID)
-		c.Locals("session_id", claims.SessionID)
 
 		// Add user info to headers for backend services
 		c.Set("X-User-ID", claims.UserID)
 		c.Set("X-User-Email", claims.Email)
-		c.Set("X-User-Roles", strings.Join(claims.Roles, ","))
+		c.Set("X-User-Role", claims.Role)
 		if claims.TenantID != "" {
 			c.Set("X-Tenant-ID", claims.TenantID)
-		}
-		if claims.SessionID != "" {
-			c.Set("X-Session-ID", claims.SessionID)
 		}
 
 		am.logger.Debug("JWT authentication successful",
@@ -166,62 +159,58 @@ func (am *AuthMiddleware) APIKey() fiber.Handler {
 	}
 }
 
-// RequireRole ensures the user has one of the required roles
-func (am *AuthMiddleware) RequireRole(roles ...string) fiber.Handler {
+// RequireRole ensures the user has the required role
+func (am *AuthMiddleware) RequireRole(requiredRole string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		userRoles, ok := c.Locals("roles").([]string)
+		userRole, ok := c.Locals("role").(string)
 		if !ok {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"error": "No roles found in token",
+				"error": "No role found in token",
+			})
+		}
+
+		// Check if user has the required role
+		if userRole != requiredRole {
+			am.logger.Warn("Insufficient permissions",
+				zap.String("user_id", c.Locals("user_id").(string)),
+				zap.String("user_role", userRole),
+				zap.String("required_role", requiredRole),
+				zap.String("path", c.Path()))
+
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Insufficient permissions",
+			})
+		}
+
+		return c.Next()
+	}
+}
+
+// RequireRoles ensures the user has one of the required roles (OR condition)
+func (am *AuthMiddleware) RequireRoles(requiredRoles ...string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		userRole, ok := c.Locals("role").(string)
+		if !ok {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "No role found in token",
 			})
 		}
 
 		// Check if user has any of the required roles
-		for _, requiredRole := range roles {
-			for _, userRole := range userRoles {
-				if userRole == requiredRole {
-					return c.Next()
-				}
+		for _, requiredRole := range requiredRoles {
+			if userRole == requiredRole {
+				return c.Next()
 			}
 		}
 
 		am.logger.Warn("Insufficient permissions",
 			zap.String("user_id", c.Locals("user_id").(string)),
-			zap.Strings("user_roles", userRoles),
-			zap.Strings("required_roles", roles),
+			zap.String("user_role", userRole),
+			zap.Strings("required_roles", requiredRoles),
 			zap.String("path", c.Path()))
 
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 			"error": "Insufficient permissions",
-		})
-	}
-}
-
-// RequirePermission ensures the user has a specific permission
-func (am *AuthMiddleware) RequirePermission(permission string) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		userPermissions, ok := c.Locals("permissions").([]string)
-		if !ok {
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"error": "No permissions found in token",
-			})
-		}
-
-		// Check if user has the required permission
-		for _, userPermission := range userPermissions {
-			if userPermission == permission {
-				return c.Next()
-			}
-		}
-
-		am.logger.Warn("Missing required permission",
-			zap.String("user_id", c.Locals("user_id").(string)),
-			zap.Strings("user_permissions", userPermissions),
-			zap.String("required_permission", permission),
-			zap.String("path", c.Path()))
-
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"error": "Missing required permission",
 		})
 	}
 }
@@ -279,14 +268,13 @@ func (am *AuthMiddleware) isValidAPIKey(apiKey string) bool {
 }
 
 // GenerateToken generates a JWT token for testing purposes
-func (am *AuthMiddleware) GenerateToken(userID, email string, roles, permissions []string, tenantID string) (string, error) {
+func (am *AuthMiddleware) GenerateToken(userID, email, role, tenantID string) (string, error) {
 	now := time.Now()
 	claims := &Claims{
-		UserID:      userID,
-		Email:       email,
-		Roles:       roles,
-		Permissions: permissions,
-		TenantID:    tenantID,
+		UserID:   userID,
+		Email:    email,
+		Role:     role,
+		TenantID: tenantID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(now.Add(am.config.Auth.JWTExpiry)),
 			IssuedAt:  jwt.NewNumericDate(now),
