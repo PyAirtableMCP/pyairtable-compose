@@ -1,0 +1,274 @@
+version: '3.8'
+
+# Enhanced comprehensive test environment with isolated containers
+# Supports unit, integration, and e2e testing across all services
+# This extends the basic docker-compose.test.yml with additional testing infrastructure
+
+services:
+  # Enhanced PostgreSQL for testing with multiple databases
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: postgres-test-enhanced
+    environment:
+      POSTGRES_DB: test_db
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      # Create multiple databases for isolation
+      POSTGRES_MULTIPLE_DATABASES: "unit_test_db,integration_test_db,e2e_test_db"
+    ports:
+      - "5434:5432"  # Different port to avoid conflicts
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./tests/fixtures/sql:/docker-entrypoint-initdb.d
+      - ./tests/fixtures/scripts/create-multiple-databases.sh:/docker-entrypoint-initdb.d/01-create-multiple-databases.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d test_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - test-network
+
+  # Enhanced Redis for testing
+  redis-test:
+    image: redis:7-alpine
+    container_name: redis-test-enhanced
+    command: redis-server --appendonly yes --requirepass test_password
+    ports:
+      - "6381:6379"  # Different port to avoid conflicts
+    volumes:
+      - redis_test_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "test_password", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - test-network
+
+  # Kafka for event streaming tests
+  zookeeper-test:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper-test
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2182:2181"
+    healthcheck:
+      test: ["CMD", "nc", "-vz", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+  kafka-test:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka-test
+    depends_on:
+      zookeeper-test:
+        condition: service_healthy
+    ports:
+      - "9094:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-test:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9094
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+  # MinIO for object storage testing
+  minio-test:
+    image: minio/minio:latest
+    container_name: minio-test
+    command: server /data --console-address ":9001"
+    ports:
+      - "9003:9000"
+      - "9004:9001"
+    environment:
+      MINIO_ROOT_USER: test_access_key
+      MINIO_ROOT_PASSWORD: test_secret_key
+    volumes:
+      - minio_test_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+  # Test runner container with all tools
+  test-runner:
+    image: pyairtable-test-runner:latest
+    build:
+      context: .
+      dockerfile: tests/Dockerfile.test
+    container_name: test-runner
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+      - test_runner_cache:/root/.cache
+    environment:
+      # Database connections
+      - DATABASE_URL=postgresql://test_user:test_password@postgres-test:5432/test_db
+      - UNIT_TEST_DATABASE_URL=postgresql://test_user:test_password@postgres-test:5432/unit_test_db
+      - INTEGRATION_TEST_DATABASE_URL=postgresql://test_user:test_password@postgres-test:5432/integration_test_db
+      - E2E_TEST_DATABASE_URL=postgresql://test_user:test_password@postgres-test:5432/e2e_test_db
+      
+      # Redis connection
+      - REDIS_URL=redis://:test_password@redis-test:6379
+      
+      # Kafka connection
+      - KAFKA_BOOTSTRAP_SERVERS=kafka-test:9092
+      
+      # MinIO connection
+      - MINIO_ENDPOINT=minio-test:9000
+      - MINIO_ACCESS_KEY=test_access_key
+      - MINIO_SECRET_KEY=test_secret_key
+      
+      # Test environment settings
+      - TEST_ENVIRONMENT=docker
+      - PARALLEL_JOBS=4
+      - COVERAGE_THRESHOLD=80
+      - PYTEST_ADDOPTS=--tb=short --strict-markers
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+      kafka-test:
+        condition: service_healthy
+      minio-test:
+        condition: service_healthy
+    networks:
+      - test-network
+
+  # Test service instances for integration testing
+  api-gateway-test:
+    build:
+      context: ./go-services/api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway-test
+    environment:
+      - PORT=8000
+      - DATABASE_URL=postgresql://test_user:test_password@postgres-test:5432/integration_test_db
+      - REDIS_URL=redis://:test_password@redis-test:6379
+      - LOG_LEVEL=debug
+    ports:
+      - "8010:8000"
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    networks:
+      - test-network
+    profiles:
+      - integration-tests
+
+  auth-service-test:
+    build:
+      context: ./go-services/auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service-test
+    environment:
+      - PORT=8001
+      - DATABASE_URL=postgresql://test_user:test_password@postgres-test:5432/integration_test_db
+      - REDIS_URL=redis://:test_password@redis-test:6379
+      - JWT_SECRET=test_jwt_secret_key_for_testing_only
+      - LOG_LEVEL=debug
+    ports:
+      - "8011:8001"
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    networks:
+      - test-network
+    profiles:
+      - integration-tests
+
+  # Selenium Grid for E2E testing
+  selenium-hub:
+    image: selenium/hub:latest
+    container_name: selenium-hub-test
+    ports:
+      - "4445:4444"
+      - "4446:4442"
+      - "4447:4443"
+    environment:
+      - GRID_MAX_SESSION=4
+      - GRID_BROWSER_TIMEOUT=30
+      - GRID_TIMEOUT=300
+    networks:
+      - test-network
+    profiles:
+      - e2e-tests
+
+  selenium-chrome:
+    image: selenium/node-chrome:latest
+    container_name: selenium-chrome-test
+    depends_on:
+      - selenium-hub
+    environment:
+      - HUB_HOST=selenium-hub
+      - NODE_MAX_INSTANCES=2
+      - NODE_MAX_SESSION=2
+    volumes:
+      - /dev/shm:/dev/shm
+    networks:
+      - test-network
+    profiles:
+      - e2e-tests
+
+  # Test data seeder
+  test-data-seeder:
+    image: python:3.11-slim
+    container_name: test-data-seeder
+    working_dir: /app
+    volumes:
+      - .:/app
+      - ./tests/fixtures:/fixtures
+    environment:
+      - DATABASE_URL=postgresql://test_user:test_password@postgres-test:5432/test_db
+      - UNIT_TEST_DATABASE_URL=postgresql://test_user:test_password@postgres-test:5432/unit_test_db
+      - INTEGRATION_TEST_DATABASE_URL=postgresql://test_user:test_password@postgres-test:5432/integration_test_db
+      - E2E_TEST_DATABASE_URL=postgresql://test_user:test_password@postgres-test:5432/e2e_test_db
+    command: |
+      bash -c "
+        pip install psycopg2-binary faker
+        python /fixtures/seeders/seed_all_databases.py
+      "
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    networks:
+      - test-network
+    profiles:
+      - seed-data
+
+volumes:
+  postgres_test_data:
+    driver: local
+  redis_test_data:
+    driver: local
+  minio_test_data:
+    driver: local
+  test_runner_cache:
+    driver: local
+
+networks:
+  test-network:
+    driver: bridge
+    name: pyairtable-test-network-enhanced

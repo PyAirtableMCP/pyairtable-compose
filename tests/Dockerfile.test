@@ -1,19 +1,38 @@
-# Test runner container for PyAirtable integration tests
+# Enhanced test runner container for comprehensive testing
+# Supports Python, Go, and Node.js testing frameworks
 FROM python:3.11-slim
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
+    wget \
     git \
+    build-essential \
+    ca-certificates \
+    gnupg \
+    lsb-release \
     postgresql-client \
     redis-tools \
     jq \
     wait-for-it \
+    unzip \
+    docker.io \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js for frontend tests
+# Install Node.js and npm for frontend tests
 RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs
+
+# Install Go for Go service testing
+ENV GO_VERSION=1.21.5
+RUN wget https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz \
+    && tar -C /usr/local -xzf go${GO_VERSION}.linux-amd64.tar.gz \
+    && rm go${GO_VERSION}.linux-amd64.tar.gz
+
+# Set Go environment
+ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOPATH="/go"
+ENV PATH="${GOPATH}/bin:${PATH}"
 
 # Install Playwright for E2E tests
 RUN npx playwright install-deps \
@@ -45,7 +64,27 @@ RUN pip install \
     locust==2.16.1 \
     docker==6.1.3 \
     testcontainers==3.7.1 \
-    pact-python==2.2.1
+    pact-python==2.2.1 \
+    bandit==1.7.5 \
+    safety==2.3.5 \
+    semgrep==1.45.0
+
+# Install Go testing tools
+RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
+    && go install github.com/fzipp/gocyclo/cmd/gocyclo@latest \
+    && go install honnef.co/go/tools/cmd/staticcheck@latest
+
+# Install additional Node.js testing tools
+RUN npm install -g \
+    jest \
+    @playwright/test \
+    cypress \
+    eslint \
+    prettier \
+    typescript \
+    ts-node \
+    newman \
+    artillery
 
 # Copy test configuration
 COPY pytest.ini .

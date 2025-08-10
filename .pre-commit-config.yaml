@@ -1,0 +1,211 @@
+# Pre-commit hooks configuration for PyAirtable Compose
+# Runs tests and quality checks before commits to ensure code quality
+
+repos:
+  # Basic code quality checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-yaml
+        exclude: ^k8s/
+      - id: check-json
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+
+  # Python formatting and linting
+  - repo: https://github.com/psf/black
+    rev: 23.7.0
+    hooks:
+      - id: black
+        files: \.py$
+        args: [--line-length=100]
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        files: \.py$
+        args: [--profile=black, --line-length=100]
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.0.0
+    hooks:
+      - id: flake8
+        files: \.py$
+        args: [--max-line-length=100, --extend-ignore=E203,W503]
+
+  # Python security and dependency scanning
+  - repo: https://github.com/pycqa/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        files: \.py$
+        args: [-x, tests/, -ll, -i]
+
+  - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
+    rev: v1.3.2
+    hooks:
+      - id: python-safety-dependencies-check
+
+  # Go formatting and linting
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-fmt
+      - id: go-imports
+      - id: go-mod-tidy
+      - id: go-unit-tests
+        args: [-timeout=60s, -race, -short]
+      - id: golangci-lint
+
+  # JavaScript/TypeScript formatting and linting
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.0.0
+    hooks:
+      - id: prettier
+        files: \.(js|jsx|ts|tsx|json|css|scss|md|yaml|yml)$
+        exclude: ^(package-lock\.json|yarn\.lock)$
+
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v8.44.0
+    hooks:
+      - id: eslint
+        files: \.(js|jsx|ts|tsx)$
+        additional_dependencies:
+          - eslint@8.44.0
+          - '@typescript-eslint/parser@6.0.0'
+          - '@typescript-eslint/eslint-plugin@6.0.0'
+
+  # Dockerfile linting
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        files: Dockerfile.*
+
+  # YAML linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.32.0
+    hooks:
+      - id: yamllint
+        args: [-c=.yamllint.yaml]
+        exclude: ^k8s/
+
+  # Custom test hooks
+  - repo: local
+    hooks:
+      # Python unit tests - fast feedback
+      - id: python-unit-tests
+        name: Run Python Unit Tests
+        entry: ./scripts/pre-commit-python-tests.sh
+        language: system
+        files: \.py$
+        pass_filenames: false
+        stages: [commit]
+        verbose: true
+
+      # Go unit tests - fast feedback  
+      - id: go-unit-tests-custom
+        name: Run Go Unit Tests
+        entry: ./scripts/pre-commit-go-tests.sh
+        language: system
+        files: \.go$
+        pass_filenames: false
+        stages: [commit]
+        verbose: true
+
+      # Frontend unit tests - fast feedback
+      - id: frontend-unit-tests
+        name: Run Frontend Unit Tests
+        entry: ./scripts/pre-commit-frontend-tests.sh
+        language: system
+        files: \.(js|jsx|ts|tsx)$
+        pass_filenames: false
+        stages: [commit]
+        verbose: true
+
+      # Security checks
+      - id: security-scan
+        name: Security Vulnerability Scan
+        entry: ./scripts/pre-commit-security-scan.sh
+        language: system
+        files: \.(py|go|js|jsx|ts|tsx|json)$
+        pass_filenames: false
+        stages: [commit]
+        verbose: true
+
+      # Dependency vulnerability check
+      - id: dependency-check
+        name: Dependency Vulnerability Check
+        entry: ./scripts/pre-commit-dependency-check.sh
+        language: system
+        files: (requirements\.txt|go\.mod|package\.json|Pipfile|poetry\.lock|yarn\.lock)$
+        pass_filenames: false
+        stages: [commit]
+        verbose: true
+
+      # Integration tests - only on push to main branches
+      - id: integration-tests
+        name: Run Integration Tests
+        entry: ./scripts/pre-commit-integration-tests.sh
+        language: system
+        pass_filenames: false
+        stages: [push]
+        verbose: true
+
+      # Coverage check - ensure minimum coverage is maintained
+      - id: coverage-check
+        name: Coverage Threshold Check
+        entry: ./scripts/pre-commit-coverage-check.sh
+        language: system
+        files: \.(py|go|js|jsx|ts|tsx)$
+        pass_filenames: false
+        stages: [commit]
+        verbose: true
+
+      # License check
+      - id: license-check
+        name: License Header Check
+        entry: ./scripts/pre-commit-license-check.sh
+        language: system
+        files: \.(py|go|js|jsx|ts|tsx)$
+        pass_filenames: false
+        stages: [commit]
+
+      # Secrets detection
+      - id: secrets-check
+        name: Secrets Detection
+        entry: ./scripts/pre-commit-secrets-check.sh
+        language: system
+        files: \.(py|go|js|jsx|ts|tsx|json|yaml|yml|env)$
+        pass_filenames: false
+        stages: [commit]
+        verbose: true
+
+# Configuration for different stages
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit.com hooks
+    
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false
+
+# Allow certain hooks to fail without blocking commits
+# (useful for non-critical checks like documentation)
+fail_fast: false
+
+# Minimum pre-commit version
+minimum_pre_commit_version: 3.0.0

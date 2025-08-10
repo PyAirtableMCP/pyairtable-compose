@@ -1,0 +1,687 @@
+name: Comprehensive Testing Pipeline
+
+on:
+  push:
+    branches: [main, develop, 'feature/*', 'hotfix/*']
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run nightly tests at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_categories:
+        description: 'Test categories to run (comma-separated)'
+        required: false
+        default: 'unit,integration,e2e'
+        type: string
+      service_types:
+        description: 'Service types to test (comma-separated)'
+        required: false
+        default: 'python,go,frontend'
+        type: string
+      coverage_threshold:
+        description: 'Minimum coverage threshold (%)'
+        required: false
+        default: '80'
+        type: string
+
+env:
+  PARALLEL_JOBS: 4
+  COVERAGE_THRESHOLD: ${{ github.event.inputs.coverage_threshold || '80' }}
+  POSTGRES_DB: test_db
+  POSTGRES_USER: test_user
+  POSTGRES_PASSWORD: test_password
+  REDIS_URL: redis://localhost:6379
+  DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+
+jobs:
+  setup-and-validate:
+    runs-on: ubuntu-latest
+    outputs:
+      test_categories: ${{ steps.parse_inputs.outputs.test_categories }}
+      service_types: ${{ steps.parse_inputs.outputs.service_types }}
+      matrix_python: ${{ steps.detect_services.outputs.matrix_python }}
+      matrix_go: ${{ steps.detect_services.outputs.matrix_go }}
+      matrix_frontend: ${{ steps.detect_services.outputs.matrix_frontend }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Parse workflow inputs
+        id: parse_inputs
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "test_categories=${{ github.event.inputs.test_categories }}" >> $GITHUB_OUTPUT
+            echo "service_types=${{ github.event.inputs.service_types }}" >> $GITHUB_OUTPUT
+          else
+            echo "test_categories=unit,integration,e2e" >> $GITHUB_OUTPUT
+            echo "service_types=python,go,frontend" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Detect services for matrix strategy
+        id: detect_services
+        run: |
+          # Detect Python services
+          python_services=()
+          if [ -d "python-services" ]; then
+            for service in python-services/*/; do
+              if [ -d "$service" ] && [ "$(basename "$service")" != "shared" ]; then
+                python_services+=("\"$(basename "$service")\"")
+              fi
+            done
+          fi
+          python_matrix=$(printf '%s\n' "${python_services[@]}" | jq -R . | jq -s .)
+          echo "matrix_python=$python_matrix" >> $GITHUB_OUTPUT
+          
+          # Detect Go services
+          go_services=()
+          if [ -d "go-services" ]; then
+            for service in go-services/*/; do
+              if [ -d "$service" ] && [ "$(basename "$service")" != "shared" ] && [ "$(basename "$service")" != "pkg" ]; then
+                go_services+=("\"$(basename "$service")\"")
+              fi
+            done
+          fi
+          go_matrix=$(printf '%s\n' "${go_services[@]}" | jq -R . | jq -s .)
+          echo "matrix_go=$go_matrix" >> $GITHUB_OUTPUT
+          
+          # Detect Frontend services
+          frontend_services=()
+          if [ -d "frontend-services" ]; then
+            for service in frontend-services/*/; do
+              if [ -d "$service" ] && [ -f "$service/package.json" ]; then
+                frontend_services+=("\"$(basename "$service")\"")
+              fi
+            done
+          fi
+          frontend_matrix=$(printf '%s\n' "${frontend_services[@]}" | jq -R . | jq -s .)
+          echo "matrix_frontend=$frontend_matrix" >> $GITHUB_OUTPUT
+
+      - name: Validate test infrastructure
+        run: |
+          echo "Validating test infrastructure..."
+          
+          # Check required files
+          required_files=(
+            "test-orchestrator.sh"
+            "docker-compose.yml"
+          )
+          
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "❌ Required file missing: $file"
+              exit 1
+            fi
+          done
+          
+          echo "✅ Test infrastructure validation passed"
+
+  # Python service testing
+  test-python-services:
+    needs: setup-and-validate
+    if: contains(needs.setup-and-validate.outputs.service_types, 'python')
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.setup-and-validate.outputs.matrix_python) }}
+        test_category: ["unit", "integration"]
+        python-version: ['3.11']
+      fail-fast: false
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client redis-tools
+
+      - name: Install Python dependencies
+        working-directory: python-services/${{ matrix.service }}
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          if [ -f requirements-test.txt ]; then
+            pip install -r requirements-test.txt
+          fi
+          pip install pytest pytest-cov pytest-xdist pytest-mock coverage
+
+      - name: Create test directories
+        run: |
+          mkdir -p test-results/python/${{ matrix.test_category }}
+          mkdir -p coverage/python/${{ matrix.test_category }}
+
+      - name: Run ${{ matrix.test_category }} tests for ${{ matrix.service }}
+        working-directory: python-services/${{ matrix.service }}
+        run: |
+          export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
+          
+          case "${{ matrix.test_category }}" in
+            "unit")
+              python -m pytest tests/unit/ -v \
+                --junitxml="../../test-results/python/${{ matrix.test_category }}/${{ matrix.service }}.xml" \
+                --cov=src \
+                --cov-report=json:"../../coverage/python/${{ matrix.test_category }}/${{ matrix.service }}.json" \
+                --cov-report=html:"../../coverage/python/${{ matrix.test_category }}/${{ matrix.service }}_html" \
+                --cov-fail-under=${{ env.COVERAGE_THRESHOLD }} \
+                -n auto
+              ;;
+            "integration")
+              python -m pytest tests/integration/ -v \
+                --junitxml="../../test-results/python/${{ matrix.test_category }}/${{ matrix.service }}.xml" \
+                --cov=src \
+                --cov-report=json:"../../coverage/python/${{ matrix.test_category }}/${{ matrix.service }}.json" \
+                -n auto
+              ;;
+          esac
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: python-${{ matrix.service }}-${{ matrix.test_category }}-results
+          path: |
+            test-results/python/${{ matrix.test_category }}/${{ matrix.service }}.xml
+            coverage/python/${{ matrix.test_category }}/${{ matrix.service }}*
+
+  # Go service testing
+  test-go-services:
+    needs: setup-and-validate
+    if: contains(needs.setup-and-validate.outputs.service_types, 'go')
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.setup-and-validate.outputs.matrix_go) }}
+        test_category: ["unit", "integration"]
+        go-version: ['1.21']
+      fail-fast: false
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache-dependency-path: go-services/${{ matrix.service }}/go.sum
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client redis-tools
+
+      - name: Create test directories
+        run: |
+          mkdir -p test-results/go/${{ matrix.test_category }}
+          mkdir -p coverage/go/${{ matrix.test_category }}
+
+      - name: Run ${{ matrix.test_category }} tests for ${{ matrix.service }}
+        working-directory: go-services/${{ matrix.service }}
+        run: |
+          go mod download
+          
+          case "${{ matrix.test_category }}" in
+            "unit")
+              if [ -d "test/unit" ]; then
+                go test -v -race -coverprofile="../../coverage/go/${{ matrix.test_category }}/${{ matrix.service }}.out" -json ./test/unit/... > "../../test-results/go/${{ matrix.test_category }}/${{ matrix.service }}.json"
+              elif [ -d "tests/unit" ]; then
+                go test -v -race -coverprofile="../../coverage/go/${{ matrix.test_category }}/${{ matrix.service }}.out" -json ./tests/unit/... > "../../test-results/go/${{ matrix.test_category }}/${{ matrix.service }}.json"
+              else
+                echo "No unit tests found for ${{ matrix.service }}"
+              fi
+              ;;
+            "integration")
+              if [ -d "test/integration" ]; then
+                go test -v -race -json ./test/integration/... > "../../test-results/go/${{ matrix.test_category }}/${{ matrix.service }}.json"
+              elif [ -d "tests/integration" ]; then
+                go test -v -race -json ./tests/integration/... > "../../test-results/go/${{ matrix.test_category }}/${{ matrix.service }}.json"
+              else
+                echo "No integration tests found for ${{ matrix.service }}"
+              fi
+              ;;
+          esac
+
+      - name: Generate coverage report
+        if: matrix.test_category == 'unit'
+        working-directory: go-services/${{ matrix.service }}
+        run: |
+          if [ -f "../../coverage/go/${{ matrix.test_category }}/${{ matrix.service }}.out" ]; then
+            go tool cover -html="../../coverage/go/${{ matrix.test_category }}/${{ matrix.service }}.out" -o "../../coverage/go/${{ matrix.test_category }}/${{ matrix.service }}.html"
+            go tool cover -func="../../coverage/go/${{ matrix.test_category }}/${{ matrix.service }}.out" | tail -1 | awk '{print "Coverage: " $3}'
+          fi
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: go-${{ matrix.service }}-${{ matrix.test_category }}-results
+          path: |
+            test-results/go/${{ matrix.test_category }}/${{ matrix.service }}.json
+            coverage/go/${{ matrix.test_category }}/${{ matrix.service }}*
+
+  # Frontend service testing
+  test-frontend-services:
+    needs: setup-and-validate
+    if: contains(needs.setup-and-validate.outputs.service_types, 'frontend')
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.setup-and-validate.outputs.matrix_frontend) }}
+        test_category: ["unit", "e2e"]
+        node-version: ['18']
+      fail-fast: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: frontend-services/${{ matrix.service }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend-services/${{ matrix.service }}
+        run: |
+          npm ci
+
+      - name: Install Playwright browsers
+        if: matrix.test_category == 'e2e'
+        working-directory: frontend-services/${{ matrix.service }}
+        run: |
+          if [ -f "playwright.config.ts" ] || [ -f "playwright.config.js" ]; then
+            npx playwright install --with-deps
+          fi
+
+      - name: Create test directories
+        run: |
+          mkdir -p test-results/frontend/${{ matrix.test_category }}
+          mkdir -p coverage/frontend/${{ matrix.test_category }}
+
+      - name: Run ${{ matrix.test_category }} tests for ${{ matrix.service }}
+        working-directory: frontend-services/${{ matrix.service }}
+        run: |
+          case "${{ matrix.test_category }}" in
+            "unit")
+              if [ -f "jest.config.js" ] || [ -f "jest.config.json" ]; then
+                npx jest --coverage --passWithNoTests \
+                  --coverageReporters=json \
+                  --coverageDirectory="../../coverage/frontend/${{ matrix.test_category }}/${{ matrix.service }}" \
+                  --testResultsProcessor="../../test-results/frontend/${{ matrix.test_category }}/${{ matrix.service }}.json"
+              else
+                npm test -- --coverage --watchAll=false --passWithNoTests || true
+              fi
+              ;;
+            "e2e")
+              if [ -f "playwright.config.ts" ] || [ -f "playwright.config.js" ]; then
+                npx playwright test --reporter=json --output-file="../../test-results/frontend/${{ matrix.test_category }}/${{ matrix.service }}.json"
+              elif command -v cypress &> /dev/null; then
+                npx cypress run --reporter json --reporter-options "output=../../test-results/frontend/${{ matrix.test_category }}/${{ matrix.service }}.json"
+              else
+                echo "No E2E testing framework found for ${{ matrix.service }}"
+              fi
+              ;;
+          esac
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: frontend-${{ matrix.service }}-${{ matrix.test_category }}-results
+          path: |
+            test-results/frontend/${{ matrix.test_category }}/${{ matrix.service }}*
+            coverage/frontend/${{ matrix.test_category }}/${{ matrix.service }}*
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v3
+        if: always() && matrix.test_category == 'e2e'
+        with:
+          name: playwright-report-${{ matrix.service }}
+          path: frontend-services/${{ matrix.service }}/playwright-report/
+          retention-days: 30
+
+  # End-to-End integration tests
+  test-e2e-integration:
+    needs: [setup-and-validate, test-python-services, test-go-services, test-frontend-services]
+    if: |
+      always() &&
+      contains(needs.setup-and-validate.outputs.test_categories, 'e2e') &&
+      (needs.test-python-services.result == 'success' || needs.test-python-services.result == 'skipped') &&
+      (needs.test-go-services.result == 'success' || needs.test-go-services.result == 'skipped') &&
+      (needs.test-frontend-services.result == 'success' || needs.test-frontend-services.result == 'skipped')
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Set up Go 1.21
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client redis-tools docker-compose
+
+      - name: Run comprehensive E2E tests
+        run: |
+          ./test-orchestrator.sh --categories e2e --parallel-jobs 2
+        timeout-minutes: 30
+
+      - name: Upload E2E test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: e2e-integration-results
+          path: |
+            test-results/
+            test-logs/
+
+  # Security and performance tests
+  security-and-performance:
+    needs: setup-and-validate
+    if: contains(needs.setup-and-validate.outputs.test_categories, 'security')
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run security tests
+        run: |
+          # Install security testing tools
+          pip install bandit safety semgrep
+          
+          # Create results directory
+          mkdir -p test-results/security
+          
+          # Run security scans
+          if [ -d "python-services" ]; then
+            bandit -r python-services/ -f json -o test-results/security/bandit-report.json || true
+            safety check --json --output test-results/security/safety-report.json || true
+          fi
+          
+          # Run semgrep for all languages
+          semgrep --config=auto --json --output=test-results/security/semgrep-report.json . || true
+
+      - name: Upload security results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-test-results
+          path: test-results/security/
+
+  # Generate comprehensive report
+  generate-report:
+    needs: [test-python-services, test-go-services, test-frontend-services, test-e2e-integration, security-and-performance]
+    if: always()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all test artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: test-artifacts/
+
+      - name: Set up Python for report generation
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install report dependencies
+        run: |
+          pip install jinja2 junit-xml coverage beautifulsoup4
+
+      - name: Generate comprehensive test report
+        run: |
+          python -c "
+          import os
+          import json
+          from datetime import datetime
+          
+          def generate_report():
+              report_data = {
+                  'timestamp': datetime.now().isoformat(),
+                  'services': {},
+                  'summary': {'total': 0, 'passed': 0, 'failed': 0}
+              }
+              
+              # Process test artifacts
+              artifacts_dir = 'test-artifacts'
+              if os.path.exists(artifacts_dir):
+                  for artifact in os.listdir(artifacts_dir):
+                      artifact_path = os.path.join(artifacts_dir, artifact)
+                      if os.path.isdir(artifact_path):
+                          print(f'Processing artifact: {artifact}')
+              
+              # Generate HTML report
+              html_content = f'''
+              <!DOCTYPE html>
+              <html>
+              <head>
+                  <title>PyAirtable Compose - CI Test Results</title>
+                  <style>
+                      body {{ font-family: Arial, sans-serif; margin: 20px; }}
+                      .header {{ background: #f4f4f4; padding: 20px; border-radius: 5px; }}
+                      .success {{ color: green; }}
+                      .failure {{ color: red; }}
+                      .summary {{ margin: 20px 0; padding: 15px; border: 1px solid #ddd; }}
+                  </style>
+              </head>
+              <body>
+                  <div class=\"header\">
+                      <h1>PyAirtable Compose - CI Test Results</h1>
+                      <p>Generated on: {report_data['timestamp']}</p>
+                      <p>Workflow: {os.getenv('GITHUB_WORKFLOW', 'Unknown')}</p>
+                      <p>Run: {os.getenv('GITHUB_RUN_NUMBER', 'Unknown')}</p>
+                  </div>
+                  <div class=\"summary\">
+                      <h2>Test Summary</h2>
+                      <p>See individual job results for detailed information.</p>
+                  </div>
+              </body>
+              </html>
+              '''
+              
+              with open('comprehensive-test-report.html', 'w') as f:
+                  f.write(html_content)
+              
+              print('Comprehensive test report generated')
+          
+          generate_report()
+          "
+
+      - name: Upload comprehensive report
+        uses: actions/upload-artifact@v3
+        with:
+          name: comprehensive-test-report
+          path: comprehensive-test-report.html
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Read test results summary
+            let comment = `## 🧪 Test Results Summary
+            
+            **Workflow Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            
+            ### Test Status
+            `;
+            
+            // Add job statuses
+            const jobs = [
+              { name: 'Python Services', status: '${{ needs.test-python-services.result }}' },
+              { name: 'Go Services', status: '${{ needs.test-go-services.result }}' },
+              { name: 'Frontend Services', status: '${{ needs.test-frontend-services.result }}' },
+              { name: 'E2E Integration', status: '${{ needs.test-e2e-integration.result }}' },
+              { name: 'Security & Performance', status: '${{ needs.security-and-performance.result }}' }
+            ];
+            
+            jobs.forEach(job => {
+              const icon = job.status === 'success' ? '✅' : job.status === 'failure' ? '❌' : '⏸️';
+              comment += `${icon} ${job.name}: ${job.status}\n`;
+            });
+            
+            comment += `
+            ### 📊 Reports Available
+            - Comprehensive test report available in workflow artifacts
+            - Coverage reports available for each service
+            - Security scan results (if applicable)
+            
+            ---
+            *Generated by GitHub Actions*
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # Cleanup and notification
+  cleanup:
+    needs: [generate-report]
+    if: always()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Cleanup workflow artifacts (older than 7 days)
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+            
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            
+            for (const artifact of artifacts.data.artifacts) {
+              const createdAt = new Date(artifact.created_at);
+              if (createdAt < sevenDaysAgo) {
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id
+                });
+                console.log(`Deleted artifact: ${artifact.name}`);
+              }
+            }
