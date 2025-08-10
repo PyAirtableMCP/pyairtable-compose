@@ -50,8 +50,19 @@ generate_api_key() {
     echo "pya_$(openssl rand -hex 32)"
 }
 
-# Generate secure JWT secret (base64 encoded, 256-bit)
+# Generate secure JWT secret (base64 encoded, 512-bit for production security)
+# OWASP recommendation: Minimum 256 bits, 512 bits for high-security environments
 generate_jwt_secret() {
+    openssl rand -base64 64
+}
+
+# Generate JWT refresh token secret (separate from access token secret)
+generate_jwt_refresh_secret() {
+    openssl rand -base64 64
+}
+
+# Generate secure session secret for additional security layer
+generate_session_secret() {
     openssl rand -base64 32
 }
 
@@ -71,10 +82,13 @@ echo "🔐 Generating cryptographically secure credentials..."
 POSTGRES_PASSWORD=$(generate_password)
 REDIS_PASSWORD=$(generate_password)  
 JWT_SECRET=$(generate_jwt_secret)
+JWT_REFRESH_SECRET=$(generate_jwt_refresh_secret)
+SESSION_SECRET=$(generate_session_secret)
 API_KEY=$(generate_api_key)
 
 echo "   ✅ Generated secure database passwords"
-echo "   ✅ Generated secure JWT secret" 
+echo "   ✅ Generated secure JWT secrets (512-bit)" 
+echo "   ✅ Generated secure session secret"
 echo "   ✅ Generated secure API key"
 
 # Create .env file
@@ -95,10 +109,24 @@ REDIS_HOST=redis
 REDIS_PORT=6379
 REDIS_PASSWORD=${REDIS_PASSWORD}
 
-# Authentication
+# Authentication - Enhanced JWT Security
 JWT_SECRET=${JWT_SECRET}
-JWT_EXPIRATION=86400
+JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+JWT_ACCESS_TOKEN_EXPIRATION=900
+JWT_REFRESH_TOKEN_EXPIRATION=604800
+SESSION_SECRET=${SESSION_SECRET}
 API_KEY=${API_KEY}
+
+# JWT Security Configuration
+JWT_ALGORITHM=HS256
+JWT_ISSUER=pyairtable-platform
+JWT_AUDIENCE=pyairtable-api
+JWT_LEEWAY=30
+
+# Token Rotation Policy
+JWT_ROTATION_ENABLED=true
+JWT_ROTATION_THRESHOLD=300
+JWT_BLACKLIST_ENABLED=true
 
 # Airtable Integration
 # IMPORTANT: Replace these with your actual Airtable credentials
@@ -132,10 +160,34 @@ RATE_LIMIT_ENABLED=true
 RATE_LIMIT_RPM=60
 RATE_LIMIT_RPH=1000
 
-# Security
+# Security Configuration
 CORS_ORIGINS=http://localhost:3000,http://localhost:8000
-HTTPS_ENABLED=false
-SECURE_COOKIES=false
+HTTPS_ENABLED=${HTTPS_ENABLED:-false}
+SECURE_COOKIES=${SECURE_COOKIES:-false}
+
+# SSL/TLS Configuration
+SSL_CERT_PATH=/etc/ssl/certs/pyairtable.crt
+SSL_KEY_PATH=/etc/ssl/private/pyairtable.key
+SSL_CA_PATH=/etc/ssl/certs/ca-certificates.crt
+TLS_MIN_VERSION=1.2
+TLS_MAX_VERSION=1.3
+
+# Security Headers
+HSTS_MAX_AGE=31536000
+CSP_ENABLED=true
+FRAME_OPTIONS=DENY
+CONTENT_TYPE_OPTIONS=nosniff
+XSS_PROTECTION=1
+
+# Rate Limiting Enhanced
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_RPM=60
+RATE_LIMIT_RPH=1000
+RATE_LIMIT_BURST=20
+RATE_LIMIT_WINDOW=300
+
+# IP Whitelist for Admin Operations
+ADMIN_IP_WHITELIST=127.0.0.1,::1
 EOF
 
 # Set restrictive permissions
@@ -146,7 +198,9 @@ echo ""
 echo "📋 Generated secure credentials:"
 echo "   - PostgreSQL Password: [SECURE - 32 chars]"
 echo "   - Redis Password: [SECURE - 32 chars]"
-echo "   - JWT Secret: [SECURE - 32 chars]"
+echo "   - JWT Access Secret: [SECURE - 64 chars, 512-bit]"
+echo "   - JWT Refresh Secret: [SECURE - 64 chars, 512-bit]"
+echo "   - Session Secret: [SECURE - 32 chars]"
 echo "   - API Key: [SECURE - 64 chars hex]"
 echo ""
 echo "⚠️  IMPORTANT: You must update these placeholder values:"
