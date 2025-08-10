@@ -1,14 +1,43 @@
-# Environment files - NEVER commit these!
+# PyAirtableMCP GitIgnore
+# =======================
+
+# =============================================================================
+# SECURITY: ENVIRONMENT FILES (CRITICAL - NEVER COMMIT THESE)
+# =============================================================================
+# All environment files containing sensitive data must be excluded
 .env
 .env.*
-!.env.example
 !.env.template
-*.env
-auth-service.env
-test-auth-service.env
+!.env.example  
+!.env.*.template
+!.env.*.example
 
-# Dependencies
-node_modules/
+# Backup and temporary environment files
+.env.backup.*
+.env.bak
+.env.tmp
+*.env.backup
+*.env.bak
+*.env.old
+
+# Service-specific environment files
+**/config/.env*
+**/configs/.env*
+**/secrets/.env*
+**/.env.secrets
+**/.env.keys
+
+# Docker & Build artifacts
+build-info.json
+docker-compose.override.yml
+Dockerfile.tmp
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -26,112 +55,34 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
-
-# PyInstaller
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# pipenv
-Pipfile.lock
-
-# PEP 582
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.env.local
-.env.development
-.env.test
-.env.production
-.env.staging
-.venv
-env/
 venv/
+env/
 ENV/
-env.bak/
-venv.bak/
 
-# Spyder project settings
-.spyderproject
-.spyproject
+# Node.js (Frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.next/
+out/
+.nuxt
+.vuepress/dist
+.serverless/
+.vercel
 
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 # OS generated files
 .DS_Store
@@ -142,102 +93,74 @@ dmypy.json
 ehthumbs.db
 Thumbs.db
 
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
-
-# nyc test coverage
-.nyc_output
-
-# Grunt intermediate storage
-.grunt
-
-# Bower dependency directory
-bower_components
-
-# node-waf configuration
-.lock-wscript
-
-# Compiled binary addons
-build/Release
-
-# Dependency directories
-jspm_packages/
-
-# TypeScript v1 declaration files
-typings/
-
-# TypeScript cache
-*.tsbuildinfo
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# dotenv environment variables file
-.env.test
-
-# parcel-bundler cache
-.cache
-.parcel-cache
-
-# Next.js build output
-.next
-
-# Nuxt.js build / generate output
-.nuxt
-dist/
-
-# Gatsby files
+# Temporary files
+*.tmp
+*.temp
 .cache/
-public
+.parcel-cache/
+.sass-cache/
 
-# Storybook build outputs
-.out
-.storybook-out
+# Database files
+*.db
+*.sqlite
+*.sqlite3
 
-# Temporary folders
-tmp/
-temp/
+# =============================================================================
+# SECURITY: SENSITIVE FILES AND CREDENTIALS
+# =============================================================================
 
-# Docker
-.dockerignore
+# Security scan results
+trivy-results.sarif
+*.sarif
+security-scan-*
+
+# API Keys and secrets (various formats)
+**/secrets/
+**/vault/
+**/*secret*
+**/*credential*
+**/*apikey*
+**/*token*
+**/*password*
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+
+# JWT and authentication files
+*.jwt
+**/auth/private*
+**/auth/secret*
+jwt-secret*
+
+# Database dumps and backups (may contain sensitive data)
+*.sql.backup
+*.dump
+*.backup.sql
+
+# Terraform state files (may contain sensitive data)
+terraform.tfvars
+terraform.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
+
+# Kubernetes secrets
+**/k8s/secrets/
+**/kubernetes/secrets/
+secret*.yaml
+secret*.yml
+*-secret.yaml
+*-secret.yml
+
+# Test artifacts
+coverage/
+.nyc_output/
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
 
 # Terraform
 *.tfstate
@@ -245,82 +168,13 @@ temp/
 .terraform/
 .terraform.lock.hcl
 
-# Credential Protection - PyAirtable Security
-# CRITICAL: These patterns prevent accidental credential commits
-.env.production
-.env.staging
-**/credentials/**
-**/*credential*
-**/*secret*
-**/*.key
-**/*.pem
-**/*.p12
-**/*.pfx
-vault-keys.json
-**/vault-init.json
-**/*pat[a-zA-Z0-9_-]*
-**/*AIza[a-zA-Z0-9_-]*
-**/*sk-[a-zA-Z0-9]*
-**/*xoxb-*
-**/*ghp_*
-.secrets/
-backup/
-backups/
+# Kubernetes
+*.kubeconfig
 
-# Service Account Keys
-**/service-account*.json
-**/sa-*.json
-**/*serviceaccount*
+# Local development overrides
+docker-compose.local.yml
+docker-compose.override.yml
 
-# TLS Certificates and Keys
-**/*.crt
-**/*.cert
-**/*.ca-bundle
-**/*.ca
-**/*.der
-**/*.p7b
-**/*.p7s
-**/*.cer
-**/*.csr
-
-# Kubernetes Secrets
-k8s-secrets/
-**/secret*.yaml
-**/secret*.yml
-
-# Vault Files
-vault-data/
-vault-config/
-vault-logs/
-vault-audit/
-
-# Database Dumps
-*.sql
-*.dump
-*.backup
-
-# Local Configuration
-config.local.*
-local.config.*
-.local
-
-# Sensitive Logs
-audit.log
-security.log
-credential*.log
-
-# Backup Files
+# Backup files
 *.bak
 *.backup
-*.old
-*.orig
-
-# Personal/Private Files
-PERSONAL/
-PRIVATE/
-personal/
-private/
-
-# Test Files with Credentials
-test-credentials.*
-mock-credentials.*
