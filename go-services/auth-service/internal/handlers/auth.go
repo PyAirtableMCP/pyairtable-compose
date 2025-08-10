@@ -12,11 +12,11 @@ import (
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
     logger      *zap.Logger
-    authService *services.AuthService
+    authService services.AuthServiceInterface
 }
 
 // NewAuthHandler creates a new auth handler
-func NewAuthHandler(logger *zap.Logger, authService *services.AuthService) *AuthHandler {
+func NewAuthHandler(logger *zap.Logger, authService services.AuthServiceInterface) *AuthHandler {
     return &AuthHandler{
         logger:      logger,
         authService: authService,

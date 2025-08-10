@@ -30,23 +30,25 @@ type UserContext struct {
 
 // AuthService handles authentication logic
 type AuthService struct {
-    logger     *zap.Logger
-    userRepo   repository.UserRepository
-    tokenRepo  repository.TokenRepository
-    jwtSecret  string
-    tokenTTL   time.Duration
-    refreshTTL time.Duration
+    logger         *zap.Logger
+    userRepo       repository.UserRepository
+    tokenRepo      repository.TokenRepository
+    jwtSecret      string
+    tokenTTL       time.Duration
+    refreshTTL     time.Duration
+    passwordPolicy *models.PasswordPolicy
 }
 
 // NewAuthService creates a new auth service
 func NewAuthService(logger *zap.Logger, userRepo repository.UserRepository, tokenRepo repository.TokenRepository, jwtSecret string) *AuthService {
     return &AuthService{
-        logger:     logger,
-        userRepo:   userRepo,
-        tokenRepo:  tokenRepo,
-        jwtSecret:  jwtSecret,
-        tokenTTL:   24 * time.Hour,      // Access token: 24 hours
-        refreshTTL: 7 * 24 * time.Hour,  // Refresh token: 7 days
+        logger:         logger,
+        userRepo:       userRepo,
+        tokenRepo:      tokenRepo,
+        jwtSecret:      jwtSecret,
+        tokenTTL:       24 * time.Hour,      // Access token: 24 hours
+        refreshTTL:     7 * 24 * time.Hour,  // Refresh token: 7 days
+        passwordPolicy: models.DefaultPasswordPolicy(),
     }
 }
 
@@ -111,8 +113,8 @@ func (s *AuthService) Register(req *models.RegisterRequest) (*models.User, error
         return nil, errors.New("email already registered")
     }
     
-    // Hash password
-    passwordHash, err := models.HashPassword(req.Password)
+    // Validate and hash password
+    passwordHash, err := s.passwordPolicy.HashPasswordWithPolicy(req.Password)
     if err != nil {
         return nil, err
     }
@@ -304,8 +306,8 @@ func (s *AuthService) ChangePassword(userID string, req *models.ChangePasswordRe
         return errors.New("current password is incorrect")
     }
     
-    // Hash new password
-    newHash, err := models.HashPassword(req.NewPassword)
+    // Validate and hash new password
+    newHash, err := s.passwordPolicy.HashPasswordWithPolicy(req.NewPassword)
     if err != nil {
         return err
     }
