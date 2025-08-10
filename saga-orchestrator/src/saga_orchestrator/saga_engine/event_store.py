@@ -80,11 +80,76 @@ class PostgreSQLEventStore(EventStore):
     def _ensure_tables(self) -> None:
         """Ensure event store tables exist."""
         try:
+            # Run migrations first
+            self._run_migrations()
+            
+            # Then ensure SQLAlchemy tables exist
             Base.metadata.create_all(self.engine)
             logger.info("Event store tables initialized")
         except Exception as e:
             logger.error(f"Failed to initialize event store tables: {e}")
             raise
+    
+    def _run_migrations(self) -> None:
+        """Run database migrations."""
+        try:
+            import os
+            from pathlib import Path
+            
+            # Get migrations directory
+            current_dir = Path(__file__).parent
+            migrations_dir = current_dir.parent.parent.parent / "migrations"
+            
+            if not migrations_dir.exists():
+                logger.info("No migrations directory found, skipping migrations")
+                return
+                
+            # Connect to database
+            with self.engine.connect() as conn:
+                # Get list of migration files
+                migration_files = sorted([f for f in os.listdir(migrations_dir) if f.endswith('.sql')])
+                
+                for migration_file in migration_files:
+                    migration_path = migrations_dir / migration_file
+                    migration_version = migration_file.replace('.sql', '')
+                    
+                    # Check if migration was already applied
+                    try:
+                        result = conn.execute(
+                            text("SELECT version FROM schema_migrations WHERE version = :version"),
+                            {"version": migration_version}
+                        ).fetchone()
+                        
+                        if result:
+                            logger.debug(f"Migration {migration_version} already applied")
+                            continue
+                            
+                    except Exception:
+                        # schema_migrations table doesn't exist yet, continue with migration
+                        pass
+                    
+                    # Run migration
+                    logger.info(f"Applying migration: {migration_version}")
+                    with open(migration_path, 'r') as f:
+                        migration_sql = f.read()
+                    
+                    # Execute migration in a transaction
+                    trans = conn.begin()
+                    try:
+                        conn.execute(text(migration_sql))
+                        trans.commit()
+                        logger.info(f"Migration {migration_version} applied successfully")
+                    except Exception as e:
+                        trans.rollback()
+                        logger.error(f"Migration {migration_version} failed: {e}")
+                        raise
+                        
+            logger.info("Database migrations completed")
+            
+        except Exception as e:
+            logger.error(f"Failed to run migrations: {e}")
+            # Don't raise - allow service to continue without migrations
+            pass
         
     async def append_events(
         self, 

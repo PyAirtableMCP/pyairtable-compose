@@ -52,6 +52,12 @@ class EventType(str, Enum):
     SAGA_FAILED = "saga.failed"
     SAGA_COMPENSATING = "saga.compensating"
     SAGA_COMPENSATED = "saga.compensated"
+    
+    # Command Events
+    COMMAND_ISSUED = "command.issued"
+    COMMAND_COMPLETED = "command.completed"
+    COMMAND_FAILED = "command.failed"
+    COMPENSATION_COMMAND = "compensation.command"
 
 
 class Event(BaseModel):

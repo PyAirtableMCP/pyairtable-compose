@@ -15,6 +15,7 @@ from ..event_bus.base import EventBus
 from ..models.events import Event, EventType, DomainEventAdapter
 from ..models.sagas import SagaInstance, SagaStep, SagaStatus
 from ..services.saga_definitions import UserOnboardingSaga, AirtableIntegrationSaga
+from ..persistence.postgres_repository import PostgresSagaRepository
 from .event_store import EventStore
 
 logger = logging.getLogger(__name__)
@@ -28,12 +29,14 @@ class SagaOrchestrator:
         event_store: EventStore, 
         event_bus: EventBus,
         redis_client: redis.Redis,
-        settings: Settings
+        settings: Settings,
+        postgres_repository: Optional[PostgresSagaRepository] = None
     ):
         self.event_store = event_store
         self.event_bus = event_bus
         self.redis = redis_client
         self.settings = settings
+        self.postgres_repository = postgres_repository
         self.logger = logging.getLogger(__name__)
         self.sagas: Dict[str, SagaInstance] = {}
         self.http_client = httpx.AsyncClient(timeout=30.0)
@@ -380,8 +383,13 @@ class SagaOrchestrator:
         logger.info(f"SAGA {saga.id} completed successfully")
     
     async def _persist_saga(self, saga: SagaInstance) -> None:
-        """Persist SAGA state to Redis."""
+        """Persist SAGA state to PostgreSQL and Redis."""
         try:
+            # Save to PostgreSQL for durability
+            if self.postgres_repository:
+                await self.postgres_repository.save_saga_instance(saga)
+            
+            # Also save to Redis for fast access (with TTL)
             saga_data = saga.dict()
             
             # Convert datetime objects to ISO strings
@@ -411,7 +419,7 @@ class SagaOrchestrator:
             if saga_id in self.sagas:
                 return self.sagas[saga_id]
             
-            # Try to get from Redis
+            # Try to get from Redis for fast access
             saga_data = await self.redis.get(f"saga:{saga_id}")
             if saga_data:
                 data = json.loads(saga_data)
@@ -419,11 +427,44 @@ class SagaOrchestrator:
                 self.sagas[saga_id] = saga
                 return saga
             
+            # Fallback to PostgreSQL for persistent storage
+            if self.postgres_repository:
+                saga = await self.postgres_repository.get_saga_instance(saga_id)
+                if saga:
+                    self.sagas[saga_id] = saga
+                    # Update Redis cache
+                    await self._cache_saga_in_redis(saga)
+                    return saga
+            
             return None
             
         except Exception as e:
             logger.error(f"Failed to get SAGA {saga_id}: {e}")
             return None
+    
+    async def _cache_saga_in_redis(self, saga: SagaInstance) -> None:
+        """Cache SAGA instance in Redis."""
+        try:
+            saga_data = saga.dict()
+            
+            # Convert datetime objects to ISO strings
+            for key, value in saga_data.items():
+                if isinstance(value, datetime):
+                    saga_data[key] = value.isoformat()
+            
+            # Handle nested datetime objects in steps
+            for step in saga_data.get("steps", []):
+                for field in ["started_at", "completed_at"]:
+                    if step.get(field):
+                        step[field] = step[field].isoformat() if isinstance(step[field], datetime) else step[field]
+            
+            await self.redis.setex(
+                f"saga:{saga.id}",
+                3600,  # 1 hour TTL
+                json.dumps(saga_data, default=str)
+            )
+        except Exception as e:
+            logger.error(f"Failed to cache SAGA {saga.id} in Redis: {e}")
     
     async def _handle_saga_response(self, event: Event) -> None:
         """Handle responses from SAGA steps."""
@@ -456,12 +497,22 @@ class SagaOrchestrator:
         self, 
         status: Optional[SagaStatus] = None,
         saga_type: Optional[str] = None,
-        limit: int = 100
+        limit: int = 100,
+        tenant_id: Optional[str] = None
     ) -> List[SagaInstance]:
         """List SAGA instances with optional filtering."""
         try:
-            # This is a simplified implementation
-            # In production, you'd want to use a proper query mechanism
+            # Use PostgreSQL for comprehensive querying if available
+            if self.postgres_repository:
+                return await self.postgres_repository.list_saga_instances(
+                    status=status,
+                    saga_type=saga_type,
+                    tenant_id=tenant_id,
+                    limit=limit,
+                    offset=0
+                )
+            
+            # Fallback to Redis-based implementation
             sagas = []
             
             # Get saga keys from Redis
@@ -476,6 +527,8 @@ class SagaOrchestrator:
                     if status and saga.status != status:
                         continue
                     if saga_type and saga.type != saga_type:
+                        continue
+                    if tenant_id and saga.tenant_id != tenant_id:
                         continue
                     
                     sagas.append(saga)

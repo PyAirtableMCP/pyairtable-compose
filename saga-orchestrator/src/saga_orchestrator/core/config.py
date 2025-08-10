@@ -2,7 +2,7 @@
 
 import logging
 from functools import lru_cache
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from pydantic import Field, PostgresDsn, RedisDsn, validator
 from pydantic_settings import BaseSettings
@@ -74,8 +74,8 @@ class Settings(BaseSettings):
     enable_metrics: bool = Field(default=True, env="ENABLE_METRICS")
     metrics_port: int = Field(default=9090, env="METRICS_PORT")
     
-    # CORS
-    cors_origins: List[str] = Field(default=["*"], env="CORS_ORIGINS")
+    # CORS - raw string that gets parsed to list
+    cors_origins_raw: str = Field(default="*", env="CORS_ORIGINS")
     
     @validator("kafka_bootstrap_servers", pre=True)
     def parse_kafka_servers(cls, v):
@@ -83,21 +83,15 @@ class Settings(BaseSettings):
             return [server.strip() for server in v.split(",")]
         return v
     
-    @validator("cors_origins", pre=True)
-    def parse_cors_origins(cls, v):
-        if isinstance(v, str):
-            # Handle empty strings
-            if not v.strip():
-                return ["*"]
-            # Handle both comma-separated strings and JSON arrays
-            if v.startswith('[') and v.endswith(']'):
-                import json
-                try:
-                    return json.loads(v)
-                except json.JSONDecodeError:
-                    pass
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+    @property 
+    def cors_origins(self) -> List[str]:
+        """Parse CORS origins from raw string to list."""
+        v = self.cors_origins_raw
+        if not v or not v.strip():
+            return ["*"]
+        if v.strip() == "*":
+            return ["*"]
+        return [origin.strip() for origin in v.split(",") if origin.strip()]
     
     @validator("log_level")
     def validate_log_level(cls, v):
