@@ -1,0 +1,197 @@
+version: '3.8'
+
+services:
+  # Infrastructure Services
+  postgres:
+    image: postgres:16-alpine
+    container_name: pyairtable-postgres
+    environment:
+      POSTGRES_DB: pyairtable
+      POSTGRES_USER: pyairtable
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pyairtable}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pyairtable"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: pyairtable-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-pyairtable}
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Consolidated Services (from GitHub Container Registry)
+  auth-service:
+    image: ghcr.io/pyairtablemcp/pyairtable-auth-consolidated:latest
+    container_name: pyairtable-auth
+    environment:
+      DATABASE_URL: postgresql://pyairtable:${POSTGRES_PASSWORD:-pyairtable}@postgres:5432/pyairtable
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      JWT_SECRET: ${JWT_SECRET:-your-jwt-secret}
+      API_KEY: ${API_KEY:-your-api-key}
+      PORT: 8004
+    ports:
+      - "8004:8004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  gateway-service:
+    image: ghcr.io/pyairtablemcp/pyairtable-gateway-consolidated:latest
+    container_name: pyairtable-gateway
+    environment:
+      AUTH_SERVICE_URL: http://auth-service:8004
+      DATA_SERVICE_URL: http://data-service:8002
+      AI_SERVICE_URL: http://ai-service:8003
+      AUTOMATION_SERVICE_URL: http://automation-service:8006
+      TENANT_SERVICE_URL: http://tenant-service:8009
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      PORT: 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - auth-service
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  data-service:
+    image: ghcr.io/pyairtablemcp/pyairtable-data-consolidated:latest
+    container_name: pyairtable-data
+    environment:
+      DATABASE_URL: postgresql://pyairtable:${POSTGRES_PASSWORD:-pyairtable}@postgres:5432/pyairtable
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      AIRTABLE_TOKEN: ${AIRTABLE_TOKEN}
+      AIRTABLE_BASE: ${AIRTABLE_BASE}
+      PORT: 8002
+    ports:
+      - "8002:8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ai-service:
+    image: ghcr.io/pyairtablemcp/pyairtable-ai-consolidated:latest
+    container_name: pyairtable-ai
+    environment:
+      DATABASE_URL: postgresql://pyairtable:${POSTGRES_PASSWORD:-pyairtable}@postgres:5432/pyairtable
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      PORT: 8003
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  automation-service:
+    image: ghcr.io/pyairtablemcp/pyairtable-automation-consolidated:latest
+    container_name: pyairtable-automation
+    environment:
+      DATABASE_URL: postgresql://pyairtable:${POSTGRES_PASSWORD:-pyairtable}@postgres:5432/pyairtable
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      DATA_SERVICE_URL: http://data-service:8002
+      AI_SERVICE_URL: http://ai-service:8003
+      PORT: 8006
+    ports:
+      - "8006:8006"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  tenant-service:
+    image: ghcr.io/pyairtablemcp/pyairtable-tenant-consolidated:latest
+    container_name: pyairtable-tenant
+    environment:
+      DATABASE_URL: postgresql://pyairtable:${POSTGRES_PASSWORD:-pyairtable}@postgres:5432/pyairtable
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      AUTH_SERVICE_URL: http://auth-service:8004
+      PORT: 8009
+    ports:
+      - "8009:8009"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8009/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend (still local build until consolidated)
+  frontend:
+    build:
+      context: ./frontend-services/tenant-dashboard
+      dockerfile: Dockerfile
+    container_name: pyairtable-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_AUTH_URL: http://localhost:8004
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gateway-service
+      - auth-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: pyairtable-network
