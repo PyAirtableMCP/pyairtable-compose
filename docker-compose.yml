@@ -232,7 +232,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       # File processing configuration
       - MAX_FILE_SIZE=${MAX_FILE_SIZE:-10MB}
-      - ALLOWED_EXTENSIONS=${ALLOWED_EXTENSIONS:-"pdf,doc,docx,txt,csv,xlsx"}
+      # - ALLOWED_EXTENSIONS=${ALLOWED_EXTENSIONS:-"pdf,doc,docx,txt,csv,xlsx"}
       - UPLOAD_DIR=${UPLOAD_DIR:-/tmp/uploads}
       # Workflow settings
       - DEFAULT_WORKFLOW_TIMEOUT=${DEFAULT_WORKFLOW_TIMEOUT:-300}
