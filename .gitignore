@@ -325,3 +325,11 @@ private/
 # Test Files with Credentials
 test-credentials.*
 mock-credentials.*
+
+# Temporary Scripts and Reports (DevOps Best Practices)
+execute_final_merge.sh
+run_merge.sh
+*_e2e_integration_report_*.json
+*_test_report_*.json
+*_validation_report_*.json
+sprint*_post_merge_validation_*.json
