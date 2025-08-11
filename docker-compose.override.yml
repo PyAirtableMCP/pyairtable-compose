@@ -2,4 +2,4 @@ version: '3.8'
 
 services:
   llm-orchestrator:
-    image: pyairtable-llm-orchestrator-fixed:latest
+    image: llm-orchestrator-test:latest

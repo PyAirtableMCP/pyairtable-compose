@@ -128,8 +128,8 @@ async def global_exception_handler(request: Request, exc: Exception):
         )
 
 # Include routers
-app.include_router(health.router, tags=["health"])
 from routes.airtable import router as airtable_router
+app.include_router(health.router, tags=["health"])
 app.include_router(airtable_router)
 
 # Root endpoint
