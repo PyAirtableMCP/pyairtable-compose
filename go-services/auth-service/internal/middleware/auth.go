@@ -2,6 +2,8 @@ package middleware
 
 import (
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/pyairtable-compose/auth-service/internal/services"
@@ -147,4 +149,89 @@ func GetUserFromContext(c *fiber.Ctx) (*services.UserContext, bool) {
 		Role:     c.Locals("userRole").(string),
 		TenantID: c.Locals("tenantID").(string),
 	}, true
+}
+
+// RateLimiter represents a simple rate limiter
+type RateLimiter struct {
+	mu       sync.Mutex
+	requests map[string][]time.Time
+	limit    int
+	window   time.Duration
+}
+
+// NewRateLimiter creates a new rate limiter
+func NewRateLimiter(limit int, window time.Duration) *RateLimiter {
+	return &RateLimiter{
+		requests: make(map[string][]time.Time),
+		limit:    limit,
+		window:   window,
+	}
+}
+
+// IsAllowed checks if a request is allowed for the given key (usually IP address)
+func (rl *RateLimiter) IsAllowed(key string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	windowStart := now.Add(-rl.window)
+
+	// Get existing requests for this key
+	requests := rl.requests[key]
+	
+	// Filter out old requests
+	var validRequests []time.Time
+	for _, reqTime := range requests {
+		if reqTime.After(windowStart) {
+			validRequests = append(validRequests, reqTime)
+		}
+	}
+
+	// Check if we can add another request
+	if len(validRequests) >= rl.limit {
+		rl.requests[key] = validRequests
+		return false
+	}
+
+	// Add current request
+	validRequests = append(validRequests, now)
+	rl.requests[key] = validRequests
+	return true
+}
+
+// RateLimitMiddleware creates a rate limiting middleware
+func RateLimitMiddleware(limiter *RateLimiter) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		key := c.IP()
+		if !limiter.IsAllowed(key) {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "Rate limit exceeded",
+			})
+		}
+		return c.Next()
+	}
+}
+
+// SecurityHeadersMiddleware adds security headers
+func SecurityHeadersMiddleware() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		c.Set("X-Content-Type-Options", "nosniff")
+		c.Set("X-Frame-Options", "DENY")
+		c.Set("X-XSS-Protection", "1; mode=block")
+		c.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		c.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		return c.Next()
+	}
+}
+
+// InputSizeMiddleware limits request body size
+func InputSizeMiddleware(maxSize int) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if int(c.Request().Header.ContentLength()) > maxSize {
+			return c.Status(fiber.StatusRequestEntityTooLarge).JSON(fiber.Map{
+				"error": "Request body too large",
+			})
+		}
+		return c.Next()
+	}
 }

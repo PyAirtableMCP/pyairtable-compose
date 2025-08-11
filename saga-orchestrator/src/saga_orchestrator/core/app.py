@@ -86,13 +86,34 @@ def create_app() -> FastAPI:
         redoc_url="/redoc" if settings.debug else None,
     )
     
-    # CORS middleware
+    # CORS middleware - Enhanced for service-to-service communication
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        allow_headers=[
+            "Accept",
+            "Accept-Language",
+            "Content-Language",
+            "Content-Type",
+            "Authorization",
+            "X-API-Key",
+            "X-Request-ID",
+            "X-Correlation-ID",
+            "X-Service-Name",
+            "X-Trace-ID",
+            "Cache-Control",
+            "Pragma",
+        ],
+        expose_headers=[
+            "X-Request-ID",
+            "X-Correlation-ID",
+            "X-RateLimit-Limit",
+            "X-RateLimit-Remaining",
+            "X-RateLimit-Reset",
+        ],
+        max_age=600,  # 10 minutes preflight cache
     )
     
     # Include routers

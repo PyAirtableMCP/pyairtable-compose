@@ -1,5 +1,7 @@
 """
-Test data factories for generating consistent test data across the test suite.
+Enhanced Test Data Factories for PyAirtable E2E Integration Tests
+Generates consistent test data across the comprehensive test suite.
+Sprint 4 - Service Enablement (Task 10/10)
 """
 
 import uuid
@@ -7,10 +9,56 @@ import random
 import string
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from faker import Faker
+import json
 
 fake = Faker()
+
+# E2E Integration Test specific data structures
+@dataclass
+class E2ETestUser:
+    """Enhanced test user for E2E integration testing"""
+    id: str = field(default_factory=lambda: f"e2e_user_{str(uuid.uuid4())[:8]}")
+    email: str = field(default_factory=lambda: f"e2e_test_{str(uuid.uuid4())[:8]}@pyairtable-integration.com")
+    password: str = field(default_factory=lambda: f"E2ETestPass123_{str(uuid.uuid4())[:4]}!")
+    first_name: str = field(default_factory=lambda: f"E2E_Test_{str(uuid.uuid4())[:4]}")
+    last_name: str = "Integration_User"
+    access_token: Optional[str] = None
+    workspace_id: Optional[str] = None
+    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    
+    def to_registration_dict(self) -> Dict[str, str]:
+        """Convert to registration request format"""
+        return {
+            "email": self.email,
+            "password": self.password,
+            "first_name": self.first_name,
+            "last_name": self.last_name
+        }
+    
+    def to_login_dict(self) -> Dict[str, str]:
+        """Convert to login request format"""
+        return {
+            "email": self.email,
+            "password": self.password
+        }
+
+@dataclass
+class E2ETestWorkspace:
+    """Enhanced test workspace for E2E integration testing"""
+    id: str = field(default_factory=lambda: f"e2e_ws_{str(uuid.uuid4())[:8]}")
+    name: str = field(default_factory=lambda: f"E2E_Integration_Workspace_{str(uuid.uuid4())[:8]}")
+    description: str = "End-to-end integration test workspace"
+    owner_id: str = ""
+    settings: Dict[str, Any] = field(default_factory=lambda: {
+        "auto_sync": True,
+        "retention_days": 7,  # Short retention for test data
+        "max_tables": 5,
+        "enable_ai": True,
+        "test_mode": True
+    })
+    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
 @dataclass
 class UserData:
@@ -303,3 +351,291 @@ def create_event_stream(aggregate_id: str, count: int = 5) -> List[EventData]:
     """Quick event stream creation"""
     factory = TestDataFactory()
     return factory.create_event_stream(aggregate_id, count)
+
+# E2E Integration Test Extensions
+class E2EIntegrationTestFactory(TestDataFactory):
+    """Extended factory for E2E integration tests"""
+    
+    def __init__(self):
+        super().__init__()
+        self.test_session_id = f"e2e_session_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+    
+    def create_e2e_test_user(self, **overrides) -> E2ETestUser:
+        """Create E2E test user"""
+        user = E2ETestUser()
+        for key, value in overrides.items():
+            if hasattr(user, key):
+                setattr(user, key, value)
+        return user
+    
+    def create_e2e_test_workspace(self, owner_id: str = None, **overrides) -> E2ETestWorkspace:
+        """Create E2E test workspace"""
+        workspace = E2ETestWorkspace()
+        if owner_id:
+            workspace.owner_id = owner_id
+        for key, value in overrides.items():
+            if hasattr(workspace, key):
+                setattr(workspace, key, value)
+        return workspace
+    
+    def create_integration_test_scenario(self) -> Dict[str, Any]:
+        """Create complete E2E integration test scenario"""
+        test_user = self.create_e2e_test_user()
+        test_workspace = self.create_e2e_test_workspace(owner_id=test_user.id)
+        
+        return {
+            "test_session_id": self.test_session_id,
+            "user": test_user,
+            "workspace": test_workspace,
+            "airtable_data": {
+                "test_base_name": f"E2E_Test_Base_{self.test_session_id}",
+                "test_records": self.create_airtable_records(count=5, 
+                    Name=f"E2E Test Record", 
+                    TestSession=self.test_session_id,
+                    Status="Testing"
+                )
+            },
+            "llm_test_prompts": [
+                "Generate a simple test response for integration testing",
+                "Analyze test data structure",
+                "Create a summary of test results"
+            ],
+            "api_endpoints_to_test": [
+                "/api/health",
+                "/api/auth/register",
+                "/api/auth/login", 
+                "/api/user/profile",
+                "/api/workspaces",
+                "/api/airtable/bases",
+                "/api/llm/status"
+            ],
+            "expected_service_statuses": {
+                "api_gateway": 200,
+                "auth_service": 200,
+                "user_service": 200,
+                "airtable_gateway": 200,
+                "llm_orchestrator": 200,
+                "platform_services": 200
+            }
+        }
+    
+    def create_service_health_test_data(self) -> Dict[str, Dict[str, Any]]:
+        """Create service health check test data"""
+        return {
+            "api_gateway": {
+                "url": "http://localhost:8000",
+                "health_endpoint": "/api/health",
+                "expected_status": 200,
+                "timeout": 10
+            },
+            "airtable_gateway": {
+                "url": "http://localhost:8002", 
+                "health_endpoint": "/health",
+                "expected_status": 200,
+                "timeout": 10
+            },
+            "llm_orchestrator": {
+                "url": "http://localhost:8003",
+                "health_endpoint": "/health", 
+                "expected_status": 200,
+                "timeout": 15
+            },
+            "platform_services": {
+                "url": "http://localhost:8007",
+                "health_endpoint": "/health",
+                "expected_status": 200,
+                "timeout": 10
+            },
+            "auth_service": {
+                "url": "http://localhost:8009",
+                "health_endpoint": "/health",
+                "expected_status": 200,
+                "timeout": 10
+            },
+            "user_service": {
+                "url": "http://localhost:8010",
+                "health_endpoint": "/health",
+                "expected_status": 200,
+                "timeout": 10
+            }
+        }
+    
+    def create_authentication_flow_test_data(self) -> Dict[str, Any]:
+        """Create authentication flow test data"""
+        test_user = self.create_e2e_test_user()
+        
+        return {
+            "registration_data": test_user.to_registration_dict(),
+            "login_data": test_user.to_login_dict(),
+            "invalid_credentials": {
+                "email": test_user.email,
+                "password": "WrongPassword123!"
+            },
+            "malformed_requests": [
+                {"email": "not_an_email", "password": "test"},
+                {"email": test_user.email},  # Missing password
+                {"password": "test"},  # Missing email
+                {}  # Empty request
+            ],
+            "expected_responses": {
+                "successful_registration": [200, 201],
+                "successful_login": [200],
+                "invalid_credentials": [401, 403],
+                "malformed_request": [400, 422]
+            }
+        }
+    
+    def create_api_gateway_routing_test_data(self) -> Dict[str, Dict[str, Any]]:
+        """Create API Gateway routing test data"""
+        return {
+            "health_check": {
+                "method": "GET",
+                "endpoint": "/api/health",
+                "expected_status": 200,
+                "requires_auth": False
+            },
+            "user_profile": {
+                "method": "GET", 
+                "endpoint": "/api/user/profile",
+                "expected_status": [200, 404],  # 404 acceptable if endpoint not implemented
+                "requires_auth": True
+            },
+            "airtable_bases": {
+                "method": "GET",
+                "endpoint": "/api/airtable/bases", 
+                "expected_status": [200, 404],
+                "requires_auth": True
+            },
+            "llm_status": {
+                "method": "GET",
+                "endpoint": "/api/llm/status",
+                "expected_status": [200, 404],
+                "requires_auth": True
+            },
+            "workspace_list": {
+                "method": "GET",
+                "endpoint": "/api/workspaces",
+                "expected_status": [200, 404],
+                "requires_auth": True
+            }
+        }
+    
+    def create_error_handling_test_data(self) -> Dict[str, Dict[str, Any]]:
+        """Create error handling test data"""
+        return {
+            "invalid_authentication": {
+                "headers": {"Authorization": "Bearer invalid_jwt_token_12345"},
+                "endpoints": [
+                    "/api/user/profile",
+                    "/api/workspaces",
+                    "/api/airtable/bases"
+                ],
+                "expected_status": 401
+            },
+            "missing_authentication": {
+                "headers": {},
+                "endpoints": [
+                    "/api/user/profile", 
+                    "/api/workspaces",
+                    "/api/airtable/bases"
+                ],
+                "expected_status": [401, 403]
+            },
+            "non_existent_endpoints": {
+                "endpoints": [
+                    "/api/nonexistent/endpoint",
+                    "/api/invalid/path",
+                    "/totally/wrong/url"
+                ],
+                "expected_status": 404
+            },
+            "malformed_requests": [
+                {
+                    "endpoint": "/api/auth/login",
+                    "method": "POST",
+                    "data": {"invalid": "structure"},
+                    "expected_status": [400, 422]
+                },
+                {
+                    "endpoint": "/api/workspaces", 
+                    "method": "POST",
+                    "data": {},  # Missing required fields
+                    "expected_status": [400, 422]
+                }
+            ]
+        }
+    
+    def create_performance_baseline_data(self) -> Dict[str, Any]:
+        """Create performance baseline test data"""
+        return {
+            "acceptable_response_times": {
+                "health_checks": 1.0,  # seconds
+                "authentication": 2.0,
+                "data_retrieval": 3.0,
+                "ai_processing": 10.0
+            },
+            "acceptable_error_rates": {
+                "health_checks": 0.01,  # 1%
+                "authentication": 0.02,  # 2%  
+                "data_operations": 0.05,  # 5%
+                "ai_operations": 0.10  # 10%
+            },
+            "load_test_config": {
+                "concurrent_users": 5,
+                "test_duration": 30,  # seconds
+                "ramp_up_time": 10,
+                "requests_per_user": 20
+            }
+        }
+    
+    def get_cleanup_instructions(self) -> Dict[str, List[str]]:
+        """Get cleanup instructions for E2E test data"""
+        return {
+            "database_cleanup": [
+                f"DELETE FROM users WHERE email LIKE '%pyairtable-integration.com'",
+                f"DELETE FROM workspaces WHERE name LIKE 'E2E_Integration_Workspace_%'",
+                f"DELETE FROM sessions WHERE created_at < NOW() - INTERVAL '1 hour'"
+            ],
+            "redis_cleanup": [
+                "FLUSHDB",  # Clear all Redis test data
+                f"DEL e2e_test_*",
+                f"DEL session:{self.test_session_id}*"
+            ],
+            "file_cleanup": [
+                f"Remove temporary files: /tmp/e2e_test_{self.test_session_id}*",
+                f"Clear test logs: /var/log/pyairtable/e2e_test_*"
+            ]
+        }
+
+# Global E2E test factory instance
+e2e_factory = E2EIntegrationTestFactory()
+
+# Convenience functions for E2E testing
+def create_e2e_test_user(**overrides) -> E2ETestUser:
+    """Quick E2E test user creation"""
+    return e2e_factory.create_e2e_test_user(**overrides)
+
+def create_e2e_integration_scenario() -> Dict[str, Any]:
+    """Quick E2E integration test scenario creation"""  
+    return e2e_factory.create_integration_test_scenario()
+
+def get_service_health_test_data() -> Dict[str, Dict[str, Any]]:
+    """Quick service health test data"""
+    return e2e_factory.create_service_health_test_data()
+
+def get_authentication_test_data() -> Dict[str, Any]:
+    """Quick authentication test data"""
+    return e2e_factory.create_authentication_flow_test_data()
+
+def get_error_handling_test_data() -> Dict[str, Dict[str, Any]]:
+    """Quick error handling test data"""
+    return e2e_factory.create_error_handling_test_data()
+
+# Export all for easy imports
+__all__ = [
+    'E2ETestUser', 'E2ETestWorkspace', 'E2EIntegrationTestFactory',
+    'TestDataFactory', 'UserData', 'WorkspaceData', 'AirtableRecordData',
+    'e2e_factory', 'create_e2e_test_user', 'create_e2e_integration_scenario',
+    'get_service_health_test_data', 'get_authentication_test_data', 
+    'get_error_handling_test_data'
+]

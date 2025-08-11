@@ -13,7 +13,7 @@ server:
 
 services:
   auth_service:
-    url: "http://localhost:8081"
+    url: "http://localhost:8009"
     timeout: "30s"
     retry_count: 3
     retry_delay: "1s"
@@ -21,7 +21,7 @@ services:
     weight: 1
   
   user_service:
-    url: "http://localhost:8082"
+    url: "http://localhost:8010"
     timeout: "30s"
     retry_count: 3
     retry_delay: "1s"
