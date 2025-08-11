@@ -92,13 +92,23 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
-# Environments
+# Environments - CRITICAL SECURITY PROTECTION
 .env
 .env.local
 .env.development
 .env.test
 .env.production
 .env.staging
+.env.all-services
+.env.phase1
+.env.phase2
+.env.phase3
+auth-service.env
+kafka-production.env
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.template
 .venv
 env/
 venv/
