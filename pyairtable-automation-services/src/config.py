@@ -9,14 +9,14 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     
     # Authentication
-    api_key: str
-    auth_service_url: str
+    api_key: str = ""
+    auth_service_url: str = ""
     
     # Database
-    database_url: str
+    database_url: str = ""
     
     # Redis
-    redis_url: str
+    redis_url: str = ""
     redis_password: Optional[str] = None
     
     # File processing
@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        validate_default = True
     
     @property
     def max_file_size_bytes(self) -> int:
