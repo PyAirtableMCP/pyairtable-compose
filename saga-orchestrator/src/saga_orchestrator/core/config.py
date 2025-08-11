@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     metrics_port: int = Field(default=9090, env="METRICS_PORT")
     
     # CORS Configuration - Use string to avoid Pydantic JSON parsing issues
-    cors_origins_str: str = Field(default="", env="CORS_ORIGINS")
+    # cors_origins_str: str = Field(default="", env="CORS_ORIGINS")  # Commented out to fix parsing issue
     
     @validator("kafka_bootstrap_servers", pre=True)
     def parse_kafka_servers(cls, v):
@@ -84,7 +84,7 @@ class Settings(BaseSettings):
         return v
     
     @property
-    def cors_origins(self) -> List[str]:
+    def get_cors_origins(self) -> List[str]:
         """Convert cors_origins_str to a list of origins."""
         # For now, hardcode to test the service startup
         # TODO: Make this dynamic based on environment
