@@ -1,0 +1,166 @@
+# Promtail Production Configuration
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Docker container logs
+  - job_name: containers
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: containerlogs
+          __path__: /var/lib/docker/containers/*/*log
+
+    pipeline_stages:
+      # Parse Docker JSON logs
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            attrs: attrs
+            tag: attrs.tag
+            
+      # Extract container name and service
+      - regex:
+          expression: '(?P<container_name>(?:[^|]*))'
+          source: tag
+          
+      # Add labels
+      - labels:
+          stream:
+          container_name:
+          
+      # Filter out health check logs
+      - match:
+          selector: '{job="containerlogs"}'
+          stages:
+            - regex:
+                expression: '.*health.*check.*'
+              action: drop
+
+  # System logs
+  - job_name: syslog
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          __path__: /var/log/syslog
+
+  # Nginx access logs
+  - job_name: nginx-access
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-access
+          __path__: /var/log/nginx/access.log
+          
+    pipeline_stages:
+      # Parse nginx access logs
+      - regex:
+          expression: '^(?P<remote_addr>\S+) - (?P<remote_user>\S+) \[(?P<time_local>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) (?P<protocol>\S+)" (?P<status>\d+) (?P<body_bytes_sent>\d+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)"'
+          
+      # Add labels
+      - labels:
+          method:
+          status:
+          remote_addr:
+          
+      # Add metrics
+      - metrics:
+          nginx_access_total:
+            type: Counter
+            description: "Total number of nginx access log entries"
+            source: status
+            config:
+              action: inc
+              
+  # Nginx error logs
+  - job_name: nginx-error
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-error
+          __path__: /var/log/nginx/error.log
+          
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(?P<log_level>\w+)\] (?P<message>.*)'
+          
+      - labels:
+          log_level:
+
+  # Application logs (structured JSON)
+  - job_name: app-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: app-logs
+          __path__: /var/lib/docker/containers/*/*log
+          
+    pipeline_stages:
+      # Parse Docker JSON wrapper
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            
+      # Parse application JSON logs
+      - json:
+          expressions:
+            level: level
+            message: message
+            service: service
+            timestamp: timestamp
+            trace_id: trace_id
+            user_id: user_id
+          source: output
+          
+      # Add labels
+      - labels:
+          level:
+          service:
+          
+      # Only keep structured logs
+      - match:
+          selector: '{job="app-logs"} |= "level"'
+          action: keep
+
+  # Security logs
+  - job_name: security
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: security
+          __path__: /var/log/auth.log
+          
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\w{3} \d{2} \d{2}:\d{2}:\d{2}) (?P<hostname>\S+) (?P<process>\S+): (?P<message>.*)'
+          
+      - labels:
+          process:
+          
+      # Alert on failed authentication attempts
+      - match:
+          selector: '{job="security"} |~ "authentication failure|failed password"'
+          stages:
+            - metrics:
+                auth_failures_total:
+                  type: Counter
+                  description: "Authentication failures"
+                  config:
+                    action: inc

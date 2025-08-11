@@ -1,0 +1,147 @@
+# Prometheus Production Configuration
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  scrape_timeout: 10s
+  external_labels:
+    environment: production
+    cluster: pyairtable-compose
+
+# Rules for alerting
+rule_files:
+  - "/etc/prometheus/rules/*.yml"
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Service discovery and scraping configs
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: /metrics
+
+  # Application services metrics
+  - job_name: 'api-gateway'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['api-gateway:9090']
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    honor_labels: true
+    
+  - job_name: 'llm-orchestrator'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['llm-orchestrator:9090']
+    metrics_path: /metrics
+    
+  - job_name: 'mcp-server'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['mcp-server:9091']
+    metrics_path: /metrics
+    
+  - job_name: 'airtable-gateway'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['airtable-gateway:9092']
+    metrics_path: /metrics
+    
+  - job_name: 'platform-services'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['platform-services:9093']
+    metrics_path: /metrics
+    
+  - job_name: 'automation-services'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['automation-services:9094']
+    metrics_path: /metrics
+    
+  - job_name: 'saga-orchestrator'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['saga-orchestrator:9095']
+    metrics_path: /metrics
+
+  # Infrastructure services
+  - job_name: 'redis-exporter'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    metrics_path: /metrics
+    
+  - job_name: 'postgres-exporter'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    metrics_path: /metrics
+
+  # System metrics
+  - job_name: 'node-exporter'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['node-exporter:9100']
+    metrics_path: /metrics
+
+  # Container metrics
+  - job_name: 'cadvisor'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['cadvisor:8080']
+    metrics_path: /metrics
+
+  # Security scanning
+  - job_name: 'trivy-exporter'
+    scrape_interval: 300s  # 5 minutes for security scans
+    static_configs:
+      - targets: ['trivy-exporter:9090']
+    metrics_path: /metrics
+
+  # Nginx metrics
+  - job_name: 'nginx-exporter'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['nginx-exporter:9113']
+    metrics_path: /metrics
+
+  # Blackbox monitoring (external monitoring)
+  - job_name: 'blackbox-http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - https://localhost/health
+        - https://localhost/api/health
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # Custom business metrics
+  - job_name: 'business-metrics'
+    scrape_interval: 60s
+    static_configs:
+      - targets: ['api-gateway:9090']
+    metrics_path: /business-metrics
+    honor_labels: true
+
+# Remote write configuration (for long-term storage)
+# remote_write:
+#   - url: "https://prometheus-remote-write-endpoint/api/v1/write"
+#     basic_auth:
+#       username: "username"
+#       password: "password"
