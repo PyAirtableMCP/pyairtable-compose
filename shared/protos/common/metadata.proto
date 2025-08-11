@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package pyairtable.common;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/PyAirtableMCP/pyairtable-protos/generated/go/common";
+
+// CommonMetadata contains audit fields used across all entities
+message CommonMetadata {
+  // Unique identifier
+  string id = 1;
+  
+  // Creation timestamp
+  google.protobuf.Timestamp created_at = 2;
+  
+  // Last update timestamp
+  google.protobuf.Timestamp updated_at = 3;
+  
+  // User who created the entity
+  string created_by = 4;
+  
+  // User who last updated the entity
+  string updated_by = 5;
+  
+  // Version number for optimistic locking
+  int64 version = 6;
+  
+  // Whether the entity is deleted (soft delete)
+  bool is_deleted = 7;
+  
+  // Deletion timestamp
+  google.protobuf.Timestamp deleted_at = 8;
+  
+  // Custom metadata
+  map<string, string> metadata = 9;
+}
+
+// TenantContext provides multi-tenancy information
+message TenantContext {
+  // Tenant/Organization ID
+  string tenant_id = 1;
+  
+  // Workspace ID
+  string workspace_id = 2;
+  
+  // Environment (dev, staging, prod)
+  string environment = 3;
+}
+
+// RequestContext provides request-scoped information
+message RequestContext {
+  // Request ID for tracing
+  string request_id = 1;
+  
+  // User making the request
+  string user_id = 2;
+  
+  // User's role
+  string role = 3;
+  
+  // Tenant context
+  TenantContext tenant = 4;
+  
+  // Client IP address
+  string client_ip = 5;
+  
+  // User agent
+  string user_agent = 6;
+}

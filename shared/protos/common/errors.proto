@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package pyairtable.common;
+
+option go_package = "github.com/PyAirtableMCP/pyairtable-protos/generated/go/common";
+
+// ErrorCode defines standard error codes across all services
+enum ErrorCode {
+  // No error
+  ERROR_CODE_UNSPECIFIED = 0;
+  
+  // Client errors (4xx)
+  ERROR_CODE_BAD_REQUEST = 400;
+  ERROR_CODE_UNAUTHORIZED = 401;
+  ERROR_CODE_FORBIDDEN = 403;
+  ERROR_CODE_NOT_FOUND = 404;
+  ERROR_CODE_CONFLICT = 409;
+  ERROR_CODE_VALIDATION_FAILED = 422;
+  ERROR_CODE_RATE_LIMITED = 429;
+  
+  // Server errors (5xx)
+  ERROR_CODE_INTERNAL = 500;
+  ERROR_CODE_NOT_IMPLEMENTED = 501;
+  ERROR_CODE_SERVICE_UNAVAILABLE = 503;
+  ERROR_CODE_TIMEOUT = 504;
+}
+
+// Error represents a standard error response
+message Error {
+  // Error code
+  ErrorCode code = 1;
+  
+  // Human-readable error message
+  string message = 2;
+  
+  // Additional error details
+  repeated ErrorDetail details = 3;
+  
+  // Request ID for tracing
+  string request_id = 4;
+}
+
+// ErrorDetail provides additional context for errors
+message ErrorDetail {
+  // Field that caused the error (for validation)
+  string field = 1;
+  
+  // Detailed error message
+  string message = 2;
+  
+  // Error metadata
+  map<string, string> metadata = 3;
+}

@@ -1,0 +1,109 @@
+# PyAirtable Integration Test Makefile
+# Agent #6 - Sprint 4 Service Enablement
+# Quick commands for running integration tests
+
+.PHONY: help install-test-deps test-quick test-full test-services test-health test-clean test-report
+
+# Default target
+help:
+	@echo "PyAirtable Integration Test Commands"
+	@echo "=================================="
+	@echo ""
+	@echo "Available targets:"
+	@echo "  install-test-deps  Install all test dependencies"
+	@echo "  test-quick        Run quick integration tests"
+	@echo "  test-full         Run full integration test suite"
+	@echo "  test-services     Run services-only health checks"
+	@echo "  test-health       Check service health only"
+	@echo "  test-pytest       Run pytest integration tests"
+	@echo "  test-clean        Clean up test artifacts"
+	@echo "  test-report       Show latest test report"
+	@echo "  test-coverage     Generate test coverage report"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make test-quick   # Quick integration tests"
+	@echo "  make test-full    # Complete test suite"
+
+# Install test dependencies
+install-test-deps:
+	@echo "📦 Installing test dependencies..."
+	@pip3 install --break-system-packages httpx faker pytest-asyncio asyncpg docker
+	@echo "✅ Test dependencies installed"
+
+# Quick integration tests (recommended for development)
+test-quick: install-test-deps
+	@echo "🚀 Running quick integration tests..."
+	@./run_integration_tests.sh quick
+
+# Full integration test suite
+test-full: install-test-deps
+	@echo "🚀 Running full integration test suite..."
+	@./run_integration_tests.sh full
+
+# Services-only health checks
+test-services: install-test-deps
+	@echo "🏥 Running services-only tests..."
+	@./run_integration_tests.sh services-only
+
+# Health check only
+test-health:
+	@echo "🏥 Checking service health..."
+	@./run_integration_tests.sh health-only
+
+# Run pytest integration tests
+test-pytest: install-test-deps
+	@echo "🧪 Running pytest integration tests..."
+	@python3 -m pytest tests/integration/test_pyairtable_e2e_integration.py -v --tb=short
+
+# Run with coverage
+test-coverage: install-test-deps
+	@echo "📊 Running tests with coverage..."
+	@python3 -m pytest tests/integration/test_pyairtable_e2e_integration.py --cov=tests --cov-report=html --cov-report=xml -v
+
+# Clean up test artifacts
+test-clean:
+	@echo "🧹 Cleaning up test artifacts..."
+	@./run_integration_tests.sh cleanup
+	@rm -rf htmlcov/ .coverage coverage.xml
+	@echo "✅ Cleanup completed"
+
+# Show latest test report
+test-report:
+	@echo "📄 Latest test report:"
+	@ls -la pyairtable_e2e_integration_report_*.json 2>/dev/null | tail -1 || echo "No test reports found"
+	@echo ""
+	@echo "📋 Summary report:"
+	@ls -la integration_test_report.md 2>/dev/null || echo "No summary report found"
+
+# Development workflow - quick test and report
+test-dev: test-quick test-report
+	@echo "🏁 Development test cycle completed"
+
+# CI/CD workflow - full test suite
+test-ci: test-full test-coverage
+	@echo "🏁 CI/CD test cycle completed"
+
+# Service startup for testing
+start-services:
+	@echo "🚀 Starting services for testing..."
+	@docker-compose up -d postgres redis api-gateway airtable-gateway llm-orchestrator platform-services auth-service user-service
+	@sleep 10
+	@echo "⏳ Waiting for services to be ready..."
+	@sleep 20
+	@echo "✅ Services should be ready for testing"
+
+# Stop services
+stop-services:
+	@echo "🛑 Stopping services..."
+	@docker-compose down
+	@echo "✅ Services stopped"
+
+# Complete test workflow with service management
+test-complete: start-services test-full stop-services
+	@echo "🏁 Complete test workflow finished"
+
+# Emergency test (minimal dependencies)
+test-minimal:
+	@echo "🆘 Running minimal integration test..."
+	@python3 -c "import httpx; print('HTTP client working')"
+	@curl -f http://localhost:8000/api/health && echo "✅ API Gateway responding" || echo "❌ API Gateway not responding"

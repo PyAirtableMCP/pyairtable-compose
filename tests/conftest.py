@@ -6,6 +6,7 @@ Provides shared fixtures, test environment setup, and common utilities.
 import asyncio
 import os
 import pytest
+import pytest_asyncio
 import docker
 import asyncpg
 import redis.asyncio as redis
@@ -121,10 +122,10 @@ async def docker_client():
     else:
         yield None
 
-@pytest.fixture
-async def db_connection() -> AsyncGenerator[asyncpg.Connection, None]:
+@pytest_asyncio.fixture
+async def db_connection(request) -> AsyncGenerator[asyncpg.Connection, None]:
     """Provide a database connection for tests"""
-    if TEST_ENV in ["unit"] and not pytest.current_request.node.get_closest_marker("database"):
+    if TEST_ENV in ["unit"] and not request.node.get_closest_marker("database"):
         # Skip database connection for unit tests unless specifically marked
         yield None
         return
@@ -139,10 +140,10 @@ async def db_connection() -> AsyncGenerator[asyncpg.Connection, None]:
         if 'conn' in locals():
             await conn.close()
 
-@pytest.fixture
-async def redis_client() -> AsyncGenerator[redis.Redis, None]:
+@pytest_asyncio.fixture
+async def redis_client(request) -> AsyncGenerator[redis.Redis, None]:
     """Provide a Redis client for tests"""
-    if TEST_ENV in ["unit"] and not pytest.current_request.node.get_closest_marker("redis"):
+    if TEST_ENV in ["unit"] and not request.node.get_closest_marker("redis"):
         # Skip Redis connection for unit tests unless specifically marked
         yield None
         return
@@ -158,13 +159,13 @@ async def redis_client() -> AsyncGenerator[redis.Redis, None]:
         if 'client' in locals():
             await client.close()
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def http_client() -> AsyncGenerator[httpx.AsyncClient, None]:
     """Provide an HTTP client for API testing"""
     async with httpx.AsyncClient(timeout=30.0) as client:
         yield client
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def authenticated_client(http_client: httpx.AsyncClient, test_environment: TestEnvironment) -> httpx.AsyncClient:
     """Provide an authenticated HTTP client"""
     # Perform authentication
@@ -182,7 +183,7 @@ async def authenticated_client(http_client: httpx.AsyncClient, test_environment:
     
     return http_client
 
-@pytest.fixture(autouse=True)
+@pytest_asyncio.fixture(autouse=True)
 async def cleanup_database(db_connection: asyncpg.Connection):
     """Clean database before each test"""
     if db_connection is None:
@@ -221,7 +222,7 @@ async def cleanup_database(db_connection: asyncpg.Connection):
             await db_connection.execute("ROLLBACK")
         yield
 
-@pytest.fixture(autouse=True)
+@pytest_asyncio.fixture(autouse=True)
 async def cleanup_redis(redis_client: redis.Redis):
     """Clean Redis before each test"""
     if redis_client is None:

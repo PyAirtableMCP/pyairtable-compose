@@ -299,8 +299,8 @@ services:
       # Monitoring
       - ENABLE_METRICS=${ENABLE_METRICS:-true}
       - METRICS_PORT=9090
-      # CORS - Allow all services in the network plus external clients
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:8000,http://auth-service:8009,http://user-service:8010,http://workspace-service:8011,http://platform-services:8007,http://automation-services:8006,http://airtable-gateway:8002
+      # CORS - Allow all services in the network plus external clients  
+      - CORS_ORIGINS=${CORS_ORIGINS}
     depends_on:
       redis:
         condition: service_healthy

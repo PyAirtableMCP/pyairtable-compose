@@ -1,0 +1,210 @@
+name: PyAirtable Integration Tests
+# Agent #6 - CI/CD Integration Test Pipeline
+# Sprint 4 - Service Enablement
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run integration tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  PYTHON_VERSION: '3.11'
+  TEST_TIMEOUT: 600  # 10 minutes
+
+jobs:
+  integration-tests:
+    name: Integration Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y curl jq
+        
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements.test.txt
+        
+    - name: Start PyAirtable services
+      run: |
+        # Start core services needed for integration tests
+        docker-compose up -d postgres redis api-gateway airtable-gateway llm-orchestrator platform-services auth-service user-service
+        
+        # Wait for services to be ready
+        sleep 30
+        
+    - name: Wait for service health
+      timeout-minutes: 3
+      run: |
+        echo "Waiting for services to become healthy..."
+        for i in {1..18}; do
+          if ./run_integration_tests.sh health-only; then
+            echo "Services are healthy!"
+            break
+          fi
+          echo "Attempt $i/18: Services not ready yet, waiting..."
+          sleep 10
+        done
+        
+    - name: Run integration tests (quick mode)
+      run: |
+        ./run_integration_tests.sh quick
+        
+    - name: Run pytest integration tests
+      run: |
+        python -m pytest tests/integration/test_pyairtable_e2e_integration.py -v --tb=short --junit-xml=integration-test-results.xml
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: integration-test-results
+        path: |
+          integration-test-results.xml
+          pyairtable_e2e_integration_report_*.json
+          integration_test_report.md
+        retention-days: 30
+        
+    - name: Upload test coverage
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-coverage
+        path: |
+          coverage.xml
+          htmlcov/
+        retention-days: 7
+        
+    - name: Comment PR with test results
+      uses: actions/github-script@v7
+      if: github.event_name == 'pull_request' && always()
+      with:
+        script: |
+          const fs = require('fs');
+          
+          // Read integration test report if it exists
+          let reportContent = '';
+          try {
+            const reportFiles = fs.readdirSync('.').filter(f => f.startsWith('pyairtable_e2e_integration_report_'));
+            if (reportFiles.length > 0) {
+              const latestReport = reportFiles.sort().pop();
+              const reportData = JSON.parse(fs.readFileSync(latestReport, 'utf8'));
+              
+              reportContent = `## 🧪 Integration Test Results
+              
+              **Service Health:** ${reportData.service_health?.health_rate || 'Unknown'}
+              **Overall Success Rate:** ${reportData.overall_metrics?.overall_success_rate || 'Unknown'}  
+              **Completion Status:** ${reportData.sprint_info?.completion_status || 'Unknown'}
+              **Execution Time:** ${reportData.execution_info?.duration_formatted || 'Unknown'}
+              
+              ### Service Status
+              ${Object.entries(reportData.service_health?.service_details || {})
+                .map(([service, details]) => `- ${details.healthy ? '✅' : '❌'} **${service}**: ${details.status_code} (${details.response_time?.toFixed(2)}s)`)
+                .join('\n')}
+              
+              📄 [Full Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+            }
+          } catch (error) {
+            reportContent = '❌ Could not read integration test report';
+          }
+          
+          await github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: reportContent || '🧪 Integration tests completed - check artifacts for details'
+          });
+          
+    - name: Cleanup services
+      if: always()
+      run: |
+        docker-compose down -v
+        ./run_integration_tests.sh cleanup
+
+  service-health-check:
+    name: Service Health Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Start core services
+      run: |
+        docker-compose up -d postgres redis api-gateway
+        sleep 15
+        
+    - name: Basic health check
+      run: |
+        curl -f http://localhost:8000/api/health || exit 1
+        echo "✅ Basic service health check passed"
+        
+    - name: Cleanup
+      if: always()
+      run: |
+        docker-compose down -v
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'

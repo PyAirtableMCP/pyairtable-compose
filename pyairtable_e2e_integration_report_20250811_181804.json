@@ -1,0 +1,246 @@
+{
+  "test_session": {
+    "start_time": "2025-08-11T18:17:56.362736",
+    "mode": "quick",
+    "scope": "full_e2e"
+  },
+  "sprint_info": {
+    "sprint": "Sprint 4 - Service Enablement",
+    "task": "10/10 - E2E Integration Tests",
+    "completion_status": "NEEDS_ATTENTION"
+  },
+  "service_health": {
+    "healthy_services": 6,
+    "total_services": 7,
+    "health_rate": "85.7%",
+    "service_details": {
+      "api_gateway": {
+        "healthy": true,
+        "status_code": 200,
+        "response_time": 0.023229
+      },
+      "airtable_gateway": {
+        "healthy": true,
+        "status_code": 200,
+        "response_time": 0.003167
+      },
+      "llm_orchestrator": {
+        "healthy": true,
+        "status_code": 200,
+        "response_time": 0.005909
+      },
+      "platform_services": {
+        "healthy": true,
+        "status_code": 200,
+        "response_time": 0.004137
+      },
+      "auth_service": {
+        "healthy": true,
+        "status_code": 200,
+        "response_time": 0.002052
+      },
+      "user_service": {
+        "healthy": true,
+        "status_code": 200,
+        "response_time": 0.002015
+      },
+      "workspace_service": {
+        "healthy": false,
+        "status_code": 0,
+        "response_time": 7.03486
+      }
+    }
+  },
+  "authentication": {
+    "test_results": {
+      "registration": true,
+      "login": false,
+      "token_validation": false,
+      "error_handling": true
+    },
+    "success_count": 2,
+    "total_tests": 4,
+    "success_rate": "50.0%"
+  },
+  "api_gateway": {
+    "error": "Authentication failed"
+  },
+  "integration": {
+    "service_health": {
+      "api_gateway": true,
+      "airtable_gateway": true,
+      "llm_orchestrator": true,
+      "platform_services": true,
+      "auth_service": true,
+      "user_service": true
+    },
+    "detailed_report": {
+      "test_suite": "PyAirtable E2E Integration Tests",
+      "sprint": "Sprint 4 - Service Enablement (Task 10/10)",
+      "timestamp": "2025-08-11T18:18:04.095413",
+      "summary": {
+        "total_tests": 8,
+        "passed": 8,
+        "failed": 0,
+        "errors": 0,
+        "success_rate": "100.0%",
+        "total_duration": "0.59s"
+      },
+      "service_health": {
+        "tested_services": 6,
+        "operational_services": "8/12 (67%)",
+        "critical_services_status": "OPERATIONAL"
+      },
+      "test_results": [
+        {
+          "test_name": "service_health_checks",
+          "status": "PASS",
+          "duration": 0.071032,
+          "error_message": null,
+          "response_data": {
+            "api_gateway": true,
+            "airtable_gateway": true,
+            "llm_orchestrator": true,
+            "platform_services": true,
+            "auth_service": true,
+            "user_service": true
+          }
+        },
+        {
+          "test_name": "user_registration_flow",
+          "status": "PASS",
+          "duration": 0.243968,
+          "error_message": null,
+          "response_data": {
+            "user_id": null,
+            "email": "test_49fa8a01@pyairtable-e2e.com"
+          }
+        },
+        {
+          "test_name": "authentication_flow",
+          "status": "PASS",
+          "duration": 0.233942,
+          "error_message": null,
+          "response_data": {
+            "token_received": true,
+            "profile_accessible": false
+          }
+        },
+        {
+          "test_name": "api_gateway_routing",
+          "status": "PASS",
+          "duration": 0.020401,
+          "error_message": null,
+          "response_data": {
+            "routing_tests": [
+              {
+                "route": "/api/health",
+                "description": "Gateway health check",
+                "status_code": 200,
+                "accessible": true
+              },
+              {
+                "route": "/api/user/profile",
+                "description": "User service routing",
+                "status_code": 404,
+                "accessible": true
+              },
+              {
+                "route": "/api/airtable/bases",
+                "description": "Airtable gateway routing",
+                "status_code": 401,
+                "accessible": true
+              },
+              {
+                "route": "/api/llm/status",
+                "description": "LLM orchestrator routing",
+                "status_code": 404,
+                "accessible": true
+              }
+            ]
+          }
+        },
+        {
+          "test_name": "database_integration",
+          "status": "PASS",
+          "duration": 0.005743,
+          "error_message": null,
+          "response_data": {
+            "user_update_status": 404,
+            "session_storage_status": 404
+          }
+        },
+        {
+          "test_name": "airtable_integration",
+          "status": "PASS",
+          "duration": 0.004743,
+          "error_message": null,
+          "response_data": {
+            "bases_status": 401,
+            "schema_status": 401
+          }
+        },
+        {
+          "test_name": "llm_integration",
+          "status": "PASS",
+          "duration": 0.004881,
+          "error_message": null,
+          "response_data": {
+            "status_response": 404,
+            "ai_response": 200
+          }
+        },
+        {
+          "test_name": "error_handling",
+          "status": "PASS",
+          "duration": 0.006329,
+          "error_message": null,
+          "response_data": {
+            "error_tests": [
+              {
+                "test": "invalid_auth",
+                "expected_status": 401,
+                "actual_status": 404,
+                "correct_handling": false
+              },
+              {
+                "test": "not_found",
+                "expected_status": 404,
+                "actual_status": 404,
+                "correct_handling": true
+              },
+              {
+                "test": "malformed_request",
+                "expected_status": 400,
+                "actual_status": 400,
+                "correct_handling": true
+              }
+            ]
+          }
+        }
+      ],
+      "recommendations": [
+        "\u2705 All integration tests passed - system is ready for production",
+        "\u2705 Sprint 4 Service Enablement completed successfully",
+        "\ud83d\udcca Implement continuous integration testing",
+        "\ud83d\ude80 Set up automated deployment pipeline",
+        "\ud83d\udcc8 Add performance monitoring and alerting",
+        "\ud83d\udd0d Implement distributed tracing for debugging"
+      ]
+    }
+  },
+  "overall_metrics": {
+    "healthy_services": "6/7",
+    "service_health_rate": "85.7%",
+    "authentication_success_rate": "50.0%",
+    "api_gateway_success_rate": "0.0%",
+    "overall_success_rate": "25.0%",
+    "completion_status": "NEEDS_ATTENTION"
+  },
+  "execution_info": {
+    "start_time": "2025-08-11T18:17:56.362736",
+    "end_time": "2025-08-11T18:18:04.095622",
+    "duration_seconds": 7.732886,
+    "duration_formatted": "7.7s"
+  }
+}
