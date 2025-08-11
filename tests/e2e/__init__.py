@@ -1,1 +1,0 @@
-"""End-to-end tests for PyAirtable architectural patterns."""

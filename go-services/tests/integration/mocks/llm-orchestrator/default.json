@@ -1,5 +1,0 @@
-{
-  "status": "ok",
-  "service": "llm-orchestrator-mock",
-  "message": "Mock LLM Orchestrator for integration testing"
-}

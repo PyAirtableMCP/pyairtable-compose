@@ -1,1 +1,0 @@
-{"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"up","instance":"localhost:8888","job":"otel-collector"},"value":[1754409274,"1"]}]}}

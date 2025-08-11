@@ -1,1 +1,0 @@
-"""Integration tests for PyAirtable service interactions."""
