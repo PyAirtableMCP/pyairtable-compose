@@ -1,0 +1,69 @@
+# Test Runner Dockerfile for PyAirtable Compose
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    git \
+    postgresql-client \
+    redis-tools \
+    build-essential \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Go (for Go service testing)
+RUN wget -q https://go.dev/dl/go1.21.5.linux-amd64.tar.gz && \
+    tar -C /usr/local -xzf go1.21.5.linux-amd64.tar.gz && \
+    rm go1.21.5.linux-amd64.tar.gz
+
+# Set Go environment
+ENV PATH=$PATH:/usr/local/go/bin
+ENV GOPATH=/go
+ENV PATH=$PATH:$GOPATH/bin
+
+# Install Node.js (for frontend testing)
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs
+
+# Set working directory
+WORKDIR /app
+
+# Copy Python requirements
+COPY requirements-test.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements-test.txt
+
+# Install additional test tools
+RUN pip install --no-cache-dir \
+    coverage-badge \
+    pytest-html \
+    pytest-json-report \
+    pytest-benchmark
+
+# Create directories for reports and logs
+RUN mkdir -p /app/reports /app/logs
+
+# Copy test configuration
+COPY pytest.ini .
+COPY conftest.py .
+
+# Copy test scripts
+COPY run-comprehensive-tests.sh .
+RUN chmod +x run-comprehensive-tests.sh
+
+# Set environment variables for testing
+ENV PYTHONPATH=/app
+ENV TEST_ENV=integration
+ENV PYTHONUNBUFFERED=1
+
+# Expose ports for test services (if needed)
+EXPOSE 8000 8001 8002 8003 8004
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python3 -c "import sys; sys.exit(0)"
+
+# Default command (can be overridden)
+CMD ["python3", "-m", "pytest", "--version"]

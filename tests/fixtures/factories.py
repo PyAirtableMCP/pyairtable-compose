@@ -282,6 +282,91 @@ class TestDataFactory:
             "status": random.choice(["Active", "Inactive"]),
             "notes": self.fake.text(max_nb_chars=100)
         }
+    
+    def create_complete_user_journey(self) -> Dict[str, Any]:
+        """Create complete user journey data for integration tests"""
+        user = self.create_user()
+        workspace = self.create_workspace(owner_id=user.id)
+        return {
+            "user": user,
+            "workspace": workspace,
+            "auth_data": {
+                "login": {
+                    "email": user.email,
+                    "password": "TestPassword123!"
+                },
+                "token": self.create_auth_token_data(user.id)
+            },
+            "airtable_data": {
+                "base_id": f"app{self.random_string(14).upper()}",
+                "api_token": f"pat14.{self.random_string(40)}",
+                "records": self.create_airtable_records(10)
+            }
+        }
+    
+    def create_error_scenarios(self) -> Dict[str, Any]:
+        """Create various error scenarios for testing"""
+        return {
+            "auth_errors": {
+                "invalid_credentials": {
+                    "email": "invalid@example.com",
+                    "password": "wrongpassword"
+                },
+                "expired_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.expired",
+                "malformed_token": "invalid.token.format"
+            },
+            "validation_errors": {
+                "invalid_email": {
+                    "email": "not-an-email",
+                    "password": "ValidPassword123!"
+                },
+                "weak_password": {
+                    "email": self.fake.email(),
+                    "password": "123"
+                },
+                "missing_required_field": {
+                    "email": self.fake.email()
+                    # Missing password
+                }
+            },
+            "business_logic_errors": {
+                "duplicate_email": {
+                    "email": "duplicate@example.com",
+                    "password": "ValidPassword123!"
+                },
+                "inactive_user_login": {
+                    "email": "inactive@example.com",
+                    "password": "ValidPassword123!"
+                }
+            }
+        }
+    
+    def create_edge_cases(self) -> Dict[str, Any]:
+        """Create edge case data for comprehensive testing"""
+        return {
+            "boundary_values": {
+                "min_string": "",
+                "max_string": "x" * 1000,
+                "negative_number": -1,
+                "zero": 0,
+                "max_int": 2147483647,
+                "unicode_text": "🚀 Test with emojis and üñíçødé 测试",
+                "special_chars": "!@#$%^&*()_+-=[]{}|;':\",./<>?"
+            },
+            "null_and_empty": {
+                "null_value": None,
+                "empty_string": "",
+                "empty_list": [],
+                "empty_dict": {},
+                "whitespace_only": "   \n\t  "
+            },
+            "extreme_dates": {
+                "past_date": datetime(1900, 1, 1),
+                "future_date": datetime(2100, 12, 31),
+                "epoch": datetime(1970, 1, 1),
+                "leap_year": datetime(2024, 2, 29)
+            }
+        }
 
 # Convenience functions for quick access
 def create_user(**overrides) -> UserData:

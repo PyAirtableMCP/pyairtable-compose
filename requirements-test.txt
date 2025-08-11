@@ -1,0 +1,88 @@
+# Test Framework
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-html>=3.2.0
+pytest-xdist>=3.3.0
+pytest-timeout>=2.1.0
+pytest-mock>=3.11.0
+
+# Contract Testing
+pact-python>=2.1.0
+jsonschema>=4.19.0
+openapi-spec-validator>=0.6.0
+
+# HTTP Testing
+httpx>=0.24.0
+responses>=0.23.0
+respx>=0.20.0
+
+# Database Testing
+asyncpg>=0.28.0
+psycopg2-binary>=2.9.0
+pytest-postgresql>=5.0.0
+alembic>=1.11.0
+
+# Redis Testing
+redis>=4.6.0
+fakeredis>=2.17.0
+
+# Docker Integration
+docker>=6.1.0
+testcontainers>=3.7.0
+
+# Performance Testing
+locust>=2.15.0
+pytest-benchmark>=4.0.0
+
+# Security Testing
+bandit>=1.7.0
+safety>=2.3.0
+semgrep>=1.31.0
+
+# Load Testing
+k6>=0.1.0
+
+# Mocking and Fixtures
+factory-boy>=3.3.0
+Faker>=19.0.0
+freezegun>=1.2.0
+
+# Utilities
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+structlog>=23.1.0
+
+# Code Quality
+coverage>=7.0.0
+coverage-badge>=1.1.0
+flake8>=6.0.0
+black>=23.0.0
+isort>=5.12.0
+
+# API Documentation Testing
+dredd>=5.1.0
+
+# Chaos Engineering
+chaos-toolkit>=1.16.0
+chaostoolkit-kubernetes>=0.24.0
+
+# Browser Testing (for E2E)
+playwright>=1.36.0
+selenium>=4.11.0
+
+# Monitoring and Observability Testing
+opentelemetry-api>=1.19.0
+opentelemetry-sdk>=1.19.0
+prometheus-client>=0.17.0
+
+# JWT and Auth Testing
+PyJWT>=2.8.0
+cryptography>=41.0.0
+
+# File and Data Processing
+openpyxl>=3.1.0
+pandas>=2.0.0
+
+# Environment Management
+python-decouple>=3.8
