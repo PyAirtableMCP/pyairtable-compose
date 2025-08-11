@@ -9,10 +9,10 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 import logging
 
-from ..services.table_analysis import TableAnalysisService, AnalysisCategory, TableMetadata, AnalysisResult
-from ..dependencies import get_redis_client
-from ..config import get_settings
-from ..models.chat import Message, MessageRole, ChatRequest
+from services.table_analysis import TableAnalysisService, AnalysisCategory, TableMetadata, AnalysisResult
+from dependencies import get_redis_client
+from config import get_settings
+from models.chat import Message, MessageRole, ChatRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/analysis", tags=["table-analysis"])

@@ -9,7 +9,7 @@ from datetime import datetime
 import httpx
 from dataclasses import dataclass
 
-from ..config import get_settings
+from config import get_settings
 from .table_analysis import TableAnalysisService, AnalysisCategory, TableMetadata, AnalysisResult
 
 logger = logging.getLogger(__name__)

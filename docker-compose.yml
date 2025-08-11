@@ -11,8 +11,9 @@ services:
       - "8000:8000"
     environment:
       - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
-      - MCP_SERVER_URL=http://mcp-server:8001
-      - LLM_ORCHESTRATOR_URL=http://llm-orchestrator:8003
+      - AI_PROCESSING_SERVICE_URL=http://ai-processing-service:8001
+      - MCP_SERVER_URL=http://ai-processing-service:8001
+      - LLM_ORCHESTRATOR_URL=http://ai-processing-service:8001
       - PLATFORM_SERVICES_URL=http://platform-services:8007
       - AUTOMATION_SERVICES_URL=http://automation-services:8006
       - SAGA_ORCHESTRATOR_URL=http://saga-orchestrator:8008
@@ -26,10 +27,8 @@ services:
     depends_on:
       airtable-gateway:
         condition: service_healthy
-      mcp-server:
+      ai-processing-service:
         condition: service_healthy
-      llm-orchestrator:
-        condition: service_started
       platform-services:
         condition: service_healthy
       automation-services:
@@ -49,67 +48,34 @@ services:
       retries: 5
       start_period: 90s
 
-  # LLM Orchestrator - Gemini 2.5 Flash integration
-  llm-orchestrator:
-    image: llm-orchestrator-test:latest
-    # build:
-    #   context: ../llm-orchestrator-py
-    #   dockerfile: Dockerfile
+  # AI Processing Service - Consolidated MCP Server + LLM Orchestrator
+  ai-processing-service:
+    build:
+      context: ./python-services/ai-processing-service
+      dockerfile: Dockerfile
     ports:
-      - "8003:8003"
+      - "8001:8001"  # Using MCP server's original port
     environment:
+      # Service Configuration
+      - API_KEY=${API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - REQUIRE_API_KEY=${REQUIRE_API_KEY:-true}
+      # Gemini Configuration (from LLM Orchestrator)
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - MCP_SERVER_HTTP_URL=http://mcp-server:8001
-      - USE_HTTP_MCP=true
+      - THINKING_BUDGET=${THINKING_BUDGET}
+      # MCP Configuration (from MCP Server)
+      - MCP_SERVER_MODE=http
       # Airtable configuration
       - AIRTABLE_BASE=${AIRTABLE_BASE}
       - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
+      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
       # Redis session storage
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - USE_REDIS_SESSIONS=true
-      # Legacy stdio config (fallback)
-      - MCP_SERVER_STDIO_COMMAND=python -m src.server
-      - MCP_SERVER_WORKING_DIR=/app/mcp-server
-      - THINKING_BUDGET=${THINKING_BUDGET}
-      - LOG_LEVEL=${LOG_LEVEL}
+      # Database
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     depends_on:
-      mcp-server:
-        condition: service_healthy
       redis:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - pyairtable-network
-    healthcheck:
-      test: [
-        "CMD-SHELL",
-        "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8003/health')\" || exit 1"
-      ]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-
-  # MCP Server - Protocol implementation (HTTP mode for performance)
-  mcp-server:
-    image: mcp-server-test:latest
-    # build:
-    #   context: ../mcp-server-py
-    #   dockerfile: Dockerfile
-    ports:
-      - "8001:8001"
-    environment:
-      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
-      - AIRTABLE_GATEWAY_API_KEY=${API_KEY}
-      - MCP_SERVER_MODE=http
-      - MCP_SERVER_PORT=8001
-      # Airtable configuration
-      - AIRTABLE_BASE=${AIRTABLE_BASE}
-      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
-      - LOG_LEVEL=${LOG_LEVEL}
-    depends_on:
-      airtable-gateway:
         condition: service_healthy
     restart: unless-stopped
     networks:
@@ -127,9 +93,6 @@ services:
   # Airtable Gateway - Direct Airtable API integration
   airtable-gateway:
     image: ghcr.io/reg-kris/airtable-gateway-py:latest
-    build:
-      context: ./python-services/airtable-gateway
-      dockerfile: Dockerfile
     ports:
       - "8002:8002"
     environment:
@@ -213,7 +176,7 @@ services:
     ports:
       - "8006:8006"
     environment:
-      - MCP_SERVER_URL=http://mcp-server:8001
+      - MCP_SERVER_URL=http://ai-processing-service:8001
       - PLATFORM_SERVICES_URL=http://platform-services:8007
       - AUTH_SERVICE_URL=http://platform-services:8007
       - API_KEY=${API_KEY}
@@ -230,7 +193,7 @@ services:
       - MAX_WORKFLOW_RETRIES=${MAX_WORKFLOW_RETRIES:-3}
       - SCHEDULER_CHECK_INTERVAL=${SCHEDULER_CHECK_INTERVAL:-30}
     depends_on:
-      mcp-server:
+      ai-processing-service:
         condition: service_healthy
       platform-services:
         condition: service_healthy
@@ -387,8 +350,8 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NEXT_PUBLIC_API_GATEWAY_URL=http://api-gateway:8000
       # Internal service URLs (for SSR/API routes)
-      - LLM_ORCHESTRATOR_URL=http://llm-orchestrator:8003
-      - MCP_SERVER_URL=http://mcp-server:8001
+      - LLM_ORCHESTRATOR_URL=http://ai-processing-service:8001
+      - MCP_SERVER_URL=http://ai-processing-service:8001
       - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
       - PLATFORM_SERVICES_URL=http://platform-services:8007
       - AUTOMATION_SERVICES_URL=http://automation-services:8006
@@ -415,9 +378,7 @@ services:
     depends_on:
       api-gateway:
         condition: service_healthy
-      llm-orchestrator:
-        condition: service_healthy
-      mcp-server:
+      ai-processing-service:
         condition: service_healthy
       airtable-gateway:
         condition: service_healthy

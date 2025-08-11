@@ -8,9 +8,9 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
 import logging
 
-from ..services.workflow_orchestrator import WorkflowOrchestrator, WorkflowConfig
-from ..services.table_analysis import AnalysisCategory
-from ..config import get_settings
+from services.workflow_orchestrator import WorkflowOrchestrator, WorkflowConfig
+from services.table_analysis import AnalysisCategory
+from config import get_settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/workflow", tags=["workflow"])
@@ -200,7 +200,7 @@ async def estimate_workflow_cost(
         estimated_table_count = 35  # Based on the requirement
         
         # Use analysis service for cost estimation
-        from ..services.table_analysis import TableAnalysisService
+        from services.table_analysis import TableAnalysisService
         analysis_service = TableAnalysisService()
         
         estimate = analysis_service.estimate_batch_cost(

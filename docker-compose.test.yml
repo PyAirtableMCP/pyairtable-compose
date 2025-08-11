@@ -1,0 +1,317 @@
+version: '3.8'
+
+# Testing overrides for PyAirtable Platform
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.test.yml up
+
+services:
+  # =============================================================================
+  # TEST OVERRIDES - FAST STARTUP & DEBUGGING
+  # =============================================================================
+
+  # API Gateway - Test settings
+  api-gateway:
+    environment:
+      - ENVIRONMENT=test
+      - LOG_LEVEL=debug
+      - CORS_ORIGINS=*
+      - REQUIRE_API_KEY=false
+      - RATE_LIMIT_RPM=10000
+      - RATE_LIMIT_BURST=1000
+      - API_KEY=test-api-key
+    healthcheck:
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # AI Processing Service - Test settings
+  ai-processing-service:
+    environment:
+      - ENVIRONMENT=test
+      - LOG_LEVEL=debug
+    healthcheck:
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+
+  # Airtable Gateway - Test settings
+  airtable-gateway:
+    environment:
+      - ENVIRONMENT=test
+      - LOG_LEVEL=debug
+      - AIRTABLE_TOKEN=test-airtable-token
+      - AIRTABLE_BASE=test-base-id
+      - API_KEY=test-api-key
+      - CACHE_TTL=60
+      - RATE_LIMIT=1000
+    healthcheck:
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+
+  # Platform Services - Test settings
+  platform-services:
+    environment:
+      - ENVIRONMENT=test
+      - LOG_LEVEL=debug
+      - API_KEY=test-api-key
+      - REQUIRE_API_KEY=false
+      - JWT_SECRET=test-jwt-secret-key-for-testing-only
+      - JWT_EXPIRES_IN=1h
+      - PASSWORD_MIN_LENGTH=4
+      - PASSWORD_HASH_ROUNDS=4
+      - CORS_ORIGINS=*
+    healthcheck:
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Automation Services - Test settings
+  automation-services:
+    environment:
+      - ENVIRONMENT=test
+      - LOG_LEVEL=debug
+      - API_KEY=test-api-key
+      - MAX_FILE_SIZE=1MB
+      - ALLOWED_EXTENSIONS=txt,json,csv
+      - UPLOAD_DIR=/tmp/test-uploads
+      - DEFAULT_WORKFLOW_TIMEOUT=30
+      - MAX_WORKFLOW_RETRIES=1
+      - SCHEDULER_CHECK_INTERVAL=5
+    volumes:
+      - test-file-uploads:/tmp/test-uploads
+    healthcheck:
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # SAGA Orchestrator - Test settings
+  saga-orchestrator:
+    environment:
+      - ENVIRONMENT=test
+      - LOG_LEVEL=debug
+      - API_KEY=test-api-key
+      - REQUIRE_API_KEY=false
+      - SAGA_TIMEOUT_SECONDS=60
+      - SAGA_RETRY_ATTEMPTS=2
+      - SAGA_STEP_TIMEOUT_SECONDS=30
+      - ENABLE_METRICS=false
+      - CORS_ORIGINS=*
+    healthcheck:
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+
+  # Frontend - Test settings
+  frontend:
+    environment:
+      - NODE_ENV=test
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXTAUTH_SECRET=test-nextauth-secret
+      - NEXTAUTH_URL=http://localhost:3000
+      - LOG_LEVEL=debug
+      - NEXT_PUBLIC_ENABLE_DEBUG=true
+      - NEXT_PUBLIC_SHOW_COST_TRACKING=false
+      - API_KEY=test-api-key
+    healthcheck:
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+
+  # =============================================================================
+  # TEST INFRASTRUCTURE - FAST & LIGHTWEIGHT
+  # =============================================================================
+
+  # Redis - Test configuration (faster, no persistence)
+  redis:
+    command: >
+      redis-server
+      --requirepass test-password
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
+    environment:
+      - REDIS_PASSWORD=test-password
+    healthcheck:
+      test: [
+        "CMD-SHELL",
+        "redis-cli --no-auth-warning -a test-password ping | grep PONG"
+      ]
+      interval: 3s
+      timeout: 2s
+      retries: 5
+      start_period: 5s
+
+  # PostgreSQL - Test configuration (faster startup)
+  postgres:
+    environment:
+      - POSTGRES_DB=pyairtable_test
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=test_password
+      - POSTGRES_INITDB_ARGS="--auth-host=md5 --auth-local=md5"
+    command: >
+      postgres
+      -c fsync=off
+      -c synchronous_commit=off
+      -c full_page_writes=off
+      -c random_page_cost=1.0
+      -c max_connections=50
+      -c shared_buffers=128MB
+      -c effective_cache_size=256MB
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      - ./migrations:/docker-entrypoint-initdb.d/migrations:ro
+    healthcheck:
+      test: [
+        "CMD-SHELL",
+        "pg_isready -U test_user -d pyairtable_test"
+      ]
+      interval: 3s
+      timeout: 2s
+      retries: 5
+      start_period: 10s
+
+  # =============================================================================
+  # TEST UTILITIES & MOCKING
+  # =============================================================================
+
+  # Mock External APIs
+  mock-airtable-api:
+    image: wiremock/wiremock:2.35.0
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./tests/fixtures/airtable-mocks:/home/wiremock/mappings:ro
+    command: ["--global-response-templating", "--verbose"]
+    networks:
+      - pyairtable-network
+
+  mock-gemini-api:
+    image: wiremock/wiremock:2.35.0
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./tests/fixtures/gemini-mocks:/home/wiremock/mappings:ro
+    command: ["--global-response-templating", "--verbose"]
+    networks:
+      - pyairtable-network
+
+  # Test Runner Service
+  test-runner:
+    build:
+      context: ./tests
+      dockerfile: Dockerfile.test
+    environment:
+      - TEST_ENV=integration
+      - PYTHONPATH=/app/tests
+      - DATABASE_URL=postgresql://test_user:test_password@postgres:5432/pyairtable_test
+      - REDIS_URL=redis://:test-password@redis:6379
+      - API_GATEWAY_URL=http://api-gateway:8000
+      - AI_PROCESSING_SERVICE_URL=http://ai-processing-service:8001
+      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
+      - PLATFORM_SERVICES_URL=http://platform-services:8007
+      - AUTOMATION_SERVICES_URL=http://automation-services:8006
+      - SAGA_ORCHESTRATOR_URL=http://saga-orchestrator:8008
+      - FRONTEND_URL=http://frontend:3000
+      - MOCK_AIRTABLE_URL=http://mock-airtable-api:8080
+      - MOCK_GEMINI_URL=http://mock-gemini-api:8080
+    volumes:
+      - ./tests:/app/tests:ro
+      - test-reports:/app/reports
+    working_dir: /app/tests
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      ai-processing-service:
+        condition: service_healthy
+      airtable-gateway:
+        condition: service_healthy
+      platform-services:
+        condition: service_healthy
+      automation-services:
+        condition: service_healthy
+      saga-orchestrator:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+      mock-airtable-api:
+        condition: service_started
+      mock-gemini-api:
+        condition: service_started
+    command: >
+      sh -c "
+        echo 'Waiting for services to be ready...' &&
+        sleep 15 &&
+        echo 'Running integration tests...' &&
+        pytest -v --tb=short 
+        --cov=. 
+        --cov-report=html:/app/reports/coverage 
+        --cov-report=xml:/app/reports/coverage.xml 
+        --junit-xml=/app/reports/junit.xml
+        tests/integration/
+      "
+    networks:
+      - pyairtable-network
+
+  # Performance Testing
+  k6-load-test:
+    image: grafana/k6:latest
+    volumes:
+      - ./tests/performance:/scripts:ro
+      - test-reports:/reports
+    environment:
+      - BASE_URL=http://api-gateway:8000
+      - FRONTEND_URL=http://frontend:3000
+    command: >
+      run
+      --out json=/reports/k6-results.json
+      --summary-export=/reports/k6-summary.json
+      /scripts/load-test.js
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    networks:
+      - pyairtable-network
+    profiles:
+      - performance
+
+  # Chaos Testing (Optional)
+  chaos-monkey:
+    image: quay.io/linki/chaoskube:v0.21.0
+    environment:
+      - CHAOSKUBE_INTERVAL=60s
+      - CHAOSKUBE_DRY_RUN=false
+      - CHAOSKUBE_LOG_LEVEL=debug
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: >
+      --interval=60s
+      --log-level=debug
+      --annotation-selector=chaos.alpha.kubernetes.io/enabled=true
+    profiles:
+      - chaos
+    networks:
+      - pyairtable-network
+
+# =============================================================================
+# TEST VOLUMES - TEMPORARY DATA
+# =============================================================================
+volumes:
+  postgres-test-data:
+    driver: local
+  test-file-uploads:
+    driver: local
+  test-reports:
+    driver: local
+
+# Note: Networks are inherited from base docker-compose.yml

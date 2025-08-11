@@ -5,8 +5,8 @@ from typing import Optional, List
 from datetime import datetime
 from redis import asyncio as aioredis
 
-from ..models.chat import Session, Message
-from ..config import get_settings
+from models.chat import Session, Message
+from config import get_settings
 
 
 class SessionService:

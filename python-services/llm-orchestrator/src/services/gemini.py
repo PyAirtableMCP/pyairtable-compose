@@ -33,8 +33,8 @@ except ImportError:
     
     tracer = None
 
-from ..config import get_settings
-from ..models.chat import Message, MessageRole, ChatRequest, ChatResponse, TokenUsage
+from config import get_settings
+from models.chat import Message, MessageRole, ChatRequest, ChatResponse, TokenUsage
 
 
 class GeminiService:

@@ -4,10 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from redis import asyncio as aioredis
 
-from ..models.chat import ChatRequest, ChatResponse, Message, Session
-from ..services.gemini import GeminiService
-from ..services.session import SessionService
-from ..dependencies import get_redis_client
+from models.chat import ChatRequest, ChatResponse, Message, Session
+from services.gemini import GeminiService
+from services.session import SessionService
+from dependencies import get_redis_client
 
 router = APIRouter(prefix="/api/v1", tags=["chat"])
 

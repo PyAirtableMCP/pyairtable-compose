@@ -10,8 +10,8 @@ from enum import Enum
 from dataclasses import dataclass, asdict
 import logging
 
-from ..config import get_settings
-from ..models.chat import Message, MessageRole, ChatRequest
+from config import get_settings
+from models.chat import Message, MessageRole, ChatRequest
 from .gemini import GeminiService
 
 logger = logging.getLogger(__name__)
