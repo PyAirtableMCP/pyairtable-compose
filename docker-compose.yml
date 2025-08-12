@@ -14,6 +14,7 @@ services:
       - AI_PROCESSING_SERVICE_URL=http://ai-processing-service:8001
       - MCP_SERVER_URL=http://ai-processing-service:8001
       - LLM_ORCHESTRATOR_URL=http://ai-processing-service:8001
+      - WORKSPACE_SERVICE_URL=http://workspace-service:8003
       - PLATFORM_SERVICES_URL=http://platform-services:8007
       - AUTOMATION_SERVICES_URL=http://automation-services:8006
       - SAGA_ORCHESTRATOR_URL=http://saga-orchestrator:8008
@@ -28,6 +29,8 @@ services:
       airtable-gateway:
         condition: service_healthy
       ai-processing-service:
+        condition: service_healthy
+      workspace-service:
         condition: service_healthy
       platform-services:
         condition: service_healthy
@@ -121,6 +124,51 @@ services:
       retries: 5
       start_period: 45s
 
+  # Workspace Service - Workspace management and collaboration
+  workspace-service:
+    build:
+      context: ../pyairtable-python-services/workspace-service
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      # Service Configuration
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - API_KEY=${API_KEY}
+      - REQUIRE_API_KEY=${REQUIRE_API_KEY:-true}
+      # JWT Authentication
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
+      # Database and Redis
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      # CORS and Security
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      # Workspace Settings
+      - MAX_WORKSPACES_PER_USER=${MAX_WORKSPACES_PER_USER:-50}
+      - MAX_MEMBERS_PER_WORKSPACE=${MAX_MEMBERS_PER_WORKSPACE:-100}
+      - DEFAULT_WORKSPACE_TEMPLATE=${DEFAULT_WORKSPACE_TEMPLATE:-blank}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    healthcheck:
+      test: [
+        "CMD-SHELL",
+        "curl -f http://localhost:8003/health || exit 1"
+      ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+
   # Phase 4 Consolidated Services
   # Platform Services - Use existing auth analytics service (Port 8007) 
   platform-services:
@@ -169,11 +217,11 @@ services:
       retries: 5
       start_period: 30s
 
-  # Automation Services - Use existing workflow engine (Port 8006)
+  # Automation Services - Use existing AI service (Port 8006)
   automation-services:
     image: ghcr.io/reg-kris/pyairtable-automation-services:latest
     build:
-      context: ../pyairtable-python-services/workflow-engine
+      context: ../pyairtable-python-services/ai-service
       dockerfile: Dockerfile
     ports:
       - "8006:8006"
