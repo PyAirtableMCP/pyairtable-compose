@@ -51,7 +51,7 @@ services:
   # AI Processing Service - Consolidated MCP Server + LLM Orchestrator
   ai-processing-service:
     build:
-      context: ./python-services/ai-processing-service
+      context: ../pyairtable-python-services/ai-processing-service
       dockerfile: Dockerfile
     ports:
       - "8001:8001"  # Using MCP server's original port
@@ -93,7 +93,7 @@ services:
   # Airtable Gateway - Direct Airtable API integration
   airtable-gateway:
     build:
-      context: ./python-services/airtable-gateway
+      context: ../pyairtable-python-services/airtable-gateway
       dockerfile: Dockerfile
     ports:
       - "8002:8002"
@@ -125,7 +125,7 @@ services:
   # Platform Services - Unified Auth & Analytics (Port 8007) 
   platform-services:
     build:
-      context: ../pyairtable-platform-services
+      context: ../pyairtable-python-services/platform-services
       dockerfile: Dockerfile
     ports:
       - "8007:8007"
@@ -173,7 +173,7 @@ services:
   automation-services:
     image: ghcr.io/reg-kris/pyairtable-automation-services:latest
     build:
-      context: ./pyairtable-automation-services
+      context: ../pyairtable-python-services/automation-services
       dockerfile: Dockerfile
     ports:
       - "8006:8006"
