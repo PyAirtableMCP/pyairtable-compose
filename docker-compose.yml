@@ -308,7 +308,7 @@ services:
       retries: 8
       start_period: 15s
 
-  # PostgreSQL - Database for sessions and metadata
+  # PostgreSQL - Optimized database for sessions and metadata
   postgres:
     image: postgres:16-alpine
     # SECURITY: Remove exposed port - internal access only
@@ -319,10 +319,27 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_INITDB_ARGS="--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+      # Performance optimization environment variables
+      - POSTGRES_SHARED_PRELOAD_LIBRARIES=pg_stat_statements,auto_explain
+      - POSTGRES_MAX_CONNECTIONS=100
+      - POSTGRES_SHARED_BUFFERS=256MB
+      - POSTGRES_EFFECTIVE_CACHE_SIZE=1GB
+      - POSTGRES_WORK_MEM=4MB
+      - POSTGRES_MAINTENANCE_WORK_MEM=64MB
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
       - ./migrations:/docker-entrypoint-initdb.d/migrations:ro
+      - ./postgres-optimization.conf:/etc/postgresql/postgresql.conf:ro
+      - ./migrations/run_migrations.sh:/docker-entrypoint-initdb.d/999_run_migrations.sh:ro
+    command: [
+      "postgres",
+      "-c", "config_file=/etc/postgresql/postgresql.conf",
+      "-c", "shared_preload_libraries=pg_stat_statements,auto_explain",
+      "-c", "log_statement=all",
+      "-c", "log_min_duration_statement=250",
+      "-c", "pg_stat_statements.track=all"
+    ]
     restart: unless-stopped
     networks:
       pyairtable-network:
@@ -334,10 +351,10 @@ services:
         "CMD-SHELL",
         "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB -h localhost -p 5432 && PGPASSWORD=$$POSTGRES_PASSWORD psql -U $$POSTGRES_USER -d $$POSTGRES_DB -c 'SELECT 1;' >/dev/null 2>&1"
       ]
-      interval: 10s
-      timeout: 8s
+      interval: 15s
+      timeout: 10s
       retries: 8
-      start_period: 45s
+      start_period: 60s
 
   # Next.js Frontend - Web interface
   frontend:
