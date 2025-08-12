@@ -122,10 +122,10 @@ services:
       start_period: 45s
 
   # Phase 4 Consolidated Services
-  # Platform Services - Unified Auth & Analytics (Port 8007) 
+  # Platform Services - Use existing auth analytics service (Port 8007) 
   platform-services:
     build:
-      context: ../pyairtable-python-services/platform-services
+      context: ../pyairtable-python-services/analytics-service
       dockerfile: Dockerfile
     ports:
       - "8007:8007"
@@ -169,11 +169,11 @@ services:
       retries: 5
       start_period: 30s
 
-  # Automation Services - Unified file processing and workflow automation (Port 8006)
+  # Automation Services - Use existing workflow engine (Port 8006)
   automation-services:
     image: ghcr.io/reg-kris/pyairtable-automation-services:latest
     build:
-      context: ../pyairtable-python-services/automation-services
+      context: ../pyairtable-python-services/workflow-engine
       dockerfile: Dockerfile
     ports:
       - "8006:8006"
