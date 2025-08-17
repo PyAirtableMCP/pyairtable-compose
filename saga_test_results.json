@@ -1,0 +1,243 @@
+[
+  {
+    "test": "Health Check",
+    "status": "PASS",
+    "result": {
+      "status": "healthy",
+      "timestamp": "2025-08-17T10:51:20.279654",
+      "version": "1.0.0",
+      "environment": "development",
+      "services": {
+        "redis": "healthy",
+        "http_client": "healthy",
+        "active_sagas": "0",
+        "auth": "configured",
+        "user": "configured",
+        "permission": "configured",
+        "notification": "configured",
+        "airtable": "configured",
+        "schema": "configured",
+        "webhook": "configured",
+        "data_sync": "configured"
+      }
+    }
+  },
+  {
+    "test": "Service Info",
+    "status": "PASS",
+    "result": {
+      "service": "SAGA Orchestrator",
+      "status": "running",
+      "version": "1.0.0",
+      "environment": "development",
+      "patterns": [
+        "orchestration",
+        "choreography"
+      ],
+      "features": [
+        "compensation",
+        "timeout_handling",
+        "retry_logic",
+        "monitoring"
+      ]
+    }
+  },
+  {
+    "test": "Workflow Templates",
+    "status": "PASS",
+    "result": {
+      "templates": [
+        {
+          "name": "user_registration",
+          "description": "Complete user registration with rollback capabilities",
+          "steps": 4,
+          "estimated_duration": "2-5 minutes"
+        },
+        {
+          "name": "workspace_creation",
+          "description": "Create workspace with Airtable base setup",
+          "steps": 4,
+          "estimated_duration": "5-15 minutes"
+        },
+        {
+          "name": "data_sync",
+          "description": "Synchronize data between Airtable and external systems",
+          "steps": 5,
+          "estimated_duration": "10-30 minutes"
+        },
+        {
+          "name": "ai_analysis",
+          "description": "AI-powered data analysis workflow",
+          "steps": 5,
+          "estimated_duration": "15-60 minutes"
+        },
+        {
+          "name": "webhook_processing",
+          "description": "Process webhook events with choreography pattern",
+          "steps": 4,
+          "estimated_duration": "1-5 minutes"
+        }
+      ]
+    }
+  },
+  {
+    "test": "Create Simple SAGA",
+    "status": "PASS",
+    "result": {
+      "saga_id": "saga_3b8496feb287",
+      "status": "pending",
+      "pattern": "orchestration",
+      "current_step": 0,
+      "total_steps": 2,
+      "created_at": "2025-08-17T10:51:20.284791",
+      "started_at": null,
+      "completed_at": null,
+      "metadata": {
+        "test": "simple_saga",
+        "created_by": "test_suite"
+      },
+      "error": null
+    }
+  },
+  {
+    "test": "SAGA Status Tracking",
+    "status": "PASS",
+    "result": {
+      "saga_id": "saga_3b8496feb287",
+      "status": "pending",
+      "pattern": "orchestration",
+      "current_step": 0,
+      "total_steps": 2,
+      "created_at": "2025-08-17T10:51:20.284791",
+      "started_at": null,
+      "completed_at": null,
+      "metadata": {
+        "test": "simple_saga",
+        "created_by": "test_suite"
+      },
+      "error": null
+    }
+  },
+  {
+    "test": "SAGA Step Details",
+    "status": "PASS",
+    "result": {
+      "saga_id": "saga_3b8496feb287",
+      "status": "pending",
+      "current_step": 0,
+      "steps": [
+        {
+          "step_id": "test_step_1",
+          "action": "health",
+          "status": "pending",
+          "started_at": null,
+          "completed_at": null,
+          "result": null,
+          "error": null
+        },
+        {
+          "step_id": "test_step_2",
+          "action": "health",
+          "status": "pending",
+          "started_at": null,
+          "completed_at": null,
+          "result": null,
+          "error": null
+        }
+      ]
+    }
+  },
+  {
+    "test": "List SAGAs",
+    "status": "PASS",
+    "result": {
+      "sagas": [
+        {
+          "saga_id": "saga_3b8496feb287",
+          "status": "pending",
+          "pattern": "orchestration",
+          "created_at": "2025-08-17T10:51:20.284791",
+          "completed_at": null,
+          "current_step": 0,
+          "total_steps": 2,
+          "error": null
+        },
+        {
+          "saga_id": "saga_a9bb19b0d7f2",
+          "status": "compensated",
+          "pattern": "orchestration",
+          "created_at": "2025-08-17T10:50:20.417278",
+          "completed_at": "2025-08-17T10:51:01.634079",
+          "current_step": 0,
+          "total_steps": 2,
+          "error": "HTTP 405: {\"detail\":\"Method Not Allowed\"}"
+        }
+      ],
+      "total": 2,
+      "limit": 50,
+      "offset": 0
+    }
+  },
+  {
+    "test": "Metrics Collection",
+    "status": "PASS",
+    "result": {
+      "total_sagas": 2,
+      "status_counts": {
+        "pending": 1,
+        "running": 0,
+        "completed": 0,
+        "failed": 0,
+        "compensating": 0,
+        "compensated": 1,
+        "timeout": 0
+      },
+      "pattern_counts": {
+        "orchestration": 2,
+        "choreography": 0
+      },
+      "timestamp": "2025-08-17T10:51:20.290761",
+      "service": "saga-orchestrator"
+    }
+  },
+  {
+    "test": "Prometheus Metrics",
+    "status": "PASS",
+    "result": {
+      "prometheus_format": true,
+      "length": 4844
+    }
+  },
+  {
+    "test": "Manual Compensation",
+    "status": "PASS",
+    "result": {
+      "compensation_attempted": true,
+      "status_code": 200
+    }
+  },
+  {
+    "test": "Event Handling",
+    "status": "PASS",
+    "result": {
+      "event_id": "5b408c13-dafd-4699-baef-395a7373fd3d",
+      "status": "received",
+      "type": "test_event"
+    }
+  },
+  {
+    "test": "SAGA Deletion",
+    "status": "PASS",
+    "result": {
+      "deleted_saga_id": "saga_e40edb0cad5d",
+      "status_code": 200
+    }
+  },
+  {
+    "test": "Error Handling",
+    "status": "PASS",
+    "result": {
+      "error_handling": "working"
+    }
+  }
+]

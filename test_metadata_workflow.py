@@ -14,6 +14,7 @@ import asyncio
 import sys
 import logging
 import json
+import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 class MCPWorkflowTester:
     def __init__(self):
         self.api_gateway_url = "http://localhost:8000"
-        self.api_key = "pya_efe1764855b2300ebc87363fb26b71da645a1e6c"
+        self.api_key = os.getenv("API_KEY", "your-api-key-here")
         self.base_id = "appVLUAubH5cFWhMV"
         self.session_id = f"metadata-workflow-{int(time.time())}"
         

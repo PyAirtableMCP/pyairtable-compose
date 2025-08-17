@@ -1,0 +1,334 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # CORE INFRASTRUCTURE SERVICES
+  # ============================================================================
+  
+  # Redis - Session storage and caching
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD} ping | grep PONG"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # PostgreSQL - Primary database
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ============================================================================
+  # WORKING PYTHON MICROSERVICES
+  # ============================================================================
+
+  # AI Processing Service - Consolidated MCP Server + LLM Orchestrator
+  ai-processing-service:
+    build:
+      context: ../pyairtable-python-services/ai-processing-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      # Service Configuration
+      - API_KEY=${API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - REQUIRE_API_KEY=${REQUIRE_API_KEY:-true}
+      # Gemini Configuration
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - THINKING_BUDGET=${THINKING_BUDGET}
+      # MCP Configuration
+      - MCP_SERVER_MODE=http
+      # Airtable configuration
+      - AIRTABLE_BASE=${AIRTABLE_BASE}
+      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
+      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
+      # Redis session storage
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      # Database
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # Airtable Gateway - Direct Airtable API integration
+  airtable-gateway:
+    build:
+      context: ../pyairtable-python-services/airtable-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
+      - AIRTABLE_PAT=${AIRTABLE_TOKEN}
+      - AIRTABLE_BASE=${AIRTABLE_BASE}
+      - API_KEY=${API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import httpx; httpx.get('http://localhost:8002/health').raise_for_status()\" || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+
+  # Workspace Service - Workspace management and collaboration
+  workspace-service:
+    build:
+      context: ../pyairtable-python-services/workspace-service
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      # Service Configuration
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - API_KEY=${API_KEY}
+      - REQUIRE_API_KEY=${REQUIRE_API_KEY:-true}
+      # JWT Authentication
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
+      # Database and Redis
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      # CORS and Security
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8003/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # AI Service - General AI processing
+  ai-service:
+    build:
+      context: ../pyairtable-python-services/ai-service
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      - API_KEY=${API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8004/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Analytics Service - Data analytics and reporting
+  analytics-service:
+    build:
+      context: ../pyairtable-python-services/analytics-service
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8005"
+    environment:
+      - API_KEY=${API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8005/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ============================================================================
+  # GO MICROSERVICES (when needed)
+  # ============================================================================
+
+  # API Gateway - Main entry point (Go-based)
+  api-gateway:
+    build:
+      context: ../pyairtable-go-services/api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - AIRTABLE_GATEWAY_URL=http://airtable-gateway:8002
+      - AI_PROCESSING_SERVICE_URL=http://ai-processing-service:8001
+      - MCP_SERVER_URL=http://ai-processing-service:8001
+      - WORKSPACE_SERVICE_URL=http://workspace-service:8003
+      - AI_SERVICE_URL=http://ai-service:8004
+      - ANALYTICS_SERVICE_URL=http://analytics-service:8005
+      - API_KEY=${API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      airtable-gateway:
+        condition: service_healthy
+      ai-processing-service:
+        condition: service_healthy
+      workspace-service:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+      analytics-service:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  # ============================================================================
+  # FRONTEND SERVICES
+  # ============================================================================
+
+  # Tenant Dashboard - Main frontend application
+  tenant-dashboard:
+    build:
+      context: ./frontend-services/tenant-dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_APP_ENV=${ENVIRONMENT:-development}
+      - API_URL=http://api-gateway:8000
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+
+  # ============================================================================
+  # MONITORING & OBSERVABILITY (Optional - for development)
+  # ============================================================================
+
+  # Grafana - Monitoring dashboard
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    profiles:
+      - monitoring
+
+  # Prometheus - Metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+    networks:
+      - pyairtable-network
+    profiles:
+      - monitoring
+
+# ============================================================================
+# NETWORKS AND VOLUMES
+# ============================================================================
+
+networks:
+  pyairtable-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_data:
+    driver: local
+  grafana_data:
+    driver: local
+  prometheus_data:
+    driver: local

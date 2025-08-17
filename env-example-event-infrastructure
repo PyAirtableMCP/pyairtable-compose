@@ -1,0 +1,158 @@
+# PyAirtable Event Infrastructure Configuration
+# Copy this file to .env and update values for your environment
+
+# ================================
+# CORE SERVICES
+# ================================
+ENVIRONMENT=development
+LOG_LEVEL=info
+API_KEY=your-secure-api-key-here
+REQUIRE_API_KEY=true
+
+# ================================
+# REDIS INFRASTRUCTURE
+# ================================
+# Redis Master - Sessions, Caching, Pub/Sub
+REDIS_PASSWORD=your-secure-redis-password
+
+# Redis Streams - Event streaming (port 6380)
+REDIS_STREAMS_URL=redis://:${REDIS_PASSWORD}@redis-streams:6379
+
+# Redis Queue - Job queues (port 6381)  
+REDIS_QUEUE_URL=redis://:${REDIS_PASSWORD}@redis-queue:6379
+
+# ================================
+# EVENT SYSTEM CONFIGURATION
+# ================================
+# Enable/disable event publishing
+EVENT_BUS_ENABLED=true
+PUBLISH_EVENTS=true
+PUBLISH_WORKSPACE_EVENTS=true
+PUBLISH_AUTH_EVENTS=true
+
+# Event stream configuration
+STREAM_NAME=pyairtable-events
+CONSUMER_GROUP=event-processors
+
+# ================================
+# QUEUE SYSTEM CONFIGURATION
+# ================================
+# Queue processing settings
+QUEUE_ENABLED=true
+LONG_RUNNING_JOBS_ENABLED=true
+MAX_JOB_DURATION=3600
+MAX_JOB_ATTEMPTS=3
+CONCURRENCY=5
+
+# Job retention (in seconds)
+FAILED_JOB_TTL=86400    # 24 hours
+COMPLETED_JOB_TTL=3600  # 1 hour
+
+# Queue UI settings (accessible on port 8009)
+QUEUE_UI_PORT=3000
+QUEUE_UI_HOST=0.0.0.0
+
+# ================================
+# DEAD LETTER QUEUE CONFIGURATION
+# ================================
+DLQ_QUEUE_NAME=dead-letter-queue
+RETRY_ATTEMPTS=3
+RETRY_DELAY=60000  # 1 minute in milliseconds
+
+# ================================
+# DATABASE CONFIGURATION
+# ================================
+POSTGRES_DB=pyairtable
+POSTGRES_USER=pyairtable
+POSTGRES_PASSWORD=your-secure-postgres-password
+
+# ================================
+# AUTHENTICATION & SECURITY
+# ================================
+JWT_SECRET=your-jwt-secret-key-here
+JWT_ALGORITHM=HS256
+JWT_EXPIRES_IN=24h
+NEXTAUTH_SECRET=your-nextauth-secret
+NEXTAUTH_URL=http://localhost:3000
+
+# Password security
+PASSWORD_MIN_LENGTH=8
+PASSWORD_HASH_ROUNDS=12
+
+# ================================
+# CORS CONFIGURATION
+# ================================
+CORS_ORIGINS=http://localhost:3000,http://localhost:8000
+CORS_METHODS=GET,POST,PUT,DELETE,OPTIONS
+CORS_HEADERS=Content-Type,Authorization
+CORS_CREDENTIALS=true
+CORS_MAX_AGE=86400
+
+# ================================
+# AIRTABLE INTEGRATION
+# ================================
+AIRTABLE_TOKEN=your-airtable-personal-access-token
+AIRTABLE_BASE=your-airtable-base-id
+
+# ================================
+# AI/LLM CONFIGURATION
+# ================================
+GEMINI_API_KEY=your-gemini-api-key
+THINKING_BUDGET=100
+
+# ================================
+# WORKSPACE CONFIGURATION
+# ================================
+MAX_WORKSPACES_PER_USER=50
+MAX_MEMBERS_PER_WORKSPACE=100
+DEFAULT_WORKSPACE_TEMPLATE=blank
+
+# ================================
+# AUTOMATION SETTINGS
+# ================================
+MAX_FILE_SIZE=10MB
+ALLOWED_EXTENSIONS=pdf,doc,docx,txt,csv,xlsx
+UPLOAD_DIR=/tmp/uploads
+
+# Workflow settings
+DEFAULT_WORKFLOW_TIMEOUT=300
+MAX_WORKFLOW_RETRIES=3
+SCHEDULER_CHECK_INTERVAL=30
+
+# ================================
+# SAGA ORCHESTRATOR
+# ================================
+SAGA_TIMEOUT_SECONDS=3600
+SAGA_RETRY_ATTEMPTS=3
+SAGA_STEP_TIMEOUT_SECONDS=300
+
+# ================================
+# ANALYTICS & MONITORING
+# ================================
+ANALYTICS_RETENTION_DAYS=90
+METRICS_BATCH_SIZE=100
+ENABLE_METRICS=true
+METRICS_PORT=9090
+
+# Debug settings
+ENABLE_DEBUG=false
+NODE_ENV=development
+SHOW_COST_TRACKING=true
+
+# ================================
+# EVENT PROCESSOR CONFIGURATION
+# ================================
+STREAM_CONSUMER_GROUP=event-processors
+STREAM_CONSUMER_NAME=processor-1
+BATCH_SIZE=10
+BLOCK_TIME=5000
+
+# ================================
+# HEALTH CHECK INTERVALS
+# ================================
+# Health check intervals are defined in docker-compose.yml
+# These are for reference:
+# - Redis: 10s interval, 5s timeout
+# - Queue UI: 30s interval, 10s timeout  
+# - Event Processor: 30s interval, 5s timeout
+# - DLQ Processor: 30s interval, 5s timeout

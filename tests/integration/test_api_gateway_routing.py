@@ -173,7 +173,7 @@ class TestAPIGatewayRouting:
         cors_response = await http_client.options(
             f"{self.BASE_URL}/api/v1/auth/login",
             headers={
-                "Origin": "http://localhost:3000",
+                "Origin": "http://localhost:5173",
                 "Access-Control-Request-Method": "POST",
                 "Access-Control-Request-Headers": "Content-Type, Authorization"
             }
@@ -188,13 +188,13 @@ class TestAPIGatewayRouting:
             json={"email": "test@example.com", "password": "password"},
             headers={
                 "Content-Type": "application/json",
-                "Origin": "http://localhost:3000"
+                "Origin": "http://localhost:5173"
             }
         )
         
         # Check for CORS headers in response (if CORS is configured)
         if "access-control-allow-origin" in response.headers:
-            assert response.headers["access-control-allow-origin"] in ["*", "http://localhost:3000"]
+            assert response.headers["access-control-allow-origin"] in ["*", "http://localhost:5173"]
 
     @pytest.mark.integration
     @pytest.mark.api_gateway

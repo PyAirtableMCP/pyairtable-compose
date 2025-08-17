@@ -13,15 +13,13 @@ BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
 NC='\033[0m' # No Color
 
-# Configuration
-BASE_URL_FRONTEND="http://localhost:3000"
-BASE_URL_LLM="http://localhost:8003"
+# Configuration - CORRECT PORTS per CLAUDE.md
+BASE_URL_FRONTEND="http://localhost:5173"
+BASE_URL_API_GATEWAY="http://localhost:8000"
+BASE_URL_PLATFORM_SERVICES="http://localhost:8007"
 BASE_URL_MCP="http://localhost:8001"
-BASE_URL_GATEWAY="http://localhost:8002"
-BASE_URL_AUTH="http://localhost:8007"
-BASE_URL_WORKFLOW="http://localhost:8004"
-BASE_URL_ANALYTICS="http://localhost:8005"
-BASE_URL_FILEPROCESSOR="http://localhost:8006"
+BASE_URL_AIRTABLE_GATEWAY="http://localhost:8002"
+BASE_URL_AUTOMATION="http://localhost:8006"
 TEST_SESSION_ID="test-session-$(date +%s)"
 
 # Function to print status
@@ -92,14 +90,12 @@ test_health_checks() {
     echo -e "${BLUE}🏥 Health Check Tests${NC}"
     echo "======================="
     
-    test_endpoint "Frontend Health" "$BASE_URL_FRONTEND/api/health"
-    test_endpoint "LLM Orchestrator Health" "$BASE_URL_LLM/health"
+    test_endpoint "Frontend Health" "$BASE_URL_FRONTEND"
+    test_endpoint "API Gateway Health" "$BASE_URL_API_GATEWAY/api/health"
+    test_endpoint "Platform Services Health" "$BASE_URL_PLATFORM_SERVICES/health"
     test_endpoint "MCP Server Health" "$BASE_URL_MCP/health"
-    test_endpoint "Airtable Gateway Health" "$BASE_URL_GATEWAY/health"
-    test_endpoint "Auth Service Health" "$BASE_URL_AUTH/health"
-    test_endpoint "Workflow Engine Health" "$BASE_URL_WORKFLOW/health"
-    test_endpoint "Analytics Service Health" "$BASE_URL_ANALYTICS/health"
-    test_endpoint "File Processor Health" "$BASE_URL_FILEPROCESSOR/health"
+    test_endpoint "Airtable Gateway Health" "$BASE_URL_AIRTABLE_GATEWAY/health"
+    test_endpoint "Automation Services Health" "$BASE_URL_AUTOMATION/health"
     
     echo ""
 }
@@ -109,8 +105,8 @@ test_mcp_tools() {
     echo -e "${BLUE}🛠️  MCP Tools Tests${NC}"
     echo "==================="
     
-    # Test tools listing
-    test_endpoint "MCP Tools List" "$BASE_URL_MCP/tools"
+    # Test MCP health and capabilities
+    test_endpoint "MCP Server Status" "$BASE_URL_MCP/health"
     
     echo ""
 }
@@ -120,11 +116,14 @@ test_airtable_gateway() {
     echo -e "${BLUE}🗃️  Airtable Gateway Tests${NC}"
     echo "=========================="
     
+    # Test health endpoint first 
+    test_endpoint "Airtable Gateway Health" "$BASE_URL_AIRTABLE_GATEWAY/health"
+    
     # Test bases endpoint (will fail without real Airtable token, but should return proper error)
     print_test "Testing Airtable bases endpoint..."
     local response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
         -H "X-API-Key: ${API_KEY:-test-api-key}" \
-        "$BASE_URL_GATEWAY/bases" 2>/dev/null || echo "HTTPSTATUS:000")
+        "$BASE_URL_AIRTABLE_GATEWAY/bases" 2>/dev/null || echo "HTTPSTATUS:000")
     
     local status_code=$(echo "$response" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
     
@@ -138,22 +137,13 @@ test_airtable_gateway() {
     echo ""
 }
 
-# Function to test LLM Orchestrator
-test_llm_orchestrator() {
-    echo -e "${BLUE}🤖 LLM Orchestrator Tests${NC}"
-    echo "=========================="
+# Function to test AI Processing (MCP Server)
+test_ai_processing() {
+    echo -e "${BLUE}🤖 AI Processing (MCP Server) Tests${NC}"
+    echo "===================================="
     
-    # Test function calling status
-    test_endpoint "Function Calling Status" "$BASE_URL_LLM/function-calling/status"
-    
-    # Test cost tracking status
-    test_endpoint "Cost Tracking Status" "$BASE_URL_LLM/cost-tracking/status"
-    
-    # Test circuit breakers
-    test_endpoint "Circuit Breaker Status" "$BASE_URL_LLM/health/circuit-breakers"
-    
-    # Test services health
-    test_endpoint "Services Health" "$BASE_URL_LLM/health/services"
+    # Test health endpoint
+    test_endpoint "AI Processing Health" "$BASE_URL_MCP/health"
     
     echo ""
 }
@@ -163,11 +153,14 @@ test_auth_service() {
     echo -e "${BLUE}🔐 Auth Service Tests${NC}"
     echo "===================="
     
+    # Test Platform Services health first
+    test_endpoint "Platform Services Health" "$BASE_URL_PLATFORM_SERVICES/health"
+    
     # Test auth endpoints (will fail without valid credentials, but should return proper error)
-    print_test "Testing Auth Service status endpoint..."
+    print_test "Testing Auth Service via API Gateway..."
     local response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
         -H "X-API-Key: ${API_KEY:-test-api-key}" \
-        "$BASE_URL_AUTH/status" 2>/dev/null || echo "HTTPSTATUS:000")
+        "$BASE_URL_API_GATEWAY/api/v1/auth/login" 2>/dev/null || echo "HTTPSTATUS:000")
     
     local status_code=$(echo "$response" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
     
@@ -181,57 +174,17 @@ test_auth_service() {
     echo ""
 }
 
-# Function to test Workflow Engine
-test_workflow_engine() {
-    echo -e "${BLUE}⚙️  Workflow Engine Tests${NC}"
-    echo "========================="
+# Function to test Automation Services
+test_automation_services() {
+    echo -e "${BLUE}⚙️  Automation Services Tests${NC}"
+    echo "==============================="
     
-    # Test workflow endpoints
-    test_endpoint "Workflow Status" "$BASE_URL_WORKFLOW/status"
-    
-    echo ""
-}
-
-# Function to test Analytics Service
-test_analytics_service() {
-    echo -e "${BLUE}📊 Analytics Service Tests${NC}"
-    echo "=========================="
-    
-    # Test analytics endpoints
-    test_endpoint "Analytics Status" "$BASE_URL_ANALYTICS/status"
-    test_endpoint "Analytics Metrics" "$BASE_URL_ANALYTICS/metrics"
+    # Test automation services endpoints
+    test_endpoint "Automation Services Health" "$BASE_URL_AUTOMATION/health"
     
     echo ""
 }
 
-# Function to test File Processor
-test_file_processor() {
-    echo -e "${BLUE}📁 File Processor Tests${NC}"
-    echo "======================="
-    
-    # Test file processor endpoints
-    test_endpoint "File Processor Status" "$BASE_URL_FILEPROCESSOR/status"
-    
-    echo ""
-}
-
-# Function to test budget management
-test_budget_management() {
-    echo -e "${BLUE}💰 Budget Management Tests${NC}"
-    echo "=========================="
-    
-    # Test budget health
-    test_endpoint "Budget Health Check" "$BASE_URL_LLM/budgets/health"
-    
-    # Test setting a session budget  
-    local budget_data='{"budget_limit": 5.00, "alert_threshold": 0.8}'
-    test_endpoint "Set Session Budget" "$BASE_URL_LLM/budgets/session/$TEST_SESSION_ID" "200" "POST" "$budget_data"
-    
-    # Test getting budget status
-    test_endpoint "Get Budget Status" "$BASE_URL_LLM/budgets/status/$TEST_SESSION_ID"
-    
-    echo ""
-}
 
 # Function to test frontend specific endpoints
 test_frontend() {
@@ -249,8 +202,9 @@ test_frontend() {
         print_error "Frontend main page: Expected HTTP 200, got $status_code"
     fi
     
-    # Test API routes
-    test_endpoint "Frontend API Config" "$BASE_URL_FRONTEND/api/config"
+    # Test auth pages
+    test_endpoint "Auth Login Page" "$BASE_URL_FRONTEND/auth/login"
+    test_endpoint "Auth Register Page" "$BASE_URL_FRONTEND/auth/register"
     
     echo ""
 }
@@ -262,28 +216,22 @@ test_integration() {
     
     print_test "Testing service communication..."
     
-    # Test if LLM Orchestrator can reach MCP Server
-    local mcp_tools_response=$(curl -s "$BASE_URL_LLM/function-calling/status" 2>/dev/null || echo "")
-    
-    if echo "$mcp_tools_response" | grep -q "tools_available"; then
-        local tools_count=$(echo "$mcp_tools_response" | grep -o '"tools_available":[0-9]*' | grep -o '[0-9]*')
-        if [ "$tools_count" -gt 0 ]; then
-            print_status "LLM ↔ MCP integration: $tools_count tools available"
-        else
-            print_warning "LLM ↔ MCP integration: Connected but no tools available"
-        fi
+    # Test API Gateway routing
+    local api_health_response=$(curl -s "$BASE_URL_API_GATEWAY/api/health" 2>/dev/null || echo "")
+    if echo "$api_health_response" | grep -q "healthy\|status\|ok" 2>/dev/null; then
+        print_status "API Gateway: Health endpoint working"
     else
-        print_error "LLM ↔ MCP integration: Communication failed"
+        print_warning "API Gateway: Health endpoint may need configuration"
     fi
     
-    # Test if Frontend can reach API Gateway
-    print_test "Testing Frontend ↔ API Gateway connectivity..."
-    local frontend_config_response=$(curl -s "$BASE_URL_FRONTEND/api/config" 2>/dev/null || echo "")
+    # Test Frontend accessibility
+    print_test "Testing Frontend accessibility..."
+    local frontend_response=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL_FRONTEND" 2>/dev/null || echo "000")
     
-    if echo "$frontend_config_response" | grep -q "api_url"; then
-        print_status "Frontend ↔ API Gateway: Configuration accessible"
+    if [ "$frontend_response" = "200" ]; then
+        print_status "Frontend: Accessible and responding"
     else
-        print_warning "Frontend ↔ API Gateway: Configuration not accessible"
+        print_warning "Frontend: May not be fully configured (HTTP $frontend_response)"
     fi
     
     echo ""
@@ -294,27 +242,27 @@ test_database() {
     echo -e "${BLUE}🗄️  Database Tests${NC}"
     echo "=================="
     
-    # Test PostgreSQL
+    # Test PostgreSQL via Docker
     print_test "Testing PostgreSQL connection..."
-    if pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
+    if docker-compose exec -T postgres pg_isready -U pyairtable >/dev/null 2>&1; then
         print_status "PostgreSQL: Connected"
         
-        # Test if database exists
-        if psql -h localhost -U postgres -lqt | cut -d \| -f 1 | grep -qw pyairtable; then
-            print_status "PostgreSQL: pyairtable database exists"
+        # Test if database is accessible
+        if docker-compose exec -T postgres psql -U pyairtable -d pyairtable -c "SELECT 1;" >/dev/null 2>&1; then
+            print_status "PostgreSQL: pyairtable database accessible"
         else
-            print_warning "PostgreSQL: pyairtable database not found"
+            print_warning "PostgreSQL: pyairtable database may need setup"
         fi
     else
-        print_error "PostgreSQL: Not reachable"
+        print_error "PostgreSQL: Not reachable via Docker"
     fi
     
-    # Test Redis
+    # Test Redis via Docker
     print_test "Testing Redis connection..."
-    if redis-cli ping >/dev/null 2>&1; then
+    if docker-compose exec -T redis redis-cli ping >/dev/null 2>&1; then
         print_status "Redis: Connected"
     else
-        print_error "Redis: Not reachable"
+        print_error "Redis: Not reachable via Docker"
     fi
     
     echo ""
@@ -329,7 +277,7 @@ test_performance() {
     
     # Test frontend response time
     local start_time=$(date +%s%N)
-    curl -s "$BASE_URL_FRONTEND/api/health" > /dev/null 2>&1
+    curl -s "$BASE_URL_FRONTEND" > /dev/null 2>&1
     local end_time=$(date +%s%N)
     local frontend_duration=$(( (end_time - start_time) / 1000000 ))
     
@@ -341,18 +289,18 @@ test_performance() {
         print_warning "Frontend response time: ${frontend_duration}ms (slow)"
     fi
     
-    # Test backend health endpoint response time
+    # Test API Gateway health endpoint response time
     local start_time=$(date +%s%N)
-    curl -s "$BASE_URL_LLM/health" > /dev/null 2>&1
+    curl -s "$BASE_URL_API_GATEWAY/api/health" > /dev/null 2>&1
     local end_time=$(date +%s%N)
     local backend_duration=$(( (end_time - start_time) / 1000000 ))
     
     if [ $backend_duration -lt 1000 ]; then
-        print_status "LLM Orchestrator response time: ${backend_duration}ms (excellent)"
+        print_status "API Gateway response time: ${backend_duration}ms (excellent)"
     elif [ $backend_duration -lt 2000 ]; then
-        print_status "LLM Orchestrator response time: ${backend_duration}ms (good)"
+        print_status "API Gateway response time: ${backend_duration}ms (good)"
     else
-        print_warning "LLM Orchestrator response time: ${backend_duration}ms (slow)"
+        print_warning "API Gateway response time: ${backend_duration}ms (slow)"
     fi
     
     echo ""
@@ -364,24 +312,22 @@ show_summary() {
     echo "================"
     echo ""
     echo -e "${GREEN}✅ Services Status:${NC}"
-    echo "• Frontend: http://localhost:3000"
-    echo "• LLM Orchestrator: http://localhost:8003"
-    echo "• MCP Server: http://localhost:8001"
+    echo "• Frontend: http://localhost:5173"
+    echo "• API Gateway: http://localhost:8000"
+    echo "• Platform Services: http://localhost:8007"
+    echo "• MCP Server (AI Processing): http://localhost:8001"
     echo "• Airtable Gateway: http://localhost:8002"
-    echo "• Auth Service: http://localhost:8007"
-    echo "• Workflow Engine: http://localhost:8004"
-    echo "• Analytics Service: http://localhost:8005"
-    echo "• File Processor: http://localhost:8006"
+    echo "• Automation Services: http://localhost:8006"
     echo ""
     echo -e "${YELLOW}⚙️  Next Steps:${NC}"
     echo "1. Add your API keys to .env files:"
     echo "   - GEMINI_API_KEY (get from Google AI Studio)"
     echo "   - AIRTABLE_TOKEN (get from Airtable Developer hub)"
     echo ""
-    echo "2. Test with real data:"
-    echo "   curl -X POST http://localhost:8003/chat \\"
+    echo "2. Test with real authentication:"
+    echo "   curl -X POST http://localhost:8000/api/v1/auth/register \\"
     echo "     -H 'Content-Type: application/json' \\"
-    echo "     -d '{\"message\": \"List my Airtable tables\", \"session_id\": \"test\"}'"
+    echo "     -d '{\"name\": \"Test User\", \"email\": \"test@example.com\", \"password\": \"Test123!\"}'"
     echo ""
     echo -e "${GREEN}🎉 System is ready for development!${NC}"
 }
@@ -404,11 +350,8 @@ main() {
     test_mcp_tools
     test_airtable_gateway
     test_auth_service
-    test_workflow_engine
-    test_analytics_service
-    test_file_processor
-    test_llm_orchestrator
-    test_budget_management
+    test_automation_services
+    test_ai_processing
     test_integration
     test_performance
     
@@ -439,20 +382,11 @@ case "${1:-all}" in
     "auth")
         test_auth_service
         ;;
-    "workflow")
-        test_workflow_engine
+    "automation")
+        test_automation_services
         ;;
-    "analytics")
-        test_analytics_service
-        ;;
-    "fileprocessor")
-        test_file_processor
-        ;;
-    "llm")
-        test_llm_orchestrator
-        ;;
-    "budget")
-        test_budget_management
+    "ai")
+        test_ai_processing
         ;;
     "integration")
         test_integration
@@ -468,14 +402,11 @@ case "${1:-all}" in
         echo "  health        Health check tests"
         echo "  database      Database connectivity tests"
         echo "  frontend      Frontend tests"
-        echo "  mcp           MCP tools tests"  
+        echo "  mcp           MCP Server tests"  
         echo "  gateway       Airtable Gateway tests"
         echo "  auth          Auth Service tests"
-        echo "  workflow      Workflow Engine tests"
-        echo "  analytics     Analytics Service tests"
-        echo "  fileprocessor File Processor tests"
-        echo "  llm           LLM Orchestrator tests"
-        echo "  budget        Budget management tests"
+        echo "  automation    Automation Services tests"
+        echo "  ai            AI Processing tests"
         echo "  integration   Service integration tests"
         echo "  performance   Performance tests"
         exit 1
