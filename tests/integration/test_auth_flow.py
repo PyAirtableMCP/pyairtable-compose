@@ -57,12 +57,12 @@ class TestAuthenticationFlow:
         
         # Register new user via API Gateway
         registration_response = await http_client.post(
-            f"{self.BASE_URL}/api/v1/auth/register",
+            f"{self.BASE_URL}/api/auth/register",
             json=test_user_data,
             headers=auth_headers
         )
         
-        assert registration_response.status_code == 201, f"Registration failed: {registration_response.text}"
+        assert registration_response.status_code == 200, f"Registration failed: {registration_response.text}"
         registration_data = registration_response.json()
         
         assert "message" in registration_data
@@ -78,7 +78,7 @@ class TestAuthenticationFlow:
         }
         
         login_response = await http_client.post(
-            f"{self.BASE_URL}/api/v1/auth/login",
+            f"{self.BASE_URL}/api/auth/login",
             json=login_data,
             headers=auth_headers
         )
@@ -98,7 +98,7 @@ class TestAuthenticationFlow:
         
         # First register the user
         await http_client.post(
-            f"{self.BASE_URL}/api/v1/auth/register",
+            f"{self.BASE_URL}/api/auth/register",
             json=test_user_data,
             headers=auth_headers
         )
@@ -110,7 +110,7 @@ class TestAuthenticationFlow:
         }
         
         login_response = await http_client.post(
-            f"{self.BASE_URL}/api/v1/auth/login",
+            f"{self.BASE_URL}/api/auth/login",
             json=login_data,
             headers=auth_headers
         )
@@ -129,7 +129,7 @@ class TestAuthenticationFlow:
         
         # Test user profile endpoint via API Gateway
         profile_response = await http_client.get(
-            f"{self.BASE_URL}/api/v1/users/profile",
+            f"{self.BASE_URL}/api/auth/users/profile",
             headers=protected_headers
         )
         
@@ -145,13 +145,13 @@ class TestAuthenticationFlow:
         
         # Register and login user
         await http_client.post(
-            f"{self.BASE_URL}/api/v1/auth/register",
+            f"{self.BASE_URL}/api/auth/register",
             json=test_user_data,
             headers=auth_headers
         )
         
         login_response = await http_client.post(
-            f"{self.BASE_URL}/api/v1/auth/login",
+            f"{self.BASE_URL}/api/auth/login",
             json={
                 "email": test_user_data["email"],
                 "password": test_user_data["password"]
@@ -164,7 +164,7 @@ class TestAuthenticationFlow:
         
         # Use refresh token to get new access token
         refresh_response = await http_client.post(
-            f"{self.BASE_URL}/api/v1/auth/refresh",
+            f"{self.BASE_URL}/api/auth/refresh",
             json={"refresh_token": refresh_token},
             headers=auth_headers
         )
@@ -183,7 +183,7 @@ class TestAuthenticationFlow:
         }
         
         profile_response = await http_client.get(
-            f"{self.BASE_URL}/api/v1/users/profile",
+            f"{self.BASE_URL}/api/auth/users/profile",
             headers=protected_headers
         )
         
@@ -196,7 +196,7 @@ class TestAuthenticationFlow:
         
         # Try to access protected endpoint without token
         response = await http_client.get(
-            f"{self.BASE_URL}/api/v1/users/profile",
+            f"{self.BASE_URL}/api/auth/users/profile",
             headers=auth_headers
         )
         
@@ -209,7 +209,7 @@ class TestAuthenticationFlow:
         }
         
         response = await http_client.get(
-            f"{self.BASE_URL}/api/v1/users/profile", 
+            f"{self.BASE_URL}/api/auth/users/profile", 
             headers=invalid_headers
         )
         
@@ -222,13 +222,13 @@ class TestAuthenticationFlow:
         
         # Register and login user
         await http_client.post(
-            f"{self.BASE_URL}/api/v1/auth/register",
+            f"{self.BASE_URL}/api/auth/register",
             json=test_user_data,
             headers=auth_headers
         )
         
         login_response = await http_client.post(
-            f"{self.BASE_URL}/api/v1/auth/login",
+            f"{self.BASE_URL}/api/auth/login",
             json={
                 "email": test_user_data["email"],
                 "password": test_user_data["password"]
@@ -246,14 +246,14 @@ class TestAuthenticationFlow:
         
         # Verify token works before logout
         profile_response = await http_client.get(
-            f"{self.BASE_URL}/api/v1/users/profile",
+            f"{self.BASE_URL}/api/auth/users/profile",
             headers=protected_headers
         )
         assert profile_response.status_code == 200
         
         # Logout
         logout_response = await http_client.post(
-            f"{self.BASE_URL}/api/v1/auth/logout",
+            f"{self.BASE_URL}/api/auth/logout",
             headers=protected_headers
         )
         
@@ -261,7 +261,7 @@ class TestAuthenticationFlow:
         
         # Verify token no longer works after logout
         profile_response = await http_client.get(
-            f"{self.BASE_URL}/api/v1/users/profile",
+            f"{self.BASE_URL}/api/auth/users/profile",
             headers=protected_headers
         )
         assert profile_response.status_code in [401, 403]
@@ -273,13 +273,13 @@ class TestAuthenticationFlow:
         
         # Register and login user
         await http_client.post(
-            f"{self.BASE_URL}/api/v1/auth/register",
+            f"{self.BASE_URL}/api/auth/register",
             json=test_user_data,
             headers=auth_headers
         )
         
         login_response = await http_client.post(
-            f"{self.BASE_URL}/api/v1/auth/login",
+            f"{self.BASE_URL}/api/auth/login",
             json={
                 "email": test_user_data["email"],
                 "password": test_user_data["password"]
@@ -297,7 +297,7 @@ class TestAuthenticationFlow:
         
         # Test authentication works for different services via API Gateway
         services_to_test = [
-            f"{self.BASE_URL}/api/v1/users/profile",  # Platform Services
+            f"{self.BASE_URL}/api/auth/users/profile",  # Platform Services
             f"{self.BASE_URL}/api/v1/analytics/events",  # Platform Services Analytics
         ]
         
@@ -317,7 +317,7 @@ class TestAuthenticationFlow:
         }
         
         response = await http_client.post(
-            f"{self.BASE_URL}/api/v1/auth/login",
+            f"{self.BASE_URL}/api/auth/login",
             json=invalid_login_data,
             headers=auth_headers
         )
@@ -333,15 +333,15 @@ class TestAuthenticationFlow:
         
         # Register user first time
         response1 = await http_client.post(
-            f"{self.BASE_URL}/api/v1/auth/register",
+            f"{self.BASE_URL}/api/auth/register",
             json=test_user_data,
             headers=auth_headers
         )
-        assert response1.status_code == 201
+        assert response1.status_code == 200
         
         # Try to register same email again
         response2 = await http_client.post(
-            f"{self.BASE_URL}/api/v1/auth/register", 
+            f"{self.BASE_URL}/api/auth/register", 
             json=test_user_data,
             headers=auth_headers
         )

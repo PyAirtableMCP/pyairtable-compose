@@ -21,7 +21,7 @@ class TestFrontendBackendCommunication:
     """Integration tests for frontend-backend communication patterns"""
     
     API_URL = "http://localhost:8000"  # API Gateway (backend for frontend)
-    FRONTEND_URL = "http://localhost:3000"  # Next.js Frontend
+    FRONTEND_URL = "http://localhost:5173"  # Vite Frontend
     
     @pytest.fixture
     async def http_client(self):
@@ -42,7 +42,7 @@ class TestFrontendBackendCommunication:
             "Content-Type": "application/json",
             "Accept": "application/json",
             "User-Agent": "PyAirtable-Frontend/1.0",
-            "Origin": "http://localhost:3000"
+            "Origin": "http://localhost:5173"
         }
     
     @pytest.fixture
@@ -304,7 +304,7 @@ class TestFrontendBackendCommunication:
         preflight_response = await http_client.options(
             f"{self.API_URL}/api/v1/auth/login",
             headers={
-                "Origin": "http://localhost:3000",
+                "Origin": "http://localhost:5173",
                 "Access-Control-Request-Method": "POST",
                 "Access-Control-Request-Headers": "Content-Type, Authorization"
             }
@@ -319,7 +319,7 @@ class TestFrontendBackendCommunication:
             json={"email": "test@example.com", "password": "test"},
             headers={
                 "Content-Type": "application/json",
-                "Origin": "http://localhost:3000"
+                "Origin": "http://localhost:5173"
             }
         )
         

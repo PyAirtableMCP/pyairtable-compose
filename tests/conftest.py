@@ -15,6 +15,7 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "integration: marks tests as integration tests (deselect with '-m \"not integration\"')"
     )
+    config.option.asyncio_mode = "auto"
     config.addinivalue_line(
         "markers", "auth: marks tests as authentication-related"
     )
@@ -59,7 +60,7 @@ def service_urls():
         "platform_services": os.getenv("PLATFORM_SERVICES_URL", "http://localhost:8007"),
         "airtable_gateway": os.getenv("AIRTABLE_GATEWAY_URL", "http://localhost:8002"),
         "ai_processing": os.getenv("AI_PROCESSING_URL", "http://localhost:8001"),
-        "frontend": os.getenv("FRONTEND_URL", "http://localhost:3000"),
+        "frontend": os.getenv("FRONTEND_URL", "http://localhost:5173"),
     }
 
 

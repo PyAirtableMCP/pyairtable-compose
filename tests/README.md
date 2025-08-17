@@ -126,7 +126,7 @@ pytest tests/integration/ -v -s --tb=long
 - `PLATFORM_SERVICES_URL` - Platform Services URL (default: http://localhost:8007)
 - `AIRTABLE_GATEWAY_URL` - Airtable Gateway URL (default: http://localhost:8002)
 - `AI_PROCESSING_URL` - AI Processing Service URL (default: http://localhost:8001)
-- `FRONTEND_URL` - Frontend URL (default: http://localhost:3000)
+- `FRONTEND_URL` - Frontend URL (default: http://localhost:5173)
 
 ### Test Markers
 

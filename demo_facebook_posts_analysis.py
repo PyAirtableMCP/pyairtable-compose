@@ -5,13 +5,14 @@ This demonstrates the complete working system with real Airtable data.
 """
 
 import json
+import os
 import requests
 from datetime import datetime
 
 # Configuration
 API_GATEWAY_URL = "http://localhost:8000"
 MCP_SERVER_URL = "http://localhost:8001"
-API_KEY = "pya_d7f8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6"
+API_KEY = os.getenv("API_KEY", "your-api-key-here")
 AIRTABLE_BASE = "appVLUAubH5cFWhMV"
 FACEBOOK_TABLE_ID = "tbl4JOCLonueUbzcT"
 
