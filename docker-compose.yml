@@ -284,7 +284,7 @@ services:
   # SAGA Orchestrator - Distributed transaction coordination (Port 8008)
   saga-orchestrator:
     build:
-      context: ./saga-orchestrator
+      context: ../pyairtable-python-services/saga-orchestrator
       dockerfile: Dockerfile
     ports:
       - "8008:8008"
@@ -466,7 +466,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_INITDB_ARGS="--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+      - POSTGRES_INITDB_ARGS=--auth-host=md5
       # Performance optimization environment variables
       - POSTGRES_SHARED_PRELOAD_LIBRARIES=pg_stat_statements,auto_explain
       - POSTGRES_MAX_CONNECTIONS=100
