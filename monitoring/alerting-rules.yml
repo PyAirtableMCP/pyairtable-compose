@@ -1,0 +1,205 @@
+groups:
+  - name: service_health
+    rules:
+      # Service Health Alerts
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "{{ $labels.job }} on {{ $labels.instance }} has been down for more than 1 minute."
+
+      - alert: ServiceHighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate on {{ $labels.job }}"
+          description: "{{ $labels.job }} has an error rate of {{ $value }} errors per second over the last 5 minutes."
+
+      - alert: ServiceHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency on {{ $labels.job }}"
+          description: "{{ $labels.job }} 95th percentile latency is {{ $value }}s over the last 5 minutes."
+
+  - name: infrastructure_health
+    rules:
+      # Redis Health
+      - alert: RedisDown
+        expr: up{job=~"redis.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis instance is down"
+          description: "Redis instance {{ $labels.instance }} has been down for more than 1 minute."
+
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis instance {{ $labels.instance }} is using {{ $value | humanizePercentage }} of available memory."
+
+      # PostgreSQL Health
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL instance {{ $labels.instance }} has been down for more than 1 minute."
+
+      - alert: PostgreSQLTooManyConnections
+        expr: pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL too many connections"
+          description: "PostgreSQL instance {{ $labels.instance }} is using {{ $value | humanizePercentage }} of available connections."
+
+  - name: performance_degradation
+    rules:
+      # API Gateway Performance
+      - alert: APIGatewayHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="api-gateway"}[5m])) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API Gateway high latency"
+          description: "API Gateway 95th percentile latency is {{ $value }}s, which is above the 2s threshold."
+
+      - alert: APIGatewayHighErrorRate
+        expr: rate(http_requests_total{job="api-gateway",status=~"5.."}[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API Gateway high error rate"
+          description: "API Gateway error rate is {{ $value }} errors per second, which is above the 0.05/s threshold."
+
+      # AI Processing Service Performance
+      - alert: AIProcessingServiceHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="ai-processing-service"}[5m])) > 10.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI Processing Service high latency"
+          description: "AI Processing Service 95th percentile latency is {{ $value }}s, which is above the 10s threshold."
+
+      # SAGA Orchestrator Performance
+      - alert: SAGAOrchestratorFailureRate
+        expr: rate(saga_failed_total[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SAGA Orchestrator high failure rate"
+          description: "SAGA Orchestrator failure rate is {{ $value }} failures per second."
+
+  - name: resource_utilization
+    rules:
+      # CPU Usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage on {{ $labels.instance }} is {{ $value }}%."
+
+      # Memory Usage
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage on {{ $labels.instance }} is {{ $value }}%."
+
+      # Disk Usage
+      - alert: HighDiskUsage
+        expr: 100 - ((node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk usage"
+          description: "Disk usage on {{ $labels.instance }} is {{ $value }}%."
+
+      # Container Resource Usage
+      - alert: ContainerHighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container high CPU usage"
+          description: "Container {{ $labels.name }} CPU usage is {{ $value }}%."
+
+      - alert: ContainerHighMemoryUsage
+        expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""}) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container high memory usage"
+          description: "Container {{ $labels.name }} memory usage is {{ $value }}%."
+
+  - name: queue_monitoring
+    rules:
+      # Queue Depth Monitoring
+      - alert: QueueDepthHigh
+        expr: bullmq_queue_waiting > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Queue depth is high"
+          description: "Queue {{ $labels.queue }} has {{ $value }} waiting jobs."
+
+      - alert: QueueProcessingStalled
+        expr: rate(bullmq_queue_completed[5m]) == 0 and bullmq_queue_waiting > 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Queue processing has stalled"
+          description: "Queue {{ $labels.queue }} has jobs waiting but no jobs have been completed in the last 10 minutes."
+
+  - name: business_metrics
+    rules:
+      # Request Volume
+      - alert: RequestVolumeDropped
+        expr: rate(http_requests_total[5m]) < 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Request volume has dropped significantly"
+          description: "Request rate on {{ $labels.job }} is {{ $value }} requests per second, which is below normal levels."
+
+      # Airtable API Rate Limiting
+      - alert: AirtableRateLimited
+        expr: rate(airtable_rate_limited_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Airtable API rate limiting detected"
+          description: "Airtable Gateway is being rate limited at {{ $value }} times per second."

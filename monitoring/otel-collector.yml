@@ -1,0 +1,123 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          static_configs:
+            - targets: ['localhost:8888']
+
+  hostmetrics:
+    collection_interval: 30s
+    scrapers:
+      cpu:
+      disk:
+      filesystem:
+      memory:
+      network:
+      paging:
+      processes:
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  memory_limiter:
+    limit_mib: 512
+    spike_limit_mib: 128
+
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: development
+        action: upsert
+      - key: service.namespace
+        value: pyairtable
+        action: upsert
+      - key: cluster.name
+        value: pyairtable-local
+        action: upsert
+
+  # Add service name detection
+  resource/service_name:
+    attributes:
+      - key: service.name
+        from_attribute: service.name
+        action: upsert
+
+  # Add span attributes
+  attributes:
+    actions:
+      - key: environment
+        value: development
+        action: upsert
+
+exporters:
+  # Prometheus metrics export
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: pyairtable
+    const_labels:
+      environment: development
+
+  # Tempo traces export
+  otlp/tempo:
+    endpoint: http://tempo:4317
+    tls:
+      insecure: true
+
+  # Loki logs export
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+    tenant_id: "pyairtable"
+    labels:
+      resource:
+        service.name: "service_name"
+        deployment.environment: "environment"
+      attributes:
+        severity: "severity"
+        http.method: "http_method"
+        http.status_code: "http_status"
+
+  # Debug exporter for troubleshooting
+  logging:
+    loglevel: info
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+  # File exporter for backup
+  file:
+    path: /tmp/otel-data.json
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, resource/service_name, batch]
+      exporters: [otlp/tempo, logging]
+
+    metrics:
+      receivers: [otlp, prometheus, hostmetrics]
+      processors: [memory_limiter, resource, batch]
+      exporters: [prometheus, logging]
+
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [loki, logging]
+
+  telemetry:
+    logs:
+      level: "info"
+    metrics:
+      address: 0.0.0.0:8888
+
+  extensions: []

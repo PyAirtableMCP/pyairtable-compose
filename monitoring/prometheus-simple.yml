@@ -1,0 +1,45 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'pyairtable-local'
+    environment: 'development'
+
+scrape_configs:
+  # Monitoring stack self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # Simple service health monitor
+  - job_name: 'service-health-monitor'
+    static_configs:
+      - targets: ['simple-monitor:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # PyAirtable Services with Real Observability
+  - job_name: 'ai-processing-service'
+    static_configs:
+      - targets: ['host.docker.internal:8001']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    
+  - job_name: 'airtable-gateway'
+    static_configs:
+      - targets: ['host.docker.internal:8002']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    
+  - job_name: 'llm-orchestrator'
+    static_configs:
+      - targets: ['host.docker.internal:8091']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s

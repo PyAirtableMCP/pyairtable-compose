@@ -1,0 +1,24 @@
+# Monitoring dependencies for PyAirtable services
+
+# Prometheus monitoring
+prometheus-client==0.17.1
+
+# OpenTelemetry tracing and metrics
+opentelemetry-api==1.19.0
+opentelemetry-sdk==1.19.0
+opentelemetry-exporter-otlp==1.19.0
+opentelemetry-exporter-otlp-proto-grpc==1.19.0
+
+# OpenTelemetry auto-instrumentation
+opentelemetry-instrumentation==0.40b0
+opentelemetry-instrumentation-requests==0.40b0
+opentelemetry-instrumentation-urllib3==0.40b0
+opentelemetry-instrumentation-redis==0.40b0
+opentelemetry-instrumentation-psycopg2==0.40b0
+opentelemetry-instrumentation-fastapi==0.40b0
+
+# Structured logging
+structlog==23.1.0
+
+# Health checks
+httpx==0.24.1
