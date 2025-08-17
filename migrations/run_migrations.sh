@@ -175,13 +175,13 @@ validate_performance() {
     local view_count=$(PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "
         SELECT COUNT(*) FROM information_schema.views 
         WHERE table_schema = 'public' 
-        AND table_name IN ('slow_queries', 'table_stats', 'index_usage', 'user_activity_stats');
+        AND table_name IN ('slow_queries', 'table_stats', 'index_usage', 'user_activity_stats', 'user_dashboard', 'tenant_admin_dashboard', 'system_health_monitor');
     " | xargs)
     
-    if [ "$view_count" -ge "4" ]; then
-        log_success "Performance monitoring views are available"
+    if [ "$view_count" -ge "7" ]; then
+        log_success "Performance monitoring views are available ($view_count views created)"
     else
-        log_warning "Some performance monitoring views may be missing"
+        log_warning "Some performance monitoring views may be missing ($view_count of 7 expected)"
     fi
 }
 
@@ -227,6 +227,10 @@ main() {
         "$MIGRATION_DIR/001_create_session_tables.sql"
         "$MIGRATION_DIR/002_create_performance_indexes.sql"
         "$MIGRATION_DIR/003_performance_monitoring.sql"
+        "$MIGRATION_DIR/004_create_workspace_tables.sql"
+        "$MIGRATION_DIR/005_advanced_performance_optimization.sql"
+        "$MIGRATION_DIR/006_advanced_views_and_functions.sql"
+        "$MIGRATION_DIR/007_connection_pooling_and_monitoring.sql"
     )
     
     local total_migrations=${#migration_files[@]}
@@ -268,8 +272,12 @@ main() {
         echo "  1. Monitor slow queries with: SELECT * FROM slow_queries;"
         echo "  2. Check table statistics with: SELECT * FROM table_stats;"
         echo "  3. Review index usage with: SELECT * FROM index_usage;"
-        echo "  4. Monitor user activity with: SELECT * FROM user_activity_stats;"
-        echo "  5. Run cleanup with: SELECT cleanup_expired_data();"
+        echo "  4. Monitor user activity with: SELECT * FROM user_dashboard LIMIT 10;"
+        echo "  5. Check system health with: SELECT * FROM perform_health_check();"
+        echo "  6. Monitor connections with: SELECT * FROM monitor_connection_pool();"
+        echo "  7. Run cleanup with: SELECT * FROM cleanup_user_sessions();"
+        echo "  8. Refresh analytics with: SELECT refresh_analytics_views();"
+        echo "  9. Get health summary with: SELECT * FROM get_health_summary();"
         echo ""
         
         exit 0
