@@ -1,0 +1,15 @@
+{
+    "testSession": "synthetic-test-1755456026-55895",
+    "suite": "smoke",
+    "environment": "local",
+    "browser": "chromium",
+    "timestamp": "2025-08-17T18:40:26Z",
+    "duration": "0",
+    "exitCode": "0",
+    "reportsGenerated": {
+        "html": "/Users/kg/IdeaProjects/pyairtable-compose/synthetic-tests/reports/html-report/index.html",
+        "json": "/Users/kg/IdeaProjects/pyairtable-compose/synthetic-tests/reports/test-results.json",
+        "junit": "/Users/kg/IdeaProjects/pyairtable-compose/synthetic-tests/reports/test-results.xml"
+    },
+    "screenshots": "/Users/kg/IdeaProjects/pyairtable-compose/synthetic-tests/screenshots"
+}

@@ -1,0 +1,7 @@
+# Requirements for testing scripts
+httpx>=0.24.0
+qdrant-client>=1.6.0
+sentence-transformers>=2.2.0
+prometheus-client>=0.17.0
+numpy>=1.24.0
+torch>=2.0.0

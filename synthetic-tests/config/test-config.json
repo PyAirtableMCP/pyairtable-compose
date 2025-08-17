@@ -1,0 +1,124 @@
+{
+  "environments": {
+    "local": {
+      "baseUrl": "http://localhost:3000",
+      "apiUrl": "http://localhost:8000",
+      "services": {
+        "api-gateway": "http://localhost:8000",
+        "airtable-gateway": "http://localhost:8002",
+        "ai-processing": "http://localhost:8001",
+        "workspace-service": "http://localhost:8003",
+        "platform-services": "http://localhost:8007",
+        "automation-services": "http://localhost:8006",
+        "saga-orchestrator": "http://localhost:8008",
+        "vector-service": "http://localhost:8010"
+      },
+      "timeouts": {
+        "navigation": 30000,
+        "action": 10000,
+        "assertion": 5000
+      }
+    },
+    "staging": {
+      "baseUrl": "https://staging.pyairtable.com",
+      "apiUrl": "https://api-staging.pyairtable.com",
+      "timeouts": {
+        "navigation": 45000,
+        "action": 15000,
+        "assertion": 10000
+      }
+    },
+    "production": {
+      "baseUrl": "https://pyairtable.com",
+      "apiUrl": "https://api.pyairtable.com",
+      "timeouts": {
+        "navigation": 60000,
+        "action": 20000,
+        "assertion": 15000
+      }
+    }
+  },
+  "testSuites": {
+    "smoke": {
+      "description": "Quick smoke tests for core functionality",
+      "tags": ["@smoke"],
+      "timeout": 300000,
+      "retries": 2
+    },
+    "regression": {
+      "description": "Full regression test suite",
+      "tags": ["@regression", "@smoke"],
+      "timeout": 600000,
+      "retries": 1
+    },
+    "full": {
+      "description": "Complete test suite including performance and edge cases",
+      "tags": [],
+      "timeout": 1800000,
+      "retries": 0
+    }
+  },
+  "humanBehavior": {
+    "typing": {
+      "minSpeed": 80,
+      "maxSpeed": 200,
+      "mistakeRate": 0.02,
+      "backspaceChance": 0.1
+    },
+    "mouse": {
+      "moveDelay": {
+        "min": 100,
+        "max": 300
+      },
+      "clickDelay": {
+        "min": 50,
+        "max": 150
+      },
+      "doubleClickDelay": 200
+    },
+    "navigation": {
+      "pageLoadWait": {
+        "min": 1000,
+        "max": 3000
+      },
+      "elementWait": {
+        "min": 500,
+        "max": 1500
+      }
+    }
+  },
+  "performance": {
+    "thresholds": {
+      "pageLoad": 3000,
+      "firstContentfulPaint": 1500,
+      "largestContentfulPaint": 2500,
+      "cumulativeLayoutShift": 0.1,
+      "firstInputDelay": 100
+    }
+  },
+  "testData": {
+    "users": {
+      "newUser": {
+        "email": "test.user.{timestamp}@example.com",
+        "password": "TestPassword123!",
+        "firstName": "Test",
+        "lastName": "User"
+      },
+      "existingUser": {
+        "email": "existing.user@example.com",
+        "password": "ExistingPassword123!"
+      }
+    },
+    "airtable": {
+      "sampleBaseId": "appXXXXXXXXXXXXXX",
+      "sampleTableName": "Test Table",
+      "sampleFields": ["Name", "Status", "Created Date"]
+    }
+  },
+  "observability": {
+    "traceIdHeader": "x-trace-id",
+    "enableTracing": true,
+    "enableMetrics": true,
+    "prometheusUrl": "http://localhost:9090"
+  }
+}
